@@ -9,7 +9,7 @@ export * from "./models/auth";
 export const userRoles = pgTable("user_roles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),
-  role: varchar("role", { enum: ["customer", "vendor", "admin"] }).notNull().default("customer"),
+  role: varchar("role", { enum: ["customer", "vendor", "service_provider", "admin"] }).notNull().default("customer"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -82,18 +82,133 @@ export const notifications = pgTable("notifications", {
   userId: varchar("user_id").notNull(),
   title: varchar("title", { length: 255 }).notNull(),
   message: text("message").notNull(),
-  type: varchar("type", { enum: ["order", "promo", "system"] }).notNull().default("system"),
+  type: varchar("type", { enum: ["order", "promo", "system", "booking", "message"] }).notNull().default("system"),
   isRead: boolean("is_read").default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Insert schemas
+// ============================================
+// SERVICES MARKETPLACE TABLES
+// ============================================
+
+// Service categories
+export const serviceCategories = [
+  "cleaning",
+  "beauty",
+  "auto",
+  "legal",
+  "immigration",
+  "fitness",
+  "education",
+  "construction",
+  "photography",
+  "translation",
+  "other"
+] as const;
+
+// Service providers table
+export const serviceProviders = pgTable("service_providers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  businessName: varchar("business_name", { length: 255 }).notNull(),
+  description: text("description"),
+  category: varchar("category", { length: 100 }).notNull(),
+  subcategories: text("subcategories"), // comma-separated list
+  address: text("address"),
+  city: varchar("city", { length: 100 }),
+  phone: varchar("phone", { length: 20 }),
+  email: varchar("email", { length: 255 }),
+  website: varchar("website", { length: 255 }),
+  imageUrl: text("image_url"),
+  galleryImages: jsonb("gallery_images"), // Array of image URLs
+  certifications: jsonb("certifications"), // Array of {name, issuer, year}
+  languages: text("languages").default("Portuguese, English"),
+  yearsExperience: integer("years_experience").default(0),
+  rating: decimal("rating", { precision: 2, scale: 1 }).default("0"),
+  reviewCount: integer("review_count").default(0),
+  priceRange: varchar("price_range", { length: 20 }).default("$$"), // $, $$, $$$
+  availability: jsonb("availability"), // {monday: {start: "09:00", end: "17:00"}, ...}
+  isVerified: boolean("is_verified").default(false),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Services offered by providers
+export const services = pgTable("services", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  providerId: varchar("provider_id").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  price: decimal("price", { precision: 10, scale: 2 }),
+  priceType: varchar("price_type", { enum: ["fixed", "hourly", "quote"] }).default("fixed"),
+  duration: integer("duration"), // in minutes
+  category: varchar("category", { length: 100 }),
+  imageUrl: text("image_url"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Bookings table
+export const bookings = pgTable("bookings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id").notNull(),
+  providerId: varchar("provider_id").notNull(),
+  serviceId: varchar("service_id"),
+  status: varchar("status", { 
+    enum: ["pending", "accepted", "declined", "confirmed", "in_progress", "completed", "cancelled"] 
+  }).notNull().default("pending"),
+  requestedDate: timestamp("requested_date"),
+  requestedTime: varchar("requested_time", { length: 20 }),
+  confirmedDate: timestamp("confirmed_date"),
+  confirmedTime: varchar("confirmed_time", { length: 20 }),
+  address: text("address"),
+  notes: text("notes"),
+  price: decimal("price", { precision: 10, scale: 2 }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Service reviews table
+export const serviceReviews = pgTable("service_reviews", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  bookingId: varchar("booking_id").notNull(),
+  customerId: varchar("customer_id").notNull(),
+  providerId: varchar("provider_id").notNull(),
+  rating: integer("rating").notNull(),
+  professionalismRating: integer("professionalism_rating"),
+  communicationRating: integer("communication_rating"),
+  valueRating: integer("value_rating"),
+  comment: text("comment"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Messages table for in-app chat
+export const messages = pgTable("messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  senderId: varchar("sender_id").notNull(),
+  receiverId: varchar("receiver_id").notNull(),
+  bookingId: varchar("booking_id"), // Optional link to booking
+  content: text("content").notNull(),
+  attachmentUrl: text("attachment_url"),
+  attachmentType: varchar("attachment_type", { length: 50 }), // image, file, etc.
+  isRead: boolean("is_read").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Insert schemas - Food Marketplace
 export const insertRestaurantSchema = createInsertSchema(restaurants).omit({ id: true, createdAt: true, rating: true, reviewCount: true });
 export const insertMenuItemSchema = createInsertSchema(menuItems).omit({ id: true, createdAt: true });
 export const insertOrderSchema = createInsertSchema(orders).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertReviewSchema = createInsertSchema(reviews).omit({ id: true, createdAt: true });
 export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true });
 export const insertUserRoleSchema = createInsertSchema(userRoles).omit({ id: true, createdAt: true });
+
+// Insert schemas - Services Marketplace
+export const insertServiceProviderSchema = createInsertSchema(serviceProviders).omit({ id: true, createdAt: true, rating: true, reviewCount: true });
+export const insertServiceSchema = createInsertSchema(services).omit({ id: true, createdAt: true });
+export const insertBookingSchema = createInsertSchema(bookings).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertServiceReviewSchema = createInsertSchema(serviceReviews).omit({ id: true, createdAt: true });
+export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, createdAt: true });
 
 // Types
 export type InsertRestaurant = z.infer<typeof insertRestaurantSchema>;
@@ -113,6 +228,24 @@ export type Notification = typeof notifications.$inferSelect;
 
 export type InsertUserRole = z.infer<typeof insertUserRoleSchema>;
 export type UserRole = typeof userRoles.$inferSelect;
+
+// Services Marketplace Types
+export type InsertServiceProvider = z.infer<typeof insertServiceProviderSchema>;
+export type ServiceProvider = typeof serviceProviders.$inferSelect;
+
+export type InsertService = z.infer<typeof insertServiceSchema>;
+export type Service = typeof services.$inferSelect;
+
+export type InsertBooking = z.infer<typeof insertBookingSchema>;
+export type Booking = typeof bookings.$inferSelect;
+
+export type InsertServiceReview = z.infer<typeof insertServiceReviewSchema>;
+export type ServiceReview = typeof serviceReviews.$inferSelect;
+
+export type InsertMessage = z.infer<typeof insertMessageSchema>;
+export type Message = typeof messages.$inferSelect;
+
+export type ServiceCategory = typeof serviceCategories[number];
 
 // Cart item type (for frontend state)
 export type CartItem = {

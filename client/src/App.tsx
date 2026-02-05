@@ -18,6 +18,11 @@ import OrdersPage from "@/pages/orders";
 import OrderDetailPage from "@/pages/order-detail";
 import VendorPage from "@/pages/vendor";
 import NotificationsPage from "@/pages/notifications";
+import ServicesPage from "@/pages/services";
+import ProviderDetailPage from "@/pages/provider-detail";
+import BookingsPage from "@/pages/bookings";
+import BookingDetailPage from "@/pages/booking-detail";
+import ProviderPortalPage from "@/pages/provider-portal";
 
 function AppContent() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -52,6 +57,11 @@ function AppContent() {
         <Route path="/orders/:id" component={OrderDetailPage} />
         <Route path="/vendor" component={VendorPage} />
         <Route path="/notifications" component={NotificationsPage} />
+        <Route path="/services" component={ServicesPage} />
+        <Route path="/services/provider/:id" component={ProviderDetailPage} />
+        <Route path="/bookings" component={BookingsPage} />
+        <Route path="/bookings/:id" component={BookingDetailPage} />
+        <Route path="/provider-portal" component={ProviderPortalPage} />
         <Route component={NotFound} />
       </Switch>
     </div>

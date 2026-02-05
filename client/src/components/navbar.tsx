@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/use-auth";
 import { useCart } from "@/lib/cart-context";
 import { useTheme } from "@/components/theme-provider";
-import { ShoppingCart, Sun, Moon, User, LogOut, Store, Bell, Menu } from "lucide-react";
+import { ShoppingCart, Sun, Moon, User, LogOut, Store, Bell, Menu, Briefcase, Calendar } from "lucide-react";
 import { useState } from "react";
 
 export function Navbar() {
@@ -57,7 +57,17 @@ export function Navbar() {
                 }`}
                 data-testid="link-restaurants"
               >
-                Restaurants
+                Food
+              </span>
+            </Link>
+            <Link href="/services">
+              <span
+                className={`text-sm font-medium transition-colors cursor-pointer ${
+                  location.startsWith("/services") || location.startsWith("/bookings") ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                }`}
+                data-testid="link-services"
+              >
+                Services
               </span>
             </Link>
             <Link href="/orders">
@@ -132,7 +142,19 @@ export function Navbar() {
                   <DropdownMenuItem asChild>
                     <Link href="/vendor" className="cursor-pointer" data-testid="link-vendor-portal">
                       <Store className="mr-2 h-4 w-4" />
-                      <span>Vendor Portal</span>
+                      <span>Restaurant Portal</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/provider-portal" className="cursor-pointer" data-testid="link-provider-portal">
+                      <Briefcase className="mr-2 h-4 w-4" />
+                      <span>Service Provider</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/bookings" className="cursor-pointer" data-testid="link-bookings">
+                      <Calendar className="mr-2 h-4 w-4" />
+                      <span>My Bookings</span>
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />

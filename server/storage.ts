@@ -1,14 +1,20 @@
 import { 
   restaurants, menuItems, orders, reviews, notifications, userRoles,
+  serviceProviders, services, bookings, serviceReviews, messages,
   type Restaurant, type InsertRestaurant,
   type MenuItem, type InsertMenuItem,
   type Order, type InsertOrder,
   type Review, type InsertReview,
   type Notification, type InsertNotification,
-  type UserRole, type InsertUserRole
+  type UserRole, type InsertUserRole,
+  type ServiceProvider, type InsertServiceProvider,
+  type Service, type InsertService,
+  type Booking, type InsertBooking,
+  type ServiceReview, type InsertServiceReview,
+  type Message, type InsertMessage
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, sql } from "drizzle-orm";
+import { eq, desc, and, sql, or, ilike } from "drizzle-orm";
 
 export interface IStorage {
   // Restaurants
@@ -47,6 +53,40 @@ export interface IStorage {
   // User Roles
   getUserRole(userId: string): Promise<UserRole | undefined>;
   createUserRole(role: InsertUserRole): Promise<UserRole>;
+  
+  // Service Providers
+  getServiceProviders(category?: string): Promise<ServiceProvider[]>;
+  getServiceProvider(id: string): Promise<ServiceProvider | undefined>;
+  getServiceProviderByUser(userId: string): Promise<ServiceProvider | undefined>;
+  createServiceProvider(provider: InsertServiceProvider): Promise<ServiceProvider>;
+  updateServiceProvider(id: string, data: Partial<InsertServiceProvider>): Promise<ServiceProvider | undefined>;
+  searchServiceProviders(query: string, category?: string): Promise<ServiceProvider[]>;
+  
+  // Services
+  getServices(providerId: string): Promise<Service[]>;
+  getService(id: string): Promise<Service | undefined>;
+  createService(service: InsertService): Promise<Service>;
+  updateService(id: string, data: Partial<InsertService>): Promise<Service | undefined>;
+  deleteService(id: string): Promise<void>;
+  
+  // Bookings
+  getBookings(customerId: string): Promise<(Booking & { provider?: { businessName: string } })[]>;
+  getBooking(id: string): Promise<(Booking & { provider?: ServiceProvider; service?: Service }) | undefined>;
+  getBookingsByProvider(providerId: string): Promise<Booking[]>;
+  createBooking(booking: InsertBooking): Promise<Booking>;
+  updateBookingStatus(id: string, status: string, data?: Partial<InsertBooking>): Promise<Booking | undefined>;
+  
+  // Service Reviews
+  getServiceReviewsByProvider(providerId: string): Promise<ServiceReview[]>;
+  getServiceReviewByBooking(bookingId: string): Promise<ServiceReview | undefined>;
+  createServiceReview(review: InsertServiceReview): Promise<ServiceReview>;
+  updateProviderRating(providerId: string): Promise<void>;
+  
+  // Messages
+  getConversation(userId1: string, userId2: string): Promise<Message[]>;
+  getConversations(userId: string): Promise<{ partnerId: string; lastMessage: Message }[]>;
+  createMessage(message: InsertMessage): Promise<Message>;
+  markMessagesRead(senderId: string, receiverId: string): Promise<void>;
 }
 
 class DatabaseStorage implements IStorage {
@@ -194,6 +234,203 @@ class DatabaseStorage implements IStorage {
   async createUserRole(role: InsertUserRole): Promise<UserRole> {
     const [created] = await db.insert(userRoles).values(role).returning();
     return created;
+  }
+
+  // Service Providers
+  async getServiceProviders(category?: string): Promise<ServiceProvider[]> {
+    if (category) {
+      return db.select().from(serviceProviders)
+        .where(and(eq(serviceProviders.isActive, true), eq(serviceProviders.category, category)))
+        .orderBy(desc(serviceProviders.rating));
+    }
+    return db.select().from(serviceProviders)
+      .where(eq(serviceProviders.isActive, true))
+      .orderBy(desc(serviceProviders.rating));
+  }
+
+  async getServiceProvider(id: string): Promise<ServiceProvider | undefined> {
+    const [provider] = await db.select().from(serviceProviders).where(eq(serviceProviders.id, id));
+    return provider;
+  }
+
+  async getServiceProviderByUser(userId: string): Promise<ServiceProvider | undefined> {
+    const [provider] = await db.select().from(serviceProviders).where(eq(serviceProviders.userId, userId));
+    return provider;
+  }
+
+  async createServiceProvider(provider: InsertServiceProvider): Promise<ServiceProvider> {
+    const [created] = await db.insert(serviceProviders).values(provider).returning();
+    return created;
+  }
+
+  async updateServiceProvider(id: string, data: Partial<InsertServiceProvider>): Promise<ServiceProvider | undefined> {
+    const [updated] = await db.update(serviceProviders).set(data).where(eq(serviceProviders.id, id)).returning();
+    return updated;
+  }
+
+  async searchServiceProviders(query: string, category?: string): Promise<ServiceProvider[]> {
+    const searchPattern = `%${query}%`;
+    let baseQuery = db.select().from(serviceProviders)
+      .where(and(
+        eq(serviceProviders.isActive, true),
+        or(
+          ilike(serviceProviders.businessName, searchPattern),
+          ilike(serviceProviders.description, searchPattern),
+          ilike(serviceProviders.city, searchPattern)
+        )
+      ));
+    
+    if (category) {
+      baseQuery = db.select().from(serviceProviders)
+        .where(and(
+          eq(serviceProviders.isActive, true),
+          eq(serviceProviders.category, category),
+          or(
+            ilike(serviceProviders.businessName, searchPattern),
+            ilike(serviceProviders.description, searchPattern),
+            ilike(serviceProviders.city, searchPattern)
+          )
+        ));
+    }
+    
+    return baseQuery.orderBy(desc(serviceProviders.rating));
+  }
+
+  // Services
+  async getServices(providerId: string): Promise<Service[]> {
+    return db.select().from(services)
+      .where(and(eq(services.providerId, providerId), eq(services.isActive, true)));
+  }
+
+  async getService(id: string): Promise<Service | undefined> {
+    const [service] = await db.select().from(services).where(eq(services.id, id));
+    return service;
+  }
+
+  async createService(service: InsertService): Promise<Service> {
+    const [created] = await db.insert(services).values(service).returning();
+    return created;
+  }
+
+  async updateService(id: string, data: Partial<InsertService>): Promise<Service | undefined> {
+    const [updated] = await db.update(services).set(data).where(eq(services.id, id)).returning();
+    return updated;
+  }
+
+  async deleteService(id: string): Promise<void> {
+    await db.update(services).set({ isActive: false }).where(eq(services.id, id));
+  }
+
+  // Bookings
+  async getBookings(customerId: string): Promise<(Booking & { provider?: { businessName: string } })[]> {
+    const bookingList = await db.select().from(bookings)
+      .where(eq(bookings.customerId, customerId))
+      .orderBy(desc(bookings.createdAt));
+    
+    const result = await Promise.all(
+      bookingList.map(async (booking) => {
+        const provider = await this.getServiceProvider(booking.providerId);
+        return { ...booking, provider: provider ? { businessName: provider.businessName } : undefined };
+      })
+    );
+    
+    return result;
+  }
+
+  async getBooking(id: string): Promise<(Booking & { provider?: ServiceProvider; service?: Service }) | undefined> {
+    const [booking] = await db.select().from(bookings).where(eq(bookings.id, id));
+    if (!booking) return undefined;
+    
+    const provider = await this.getServiceProvider(booking.providerId);
+    const service = booking.serviceId ? await this.getService(booking.serviceId) : undefined;
+    
+    return { ...booking, provider, service };
+  }
+
+  async getBookingsByProvider(providerId: string): Promise<Booking[]> {
+    return db.select().from(bookings)
+      .where(eq(bookings.providerId, providerId))
+      .orderBy(desc(bookings.createdAt));
+  }
+
+  async createBooking(booking: InsertBooking): Promise<Booking> {
+    const [created] = await db.insert(bookings).values(booking).returning();
+    return created;
+  }
+
+  async updateBookingStatus(id: string, status: string, data?: Partial<InsertBooking>): Promise<Booking | undefined> {
+    const updateData = { status: status as any, updatedAt: new Date(), ...data };
+    const [updated] = await db.update(bookings).set(updateData).where(eq(bookings.id, id)).returning();
+    return updated;
+  }
+
+  // Service Reviews
+  async getServiceReviewsByProvider(providerId: string): Promise<ServiceReview[]> {
+    return db.select().from(serviceReviews)
+      .where(eq(serviceReviews.providerId, providerId))
+      .orderBy(desc(serviceReviews.createdAt));
+  }
+
+  async getServiceReviewByBooking(bookingId: string): Promise<ServiceReview | undefined> {
+    const [review] = await db.select().from(serviceReviews).where(eq(serviceReviews.bookingId, bookingId));
+    return review;
+  }
+
+  async createServiceReview(review: InsertServiceReview): Promise<ServiceReview> {
+    const [created] = await db.insert(serviceReviews).values(review).returning();
+    await this.updateProviderRating(review.providerId);
+    return created;
+  }
+
+  async updateProviderRating(providerId: string): Promise<void> {
+    const providerReviews = await this.getServiceReviewsByProvider(providerId);
+    if (providerReviews.length === 0) return;
+    
+    const avgRating = providerReviews.reduce((sum, r) => sum + r.rating, 0) / providerReviews.length;
+    await db.update(serviceProviders)
+      .set({ rating: avgRating.toFixed(1), reviewCount: providerReviews.length })
+      .where(eq(serviceProviders.id, providerId));
+  }
+
+  // Messages
+  async getConversation(userId1: string, userId2: string): Promise<Message[]> {
+    return db.select().from(messages)
+      .where(or(
+        and(eq(messages.senderId, userId1), eq(messages.receiverId, userId2)),
+        and(eq(messages.senderId, userId2), eq(messages.receiverId, userId1))
+      ))
+      .orderBy(messages.createdAt);
+  }
+
+  async getConversations(userId: string): Promise<{ partnerId: string; lastMessage: Message }[]> {
+    const allMessages = await db.select().from(messages)
+      .where(or(eq(messages.senderId, userId), eq(messages.receiverId, userId)))
+      .orderBy(desc(messages.createdAt));
+    
+    const conversationsMap = new Map<string, Message>();
+    
+    for (const msg of allMessages) {
+      const partnerId = msg.senderId === userId ? msg.receiverId : msg.senderId;
+      if (!conversationsMap.has(partnerId)) {
+        conversationsMap.set(partnerId, msg);
+      }
+    }
+    
+    return Array.from(conversationsMap.entries()).map(([partnerId, lastMessage]) => ({
+      partnerId,
+      lastMessage
+    }));
+  }
+
+  async createMessage(message: InsertMessage): Promise<Message> {
+    const [created] = await db.insert(messages).values(message).returning();
+    return created;
+  }
+
+  async markMessagesRead(senderId: string, receiverId: string): Promise<void> {
+    await db.update(messages)
+      .set({ isRead: true })
+      .where(and(eq(messages.senderId, senderId), eq(messages.receiverId, receiverId)));
   }
 }
 
