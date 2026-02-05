@@ -257,3 +257,115 @@ export type CartItem = {
   restaurantId: string;
   restaurantName: string;
 };
+
+// ============================================
+// COMMUNITY HUB TABLES (EPIC 6)
+// ============================================
+
+// Event categories
+export const eventCategories = [
+  "festival",
+  "concert",
+  "meetup",
+  "sports",
+  "cultural",
+  "food",
+  "workshop",
+  "other"
+] as const;
+
+// Events table
+export const events = pgTable("events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  createdBy: varchar("created_by").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  category: varchar("category", { length: 50 }).notNull(),
+  imageUrl: text("image_url"),
+  venue: varchar("venue", { length: 255 }),
+  address: text("address"),
+  city: varchar("city", { length: 100 }),
+  eventDate: timestamp("event_date").notNull(),
+  endDate: timestamp("end_date"),
+  startTime: varchar("start_time", { length: 20 }),
+  endTime: varchar("end_time", { length: 20 }),
+  ticketUrl: text("ticket_url"),
+  ticketPrice: varchar("ticket_price", { length: 100 }),
+  isFree: boolean("is_free").default(false),
+  isFeatured: boolean("is_featured").default(false),
+  isApproved: boolean("is_approved").default(false),
+  attendeeCount: integer("attendee_count").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Business directory table
+export const businesses = pgTable("businesses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ownerId: varchar("owner_id"),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  category: varchar("category", { length: 100 }).notNull(),
+  subcategory: varchar("subcategory", { length: 100 }),
+  address: text("address"),
+  city: varchar("city", { length: 100 }),
+  state: varchar("state", { length: 50 }).default("CA"),
+  zipCode: varchar("zip_code", { length: 20 }),
+  phone: varchar("phone", { length: 20 }),
+  email: varchar("email", { length: 255 }),
+  website: varchar("website", { length: 255 }),
+  imageUrl: text("image_url"),
+  hours: jsonb("hours"), // {monday: "9am-5pm", ...}
+  latitude: decimal("latitude", { precision: 10, scale: 7 }),
+  longitude: decimal("longitude", { precision: 10, scale: 7 }),
+  isBrazilianOwned: boolean("is_brazilian_owned").default(true),
+  isVerified: boolean("is_verified").default(false),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Announcements table
+export const announcements = pgTable("announcements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  createdBy: varchar("created_by").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  content: text("content").notNull(),
+  type: varchar("type", { enum: ["news", "promo", "update", "alert"] }).notNull().default("news"),
+  imageUrl: text("image_url"),
+  linkUrl: text("link_url"),
+  linkText: varchar("link_text", { length: 100 }),
+  isPinned: boolean("is_pinned").default(false),
+  isActive: boolean("is_active").default(true),
+  expiresAt: timestamp("expires_at"),
+  viewCount: integer("view_count").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Event RSVPs
+export const eventRsvps = pgTable("event_rsvps", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  status: varchar("status", { enum: ["going", "interested", "not_going"] }).notNull().default("going"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Insert schemas - Community Hub
+export const insertEventSchema = createInsertSchema(events).omit({ id: true, createdAt: true, attendeeCount: true });
+export const insertBusinessSchema = createInsertSchema(businesses).omit({ id: true, createdAt: true });
+export const insertAnnouncementSchema = createInsertSchema(announcements).omit({ id: true, createdAt: true, viewCount: true });
+export const insertEventRsvpSchema = createInsertSchema(eventRsvps).omit({ id: true, createdAt: true });
+
+// Community Hub Types
+export type InsertEvent = z.infer<typeof insertEventSchema>;
+export type Event = typeof events.$inferSelect;
+
+export type InsertBusiness = z.infer<typeof insertBusinessSchema>;
+export type Business = typeof businesses.$inferSelect;
+
+export type InsertAnnouncement = z.infer<typeof insertAnnouncementSchema>;
+export type Announcement = typeof announcements.$inferSelect;
+
+export type InsertEventRsvp = z.infer<typeof insertEventRsvpSchema>;
+export type EventRsvp = typeof eventRsvps.$inferSelect;
+
+export type EventCategory = typeof eventCategories[number];

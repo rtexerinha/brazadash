@@ -1,6 +1,7 @@
 import { 
   restaurants, menuItems, orders, reviews, notifications, userRoles,
   serviceProviders, services, bookings, serviceReviews, messages,
+  events, businesses, announcements, eventRsvps,
   type Restaurant, type InsertRestaurant,
   type MenuItem, type InsertMenuItem,
   type Order, type InsertOrder,
@@ -11,7 +12,11 @@ import {
   type Service, type InsertService,
   type Booking, type InsertBooking,
   type ServiceReview, type InsertServiceReview,
-  type Message, type InsertMessage
+  type Message, type InsertMessage,
+  type Event, type InsertEvent,
+  type Business, type InsertBusiness,
+  type Announcement, type InsertAnnouncement,
+  type EventRsvp, type InsertEventRsvp
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql, or, ilike } from "drizzle-orm";
@@ -88,6 +93,38 @@ export interface IStorage {
   getConversations(userId: string): Promise<{ partnerId: string; lastMessage: Message }[]>;
   createMessage(message: InsertMessage): Promise<Message>;
   markMessagesRead(senderId: string, receiverId: string): Promise<void>;
+  
+  // Events (Community Hub)
+  getEvents(category?: string): Promise<Event[]>;
+  getEvent(id: string): Promise<Event | undefined>;
+  getUpcomingEvents(): Promise<Event[]>;
+  getFeaturedEvents(): Promise<Event[]>;
+  createEvent(event: InsertEvent): Promise<Event>;
+  updateEvent(id: string, data: Partial<InsertEvent>): Promise<Event | undefined>;
+  deleteEvent(id: string): Promise<void>;
+  
+  // Event RSVPs
+  getEventRsvp(eventId: string, userId: string): Promise<EventRsvp | undefined>;
+  createEventRsvp(rsvp: InsertEventRsvp): Promise<EventRsvp>;
+  updateEventRsvp(eventId: string, userId: string, status: string): Promise<EventRsvp | undefined>;
+  getEventAttendees(eventId: string): Promise<EventRsvp[]>;
+  
+  // Businesses (Community Hub)
+  getBusinesses(category?: string): Promise<Business[]>;
+  getBusiness(id: string): Promise<Business | undefined>;
+  searchBusinesses(query: string, category?: string): Promise<Business[]>;
+  createBusiness(business: InsertBusiness): Promise<Business>;
+  updateBusiness(id: string, data: Partial<InsertBusiness>): Promise<Business | undefined>;
+  deleteBusiness(id: string): Promise<void>;
+  
+  // Announcements (Community Hub)
+  getAnnouncements(): Promise<Announcement[]>;
+  getActiveAnnouncements(): Promise<Announcement[]>;
+  getAnnouncement(id: string): Promise<Announcement | undefined>;
+  createAnnouncement(announcement: InsertAnnouncement): Promise<Announcement>;
+  updateAnnouncement(id: string, data: Partial<InsertAnnouncement>): Promise<Announcement | undefined>;
+  deleteAnnouncement(id: string): Promise<void>;
+  incrementAnnouncementViews(id: string): Promise<void>;
 }
 
 class DatabaseStorage implements IStorage {
@@ -437,6 +474,186 @@ class DatabaseStorage implements IStorage {
     await db.update(messages)
       .set({ isRead: true })
       .where(and(eq(messages.senderId, senderId), eq(messages.receiverId, receiverId)));
+  }
+
+  // Events (Community Hub)
+  async getEvents(category?: string): Promise<Event[]> {
+    if (category) {
+      return db.select().from(events)
+        .where(and(eq(events.category, category), eq(events.isApproved, true)))
+        .orderBy(events.eventDate);
+    }
+    return db.select().from(events)
+      .where(eq(events.isApproved, true))
+      .orderBy(events.eventDate);
+  }
+
+  async getEvent(id: string): Promise<Event | undefined> {
+    const [event] = await db.select().from(events).where(eq(events.id, id));
+    return event;
+  }
+
+  async getUpcomingEvents(): Promise<Event[]> {
+    return db.select().from(events)
+      .where(and(
+        eq(events.isApproved, true),
+        sql`${events.eventDate} >= NOW()`
+      ))
+      .orderBy(events.eventDate)
+      .limit(10);
+  }
+
+  async getFeaturedEvents(): Promise<Event[]> {
+    return db.select().from(events)
+      .where(and(
+        eq(events.isApproved, true),
+        eq(events.isFeatured, true),
+        sql`${events.eventDate} >= NOW()`
+      ))
+      .orderBy(events.eventDate)
+      .limit(5);
+  }
+
+  async createEvent(event: InsertEvent): Promise<Event> {
+    const [created] = await db.insert(events).values(event).returning();
+    return created;
+  }
+
+  async updateEvent(id: string, data: Partial<InsertEvent>): Promise<Event | undefined> {
+    const [updated] = await db.update(events).set(data).where(eq(events.id, id)).returning();
+    return updated;
+  }
+
+  async deleteEvent(id: string): Promise<void> {
+    await db.delete(events).where(eq(events.id, id));
+  }
+
+  // Event RSVPs
+  async getEventRsvp(eventId: string, userId: string): Promise<EventRsvp | undefined> {
+    const [rsvp] = await db.select().from(eventRsvps)
+      .where(and(eq(eventRsvps.eventId, eventId), eq(eventRsvps.userId, userId)));
+    return rsvp;
+  }
+
+  async createEventRsvp(rsvp: InsertEventRsvp): Promise<EventRsvp> {
+    const [created] = await db.insert(eventRsvps).values(rsvp).returning();
+    // Update attendee count
+    await db.update(events)
+      .set({ attendeeCount: sql`${events.attendeeCount} + 1` })
+      .where(eq(events.id, rsvp.eventId));
+    return created;
+  }
+
+  async updateEventRsvp(eventId: string, userId: string, status: string): Promise<EventRsvp | undefined> {
+    const [updated] = await db.update(eventRsvps)
+      .set({ status })
+      .where(and(eq(eventRsvps.eventId, eventId), eq(eventRsvps.userId, userId)))
+      .returning();
+    return updated;
+  }
+
+  async getEventAttendees(eventId: string): Promise<EventRsvp[]> {
+    return db.select().from(eventRsvps)
+      .where(and(eq(eventRsvps.eventId, eventId), eq(eventRsvps.status, "going")));
+  }
+
+  // Businesses (Community Hub)
+  async getBusinesses(category?: string): Promise<Business[]> {
+    if (category) {
+      return db.select().from(businesses)
+        .where(and(eq(businesses.category, category), eq(businesses.isActive, true)))
+        .orderBy(businesses.name);
+    }
+    return db.select().from(businesses)
+      .where(eq(businesses.isActive, true))
+      .orderBy(businesses.name);
+  }
+
+  async getBusiness(id: string): Promise<Business | undefined> {
+    const [business] = await db.select().from(businesses).where(eq(businesses.id, id));
+    return business;
+  }
+
+  async searchBusinesses(query: string, category?: string): Promise<Business[]> {
+    const searchPattern = `%${query}%`;
+    if (category) {
+      return db.select().from(businesses)
+        .where(and(
+          eq(businesses.isActive, true),
+          eq(businesses.category, category),
+          or(
+            ilike(businesses.name, searchPattern),
+            ilike(businesses.description, searchPattern)
+          )
+        ))
+        .orderBy(businesses.name);
+    }
+    return db.select().from(businesses)
+      .where(and(
+        eq(businesses.isActive, true),
+        or(
+          ilike(businesses.name, searchPattern),
+          ilike(businesses.description, searchPattern)
+        )
+      ))
+      .orderBy(businesses.name);
+  }
+
+  async createBusiness(business: InsertBusiness): Promise<Business> {
+    const [created] = await db.insert(businesses).values(business).returning();
+    return created;
+  }
+
+  async updateBusiness(id: string, data: Partial<InsertBusiness>): Promise<Business | undefined> {
+    const [updated] = await db.update(businesses).set(data).where(eq(businesses.id, id)).returning();
+    return updated;
+  }
+
+  async deleteBusiness(id: string): Promise<void> {
+    await db.delete(businesses).where(eq(businesses.id, id));
+  }
+
+  // Announcements (Community Hub)
+  async getAnnouncements(): Promise<Announcement[]> {
+    return db.select().from(announcements)
+      .orderBy(desc(announcements.isPinned), desc(announcements.createdAt));
+  }
+
+  async getActiveAnnouncements(): Promise<Announcement[]> {
+    return db.select().from(announcements)
+      .where(and(
+        eq(announcements.isActive, true),
+        or(
+          sql`${announcements.expiresAt} IS NULL`,
+          sql`${announcements.expiresAt} > NOW()`
+        )
+      ))
+      .orderBy(desc(announcements.isPinned), desc(announcements.createdAt));
+  }
+
+  async getAnnouncement(id: string): Promise<Announcement | undefined> {
+    const [announcement] = await db.select().from(announcements).where(eq(announcements.id, id));
+    return announcement;
+  }
+
+  async createAnnouncement(announcement: InsertAnnouncement): Promise<Announcement> {
+    const [created] = await db.insert(announcements).values(announcement).returning();
+    return created;
+  }
+
+  async updateAnnouncement(id: string, data: Partial<InsertAnnouncement>): Promise<Announcement | undefined> {
+    const [updated] = await db.update(announcements).set(data).where(eq(announcements.id, id)).returning();
+    return updated;
+  }
+
+  async deleteAnnouncement(id: string): Promise<void> {
+    await db.delete(announcements).where(eq(announcements.id, id));
+  }
+
+  async incrementAnnouncementViews(id: string): Promise<void> {
+    await db.update(announcements)
+      .set({ viewCount: sql`${announcements.viewCount} + 1` })
+      .where(eq(announcements.id, id));
   }
 }
 
