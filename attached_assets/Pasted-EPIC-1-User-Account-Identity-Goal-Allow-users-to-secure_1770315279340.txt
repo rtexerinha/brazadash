@@ -1,0 +1,294 @@
+EPIC 1 — User Account & Identity
+Goal
+
+Allow users to securely create and manage accounts.
+
+Stories
+
+US-1.1 — Registration
+
+As a user
+
+I want to create an account using email, Google, or Apple
+
+So I can use the platform
+
+Acceptance
+
+Email verification
+
+OAuth login
+
+Password reset
+
+US-1.2 — Profile Management
+
+Edit profile
+
+Save addresses
+
+Language preference (EN/PT/ES)
+
+Payment methods
+
+US-1.3 — Role Switching
+
+User can act as:
+
+Customer
+
+Vendor
+
+Service Provider
+
+EPIC 2 — Food Marketplace
+Core Revenue Engine
+US-2.1 Browse Restaurants
+
+Filter by:
+
+Distance
+
+Rating
+
+Cuisine
+
+Delivery time
+
+US-2.2 Restaurant Profile
+
+Menu
+
+Reviews
+
+Photos
+
+Hours
+
+Delivery fee
+
+US-2.3 Cart & Checkout
+
+Add/remove items
+
+Notes for kitchen
+
+Promo codes
+
+Tip driver
+
+US-2.4 Payment Processing
+
+Credit/Debit
+
+Apple Pay / Google Pay
+
+Wallet credits
+
+US-2.5 Order Tracking
+
+Real-time status
+
+Driver map tracking
+
+ETA updates
+
+US-2.6 Order History & Reorder
+
+View past orders
+
+One-click reorder
+
+EPIC 3 — Delivery Driver Module (Optional MVP)
+US-3.1 Driver Onboarding
+
+Submit docs
+
+Background check
+
+Approval flow
+
+US-3.2 Driver App
+
+Accept/decline orders
+
+Navigation integration
+
+Earnings dashboard
+
+EPIC 4 — Services Marketplace
+This is your differentiator
+US-4.1 Browse Services
+
+Categories:
+
+Cleaning
+
+Beauty
+
+Auto
+
+Legal
+
+Immigration
+
+Fitness
+
+Education
+
+Filters:
+
+Location
+
+Rating
+
+Availability
+
+US-4.2 Provider Profile
+
+Description
+
+Certifications
+
+Photos
+
+Reviews
+
+Contact options
+
+US-4.3 Booking Request
+
+Select date/time
+
+Send request
+
+Provider accepts/declines
+
+US-4.4 Messaging
+
+In-app chat
+
+File/image sharing
+
+EPIC 5 — Reviews & Ratings
+US-5.1 Rate Food Orders
+
+Stars
+
+Comments
+
+Photo upload
+
+US-5.2 Rate Service Providers
+
+Professionalism
+
+Communication
+
+Value
+
+EPIC 6 — Brazilian Community Hub
+Community Stickiness Feature
+US-6.1 Events Discovery
+
+Brazilian festivals
+
+Concerts
+
+Meetups
+
+Jiu-jitsu tournaments 😉
+
+US-6.2 Business Directory
+
+Brazilian-owned businesses
+
+Map view
+
+Contact info
+
+US-6.3 Announcements Feed
+
+Admin posts
+
+Community updates
+
+Promotions
+
+EPIC 7 — Notifications
+US-7.1 Push Notifications
+
+Order updates
+
+Booking confirmations
+
+Promotions
+
+US-7.2 Email Notifications
+
+Receipts
+
+Password resets
+
+EPIC 8 — Vendor Portal
+US-8.1 Menu Management
+
+Add/edit items
+
+Pricing
+
+Availability
+
+US-8.2 Order Management
+
+Accept/reject
+
+Prep status
+
+Completion
+
+US-8.3 Analytics
+
+Sales reports
+
+Popular items
+
+Revenue tracking
+
+EPIC 9 — Admin Platform
+US-9.1 User Management
+
+Suspend/approve accounts
+
+US-9.2 Vendor Approvals
+
+KYC verification
+
+US-9.3 Content Moderation
+
+Review flags
+
+Remove abuse
+
+US-9.4 Platform Analytics
+
+Orders
+
+Revenue
+
+Active users
+
+EPIC 10 — Payments & Monetization
+US-10.1 Commission Engine
+
+% per order
+
+US-10.2 Service Listing Fees
+
+Featured placement
+
+US-10.3 Promotions
+
+Coupons
+
+Campaigns
