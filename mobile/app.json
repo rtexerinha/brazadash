@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "BrazaDash",
+    "slug": "brazadash",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#1B9B59",
+      "resizeMode": "contain"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.brazadash.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Allow BrazaDash to access your camera for photos.",
+        "NSPhotoLibraryUsageDescription": "Allow BrazaDash to access your photos."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#1B9B59"
+      },
+      "package": "com.brazadash.app"
+    },
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#1B9B59"
+        }
+      ]
+    ]
+  }
+}
