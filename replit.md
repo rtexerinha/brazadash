@@ -256,9 +256,42 @@ Database is automatically seeded with sample Brazilian restaurants and service p
 ### General
 - `/notifications` - User notifications
 
+## Mobile App (React Native / Expo)
+
+A complete React Native mobile app lives in the `mobile/` directory, built with Expo SDK 51 and React Navigation.
+
+### Mobile App Structure
+```
+mobile/
+├── App.tsx                    # Root component
+├── src/
+│   ├── api/client.ts          # API client (brazadash.replit.app)
+│   ├── components/            # StarRating, LoadingScreen, StatusBadge, EmptyState
+│   ├── constants/             # Theme colors, categories, status labels
+│   ├── contexts/              # AuthContext, CartContext
+│   ├── navigation/index.tsx   # Tab + stack navigation
+│   ├── screens/               # All app screens (13 total)
+│   └── types/index.ts         # TypeScript interfaces
+```
+
+### Running the Mobile App
+```bash
+cd mobile
+npm install
+npx expo start
+```
+Scan the QR code with Expo Go app on your phone.
+
+### Mobile App Features
+- 5-tab bottom navigation: Home, Food, Services, Community, Profile
+- WebView-based OIDC authentication (Replit Auth)
+- Cart persisted with AsyncStorage
+- Pull-to-refresh on all list screens
+- Brazilian flag color theme matching web app
+
 ## Development Notes
 
 - Use `npm run db:push` to sync database schema
-- Cart state persists in localStorage
+- Cart state persists in localStorage (web) / AsyncStorage (mobile)
 - Theme (light/dark) persists in localStorage
 - All protected routes require Replit Auth login
