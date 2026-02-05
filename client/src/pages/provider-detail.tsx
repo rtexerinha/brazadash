@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ReviewDisplay } from "@/components/review-display";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -170,45 +171,6 @@ function ServiceCard({ service, provider }: { service: Service; provider: Servic
   );
 }
 
-function ReviewCard({ review }: { review: ServiceReview }) {
-  return (
-    <Card data-testid={`review-${review.id}`}>
-      <CardContent className="p-4">
-        <div className="flex items-center gap-2 mb-2">
-          <div className="flex">
-            {[...Array(5)].map((_, i) => (
-              <Star
-                key={i}
-                className={`h-4 w-4 ${
-                  i < review.rating
-                    ? "fill-yellow-400 text-yellow-400"
-                    : "text-gray-300"
-                }`}
-              />
-            ))}
-          </div>
-          <span className="text-sm text-muted-foreground">
-            {review.createdAt ? new Date(review.createdAt).toLocaleDateString() : ""}
-          </span>
-        </div>
-        {review.comment && <p className="text-sm">{review.comment}</p>}
-        {(review.professionalismRating || review.communicationRating || review.valueRating) && (
-          <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
-            {review.professionalismRating && (
-              <span>Professionalism: {review.professionalismRating}/5</span>
-            )}
-            {review.communicationRating && (
-              <span>Communication: {review.communicationRating}/5</span>
-            )}
-            {review.valueRating && (
-              <span>Value: {review.valueRating}/5</span>
-            )}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
 
 export default function ProviderDetailPage() {
   const { id } = useParams();
@@ -365,7 +327,12 @@ export default function ProviderDetailPage() {
           {reviews && reviews.length > 0 ? (
             <div className="space-y-4">
               {reviews.map((review) => (
-                <ReviewCard key={review.id} review={review} />
+                <ReviewDisplay
+                  key={review.id}
+                  review={review}
+                  customerName="Customer"
+                  type="service"
+                />
               ))}
             </div>
           ) : (

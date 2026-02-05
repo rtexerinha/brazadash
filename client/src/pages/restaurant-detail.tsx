@@ -4,11 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ReviewDisplay } from "@/components/review-display";
 import { useCart } from "@/lib/cart-context";
 import { useToast } from "@/hooks/use-toast";
 import { Star, Clock, MapPin, Phone, Plus, Minus, ChevronLeft, Utensils } from "lucide-react";
 import { useState } from "react";
-import type { Restaurant, MenuItem } from "@shared/schema";
+import type { Restaurant, MenuItem, Review } from "@shared/schema";
 
 function MenuItemCard({ item, restaurant }: { item: MenuItem; restaurant: Restaurant }) {
   const [quantity, setQuantity] = useState(1);
@@ -300,32 +301,19 @@ export default function RestaurantDetailPage() {
 
             {/* Reviews */}
             {reviews && reviews.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Recent Reviews</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {reviews.slice(0, 3).map((review: any) => (
-                    <div key={review.id} className="pb-4 border-b last:border-0 last:pb-0">
-                      <div className="flex items-center gap-1 mb-1">
-                        {[...Array(5)].map((_, i) => (
-                          <Star
-                            key={i}
-                            className={`h-4 w-4 ${
-                              i < review.rating
-                                ? "fill-amber-400 text-amber-400"
-                                : "text-muted-foreground"
-                            }`}
-                          />
-                        ))}
-                      </div>
-                      <p className="text-sm text-muted-foreground line-clamp-2">
-                        {review.comment || "Great food!"}
-                      </p>
-                    </div>
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Recent Reviews</h3>
+                <div className="space-y-3">
+                  {reviews.slice(0, 5).map((review: Review) => (
+                    <ReviewDisplay
+                      key={review.id}
+                      review={review}
+                      customerName="Customer"
+                      type="food"
+                    />
                   ))}
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             )}
           </div>
         </div>

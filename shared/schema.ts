@@ -66,14 +66,18 @@ export const orders = pgTable("orders", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Reviews table
+// Reviews table (food orders)
 export const reviews = pgTable("reviews", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orderId: varchar("order_id").notNull(),
   customerId: varchar("customer_id").notNull(),
   restaurantId: varchar("restaurant_id").notNull(),
   rating: integer("rating").notNull(),
+  foodQualityRating: integer("food_quality_rating"),
+  deliveryRating: integer("delivery_rating"),
+  valueRating: integer("value_rating"),
   comment: text("comment"),
+  photoUrls: text("photo_urls").array(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -180,6 +184,7 @@ export const serviceReviews = pgTable("service_reviews", {
   communicationRating: integer("communication_rating"),
   valueRating: integer("value_rating"),
   comment: text("comment"),
+  photoUrls: text("photo_urls").array(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

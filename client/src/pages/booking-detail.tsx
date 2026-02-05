@@ -1,16 +1,12 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useParams, Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Calendar, Clock, MapPin, ChevronLeft, Star, Phone, Mail, MessageSquare } from "lucide-react";
+import { ServiceReviewForm } from "@/components/service-review-form";
+import { Calendar, Clock, MapPin, ChevronLeft, Phone, Mail, Star, CheckCircle } from "lucide-react";
 import type { Booking, ServiceProvider, Service } from "@shared/schema";
 
 const statusColors: Record<string, string> = {
@@ -33,90 +29,10 @@ const statusDescriptions: Record<string, string> = {
   cancelled: "Booking was cancelled",
 };
 
-function ReviewDialog({ bookingId, providerId }: { bookingId: string; providerId: string }) {
-  const [open, setOpen] = useState(false);
-  const [rating, setRating] = useState(5);
-  const [comment, setComment] = useState("");
-  const { toast } = useToast();
-
-  const createReview = useMutation({
-    mutationFn: async () => {
-      return apiRequest("POST", "/api/services/reviews", {
-        bookingId,
-        providerId,
-        rating,
-        comment,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/bookings", bookingId] });
-      toast({ title: "Review submitted!", description: "Thank you for your feedback." });
-      setOpen(false);
-    },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to submit review.", variant: "destructive" });
-    },
-  });
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button data-testid="button-leave-review">
-          <Star className="mr-2 h-4 w-4" />
-          Leave Review
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Leave a Review</DialogTitle>
-          <DialogDescription>Share your experience with this service provider</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label>Rating</Label>
-            <div className="flex gap-1">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <button
-                  key={star}
-                  type="button"
-                  onClick={() => setRating(star)}
-                  className="p-1"
-                  data-testid={`star-${star}`}
-                >
-                  <Star
-                    className={`h-8 w-8 ${
-                      star <= rating
-                        ? "fill-yellow-400 text-yellow-400"
-                        : "text-gray-300"
-                    }`}
-                  />
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Comment (optional)</Label>
-            <Textarea
-              placeholder="Tell us about your experience..."
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              className="resize-none"
-              data-testid="input-review-comment"
-            />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button onClick={() => createReview.mutate()} disabled={createReview.isPending} data-testid="button-submit-review">
-            {createReview.isPending ? "Submitting..." : "Submit Review"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 export default function BookingDetailPage() {
   const { id } = useParams();
+  const [hasReviewed, setHasReviewed] = useState(false);
+  const [showReviewForm, setShowReviewForm] = useState(false);
 
   const { data: booking, isLoading } = useQuery<Booking & { provider?: ServiceProvider; service?: Service }>({
     queryKey: ["/api/bookings", id],
@@ -240,8 +156,11 @@ export default function BookingDetailPage() {
           )}
 
           <div className="flex gap-2 pt-4 border-t">
-            {booking.status === "completed" && booking.provider && (
-              <ReviewDialog bookingId={booking.id} providerId={booking.provider.id} />
+            {booking.status === "completed" && booking.provider && !hasReviewed && !showReviewForm && (
+              <Button onClick={() => setShowReviewForm(true)} data-testid="button-leave-review">
+                <Star className="mr-2 h-4 w-4" />
+                Leave Review
+              </Button>
             )}
             {booking.provider && (
               <Link href={`/services/provider/${booking.provider.id}`}>
@@ -253,6 +172,34 @@ export default function BookingDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      {showReviewForm && booking.provider && booking.service && (
+        <div className="mt-6">
+          <ServiceReviewForm
+            bookingId={booking.id}
+            providerId={booking.provider.id}
+            providerName={booking.provider.businessName}
+            serviceName={booking.service.name}
+            onSuccess={() => {
+              setHasReviewed(true);
+              setShowReviewForm(false);
+            }}
+            onCancel={() => setShowReviewForm(false)}
+          />
+        </div>
+      )}
+
+      {hasReviewed && (
+        <Card className="mt-6 bg-primary/5 border-primary/20">
+          <CardContent className="p-6 text-center">
+            <CheckCircle className="h-12 w-12 text-primary mx-auto mb-3" />
+            <p className="font-medium">Thank you for your review!</p>
+            <p className="text-sm text-muted-foreground">
+              Your feedback helps us maintain quality service.
+            </p>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

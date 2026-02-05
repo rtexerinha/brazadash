@@ -1,15 +1,13 @@
 import { useParams, Link } from "wouter";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Textarea } from "@/components/ui/textarea";
+import { FoodReviewForm } from "@/components/food-review-form";
 import { format } from "date-fns";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-import { Package, MapPin, Clock, ChevronLeft, Star, CheckCircle } from "lucide-react";
+import { Package, MapPin, Clock, ChevronLeft, CheckCircle } from "lucide-react";
 import { useState } from "react";
 import type { Order } from "@shared/schema";
 
@@ -81,40 +79,10 @@ function OrderProgress({ currentStatus }: { currentStatus: string }) {
 
 export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { toast } = useToast();
-  const [rating, setRating] = useState(5);
-  const [reviewComment, setReviewComment] = useState("");
   const [hasReviewed, setHasReviewed] = useState(false);
 
   const { data: order, isLoading } = useQuery<Order & { restaurant?: { name: string }; hasReview?: boolean }>({
     queryKey: ["/api/orders", id],
-  });
-
-  const submitReview = useMutation({
-    mutationFn: async () => {
-      return apiRequest("POST", "/api/reviews", {
-        orderId: id,
-        restaurantId: order?.restaurantId,
-        rating,
-        comment: reviewComment,
-      });
-    },
-    onSuccess: () => {
-      setHasReviewed(true);
-      queryClient.invalidateQueries({ queryKey: ["/api/orders", id] });
-      queryClient.invalidateQueries({ queryKey: ["/api/restaurants", order?.restaurantId, "reviews"] });
-      toast({
-        title: "Review submitted",
-        description: "Thank you for your feedback!",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to submit review. Please try again.",
-        variant: "destructive",
-      });
-    },
   });
 
   if (isLoading) {
@@ -255,50 +223,14 @@ export default function OrderDetailPage() {
 
         {/* Review Section */}
         {canReview && (
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle className="text-lg">Leave a Review</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <p className="text-sm text-muted-foreground mb-2">Rate your experience</p>
-                <div className="flex gap-1">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      key={star}
-                      onClick={() => setRating(star)}
-                      className="p-1"
-                      data-testid={`button-star-${star}`}
-                    >
-                      <Star
-                        className={`h-8 w-8 transition-colors ${
-                          star <= rating
-                            ? "fill-amber-400 text-amber-400"
-                            : "text-muted-foreground"
-                        }`}
-                      />
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <Textarea
-                  placeholder="Share your thoughts about the food and service..."
-                  value={reviewComment}
-                  onChange={(e) => setReviewComment(e.target.value)}
-                  className="resize-none"
-                  data-testid="input-review-comment"
-                />
-              </div>
-              <Button
-                onClick={() => submitReview.mutate()}
-                disabled={submitReview.isPending}
-                data-testid="button-submit-review"
-              >
-                Submit Review
-              </Button>
-            </CardContent>
-          </Card>
+          <div className="mt-6">
+            <FoodReviewForm
+              orderId={order.id}
+              restaurantId={order.restaurantId}
+              restaurantName={(order as any).restaurant?.name || "the restaurant"}
+              onSuccess={() => setHasReviewed(true)}
+            />
+          </div>
         )}
 
         {(order.hasReview || hasReviewed) && (
