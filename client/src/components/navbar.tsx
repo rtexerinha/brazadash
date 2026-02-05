@@ -1,4 +1,5 @@
 import { Link, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -12,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/use-auth";
 import { useCart } from "@/lib/cart-context";
 import { useTheme } from "@/components/theme-provider";
-import { ShoppingCart, Sun, Moon, User, LogOut, Store, Bell, Menu, Briefcase, Calendar, Users } from "lucide-react";
+import { ShoppingCart, Sun, Moon, User, LogOut, Store, Bell, Menu, Briefcase, Calendar, Users, Shield } from "lucide-react";
 import { useState } from "react";
 
 export function Navbar() {
@@ -22,6 +23,12 @@ export function Navbar() {
   const [location] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const itemCount = getItemCount();
+
+  const { data: adminStatus } = useQuery<{ isAdmin: boolean }>({
+    queryKey: ["/api/user/is-admin"],
+    enabled: isAuthenticated,
+    staleTime: 60000,
+  });
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -169,6 +176,14 @@ export function Navbar() {
                       <span>My Bookings</span>
                     </Link>
                   </DropdownMenuItem>
+                  {adminStatus?.isAdmin && (
+                    <DropdownMenuItem asChild>
+                      <Link href="/admin" className="cursor-pointer" data-testid="link-admin">
+                        <Shield className="mr-2 h-4 w-4" />
+                        <span>Admin Dashboard</span>
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
                     <a href="/api/logout" className="cursor-pointer text-destructive" data-testid="button-logout">

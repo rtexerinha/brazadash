@@ -74,7 +74,8 @@ export default function EventsPage() {
     },
     onSuccess: () => {
       toast({ title: "RSVP Updated", description: "Your RSVP has been saved." });
-      queryClient.invalidateQueries({ queryKey: ["/api/community/events"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/community/events", selectedCategory] });
+      queryClient.invalidateQueries({ queryKey: ["/api/community/events/featured"] });
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to update RSVP. Please try again.", variant: "destructive" });

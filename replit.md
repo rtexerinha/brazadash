@@ -58,6 +58,22 @@ A Brazilian community marketplace platform serving the Brazilian community in Ca
 5. **Service Reviews**: Rate completed services with detailed feedback
 6. **Messaging**: In-app messaging between customers and providers
 
+### Community Hub (Epic 6)
+1. **Events Discovery**: Browse community events by category (festivals, concerts, meetups, sports, cultural, food, workshops)
+2. **Event RSVP**: Mark attendance as going, interested, or not going
+3. **Business Directory**: Discover Brazilian-owned businesses across 12 categories
+4. **Announcements**: Platform announcements with news, promos, updates, and alerts
+5. **Featured Events**: Highlighted community events on the main page
+
+### Admin Platform (Epic 9)
+1. **Dashboard Overview**: Stats for users, restaurants, orders, providers, bookings, events, businesses, revenue
+2. **Restaurant Management**: Activate/deactivate restaurants, view all listings
+3. **Service Provider Management**: Verify providers, manage active status
+4. **Event Moderation**: Approve and feature community events
+5. **Business Verification**: Verify business listings in directory
+6. **Announcements**: Create, edit, delete platform announcements
+7. **Review Moderation**: Remove inappropriate reviews
+
 ## Database Schema
 
 ### Core Tables
@@ -131,6 +147,39 @@ A Brazilian community marketplace platform serving the Brazilian community in Ca
 - `GET /api/messages/:partnerId` - Get conversation with user
 - `POST /api/messages` - Send message
 
+### Community Hub
+- `GET /api/community/events` - List all events (query: category)
+- `GET /api/community/events/featured` - Get featured events
+- `GET /api/community/events/upcoming` - Get upcoming events
+- `GET /api/community/events/:id` - Get event details
+- `POST /api/community/events/:id/rsvp` - RSVP to event (protected)
+- `GET /api/community/businesses` - List businesses (query: category, search)
+- `GET /api/community/businesses/:id` - Get business details
+- `GET /api/community/announcements` - Get active announcements
+- `GET /api/community/event-categories` - List event categories
+- `GET /api/community/business-categories` - List business categories
+
+### Admin Platform (Protected - Admin role required)
+- `GET /api/admin/stats` - Dashboard statistics
+- `GET /api/admin/users` - List all users
+- `PATCH /api/admin/users/:id/roles` - Update user roles
+- `GET /api/admin/restaurants` - List all restaurants
+- `PATCH /api/admin/restaurants/:id` - Update restaurant status
+- `GET /api/admin/providers` - List all service providers
+- `PATCH /api/admin/providers/:id` - Update provider status/verification
+- `GET /api/admin/orders` - List all orders
+- `GET /api/admin/bookings` - List all bookings
+- `GET /api/admin/events` - List all events
+- `PATCH /api/admin/events/:id` - Update event approval/featured
+- `GET /api/admin/businesses` - List all businesses
+- `PATCH /api/admin/businesses/:id` - Update business verification
+- `GET /api/admin/announcements` - List all announcements
+- `POST /api/admin/announcements` - Create announcement
+- `PATCH /api/admin/announcements/:id` - Update announcement
+- `DELETE /api/admin/announcements/:id` - Delete announcement
+- `GET /api/admin/reviews` - List all reviews
+- `DELETE /api/admin/reviews/:id` - Delete review
+
 ## Design System
 
 **Colors**: Brazilian flag inspired theme
@@ -166,6 +215,14 @@ Database is automatically seeded with sample Brazilian restaurants and service p
 - `/bookings` - User's service bookings
 - `/bookings/:id` - Booking details
 - `/provider-portal` - Service provider portal
+
+### Community Hub
+- `/community` - Community hub landing page
+- `/events` - Browse community events
+- `/businesses` - Business directory
+
+### Admin Platform
+- `/admin` - Admin dashboard (requires admin role)
 
 ### General
 - `/notifications` - User notifications

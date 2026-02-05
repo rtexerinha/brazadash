@@ -27,6 +27,7 @@ import ProviderPortalPage from "@/pages/provider-portal";
 import CommunityPage from "@/pages/community";
 import EventsPage from "@/pages/events";
 import BusinessesPage from "@/pages/businesses";
+import AdminPage from "@/pages/admin";
 
 function AppContent() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -70,6 +71,7 @@ function AppContent() {
         <Route path="/community" component={CommunityPage} />
         <Route path="/events" component={EventsPage} />
         <Route path="/businesses" component={BusinessesPage} />
+        <Route path="/admin" component={AdminPage} />
         <Route component={NotFound} />
       </Switch>
     </div>

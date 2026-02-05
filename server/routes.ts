@@ -1224,5 +1224,245 @@ export async function registerRoutes(
     res.json(categories);
   });
 
+  // ============================================
+  // ADMIN PLATFORM ROUTES (EPIC 9)
+  // ============================================
+
+  // Check if current user is admin (for frontend to determine if admin link should show)
+  app.get("/api/user/is-admin", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.json({ isAdmin: false });
+      }
+      const roles = await storage.getUserRoles(userId);
+      const isAdmin = roles.some(r => r.role === "admin");
+      res.json({ isAdmin });
+    } catch (error) {
+      res.json({ isAdmin: false });
+    }
+  });
+
+  // Admin middleware - checks if user has admin role
+  const isAdmin = async (req: any, res: any, next: any) => {
+    const userId = req.user?.claims?.sub;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    const roles = await storage.getUserRoles(userId);
+    if (!roles.some(r => r.role === "admin")) {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+    next();
+  };
+
+  // Admin dashboard stats
+  app.get("/api/admin/stats", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const stats = await storage.getAdminStats();
+      res.json(stats);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch admin stats" });
+    }
+  });
+
+  // User management - list all users
+  app.get("/api/admin/users", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      res.json(users);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  // User management - get user details
+  app.get("/api/admin/users/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.params.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      res.json(user);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch user" });
+    }
+  });
+
+  // User management - update user roles
+  app.patch("/api/admin/users/:id/roles", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { role, action } = req.body;
+      if (action === "add") {
+        await storage.addUserRole(req.params.id, role);
+      } else if (action === "remove") {
+        await storage.removeUserRole(req.params.id, role);
+      }
+      const roles = await storage.getUserRoles(req.params.id);
+      res.json(roles);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update user roles" });
+    }
+  });
+
+  // Restaurant management
+  app.get("/api/admin/restaurants", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const allRestaurants = await storage.getAllRestaurants();
+      res.json(allRestaurants);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch restaurants" });
+    }
+  });
+
+  app.patch("/api/admin/restaurants/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { isActive, isOpen } = req.body;
+      const updated = await storage.updateRestaurant(req.params.id, { isActive, isOpen });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update restaurant" });
+    }
+  });
+
+  // Service provider management
+  app.get("/api/admin/providers", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const providers = await storage.getAllServiceProviders();
+      res.json(providers);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch providers" });
+    }
+  });
+
+  app.patch("/api/admin/providers/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { isActive, isVerified } = req.body;
+      const updated = await storage.updateServiceProvider(req.params.id, { isActive, isVerified });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update provider" });
+    }
+  });
+
+  // Orders management
+  app.get("/api/admin/orders", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const allOrders = await storage.getAllOrders();
+      res.json(allOrders);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch orders" });
+    }
+  });
+
+  // Bookings management
+  app.get("/api/admin/bookings", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const allBookings = await storage.getAllBookings();
+      res.json(allBookings);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch bookings" });
+    }
+  });
+
+  // Events management
+  app.get("/api/admin/events", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const allEvents = await storage.getAllEvents();
+      res.json(allEvents);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch events" });
+    }
+  });
+
+  app.patch("/api/admin/events/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { isApproved, isFeatured } = req.body;
+      const updated = await storage.updateEvent(req.params.id, { isApproved, isFeatured });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update event" });
+    }
+  });
+
+  // Businesses management
+  app.get("/api/admin/businesses", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const allBusinesses = await storage.getAllBusinesses();
+      res.json(allBusinesses);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch businesses" });
+    }
+  });
+
+  app.patch("/api/admin/businesses/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { isActive, isVerified } = req.body;
+      const updated = await storage.updateBusiness(req.params.id, { isActive, isVerified });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update business" });
+    }
+  });
+
+  // Announcements management
+  app.get("/api/admin/announcements", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const allAnnouncements = await storage.getAllAnnouncements();
+      res.json(allAnnouncements);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch announcements" });
+    }
+  });
+
+  app.post("/api/admin/announcements", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const announcement = await storage.createAnnouncement({
+        ...req.body,
+        createdBy: req.user.claims.sub,
+      });
+      res.status(201).json(announcement);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create announcement" });
+    }
+  });
+
+  app.patch("/api/admin/announcements/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const updated = await storage.updateAnnouncement(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update announcement" });
+    }
+  });
+
+  app.delete("/api/admin/announcements/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      await storage.deleteAnnouncement(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete announcement" });
+    }
+  });
+
+  // Reviews management
+  app.get("/api/admin/reviews", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const reviews = await storage.getAllReviews();
+      res.json(reviews);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch reviews" });
+    }
+  });
+
+  app.delete("/api/admin/reviews/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      await storage.deleteReview(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete review" });
+    }
+  });
+
   return httpServer;
 }

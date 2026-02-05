@@ -125,6 +125,32 @@ export interface IStorage {
   updateAnnouncement(id: string, data: Partial<InsertAnnouncement>): Promise<Announcement | undefined>;
   deleteAnnouncement(id: string): Promise<void>;
   incrementAnnouncementViews(id: string): Promise<void>;
+
+  // Admin Methods
+  getAdminStats(): Promise<{
+    totalUsers: number;
+    totalRestaurants: number;
+    totalOrders: number;
+    totalProviders: number;
+    totalBookings: number;
+    totalEvents: number;
+    totalBusinesses: number;
+    revenue: number;
+  }>;
+  getAllUsers(): Promise<{ id: string; email: string; firstName: string; lastName: string; roles: string[] }[]>;
+  getUserById(id: string): Promise<{ id: string; email: string; firstName: string; lastName: string; roles: string[] } | undefined>;
+  getUserRoles(userId: string): Promise<UserRole[]>;
+  addUserRole(userId: string, role: string): Promise<UserRole>;
+  removeUserRole(userId: string, role: string): Promise<void>;
+  getAllRestaurants(): Promise<Restaurant[]>;
+  getAllOrders(): Promise<Order[]>;
+  getAllBookings(): Promise<Booking[]>;
+  getAllEvents(): Promise<Event[]>;
+  getAllBusinesses(): Promise<Business[]>;
+  getAllAnnouncements(): Promise<Announcement[]>;
+  getAllServiceProviders(): Promise<ServiceProvider[]>;
+  getAllReviews(): Promise<Review[]>;
+  deleteReview(id: string): Promise<void>;
 }
 
 class DatabaseStorage implements IStorage {
@@ -654,6 +680,120 @@ class DatabaseStorage implements IStorage {
     await db.update(announcements)
       .set({ viewCount: sql`${announcements.viewCount} + 1` })
       .where(eq(announcements.id, id));
+  }
+
+  // Admin Methods
+  async getAdminStats(): Promise<{
+    totalUsers: number;
+    totalRestaurants: number;
+    totalOrders: number;
+    totalProviders: number;
+    totalBookings: number;
+    totalEvents: number;
+    totalBusinesses: number;
+    revenue: number;
+  }> {
+    const [restaurantCount] = await db.select({ count: sql<number>`count(*)` }).from(restaurants);
+    const [orderCount] = await db.select({ count: sql<number>`count(*)` }).from(orders);
+    const [providerCount] = await db.select({ count: sql<number>`count(*)` }).from(serviceProviders);
+    const [bookingCount] = await db.select({ count: sql<number>`count(*)` }).from(bookings);
+    const [eventCount] = await db.select({ count: sql<number>`count(*)` }).from(events);
+    const [businessCount] = await db.select({ count: sql<number>`count(*)` }).from(businesses);
+    const [userCount] = await db.select({ count: sql<number>`count(DISTINCT user_id)` }).from(userRoles);
+    const [revenueResult] = await db.select({ total: sql<number>`COALESCE(SUM(total::numeric), 0)` }).from(orders);
+    
+    return {
+      totalUsers: Number(userCount?.count || 0),
+      totalRestaurants: Number(restaurantCount?.count || 0),
+      totalOrders: Number(orderCount?.count || 0),
+      totalProviders: Number(providerCount?.count || 0),
+      totalBookings: Number(bookingCount?.count || 0),
+      totalEvents: Number(eventCount?.count || 0),
+      totalBusinesses: Number(businessCount?.count || 0),
+      revenue: Number(revenueResult?.total || 0),
+    };
+  }
+
+  async getAllUsers(): Promise<{ id: string; email: string; firstName: string; lastName: string; roles: string[] }[]> {
+    const allRoles = await db.select().from(userRoles).orderBy(desc(userRoles.createdAt));
+    const userMap = new Map<string, { id: string; email: string; firstName: string; lastName: string; roles: string[] }>();
+    
+    for (const role of allRoles) {
+      if (!userMap.has(role.userId)) {
+        userMap.set(role.userId, {
+          id: role.userId,
+          email: "",
+          firstName: "",
+          lastName: "",
+          roles: [],
+        });
+      }
+      userMap.get(role.userId)!.roles.push(role.role);
+    }
+    
+    return Array.from(userMap.values());
+  }
+
+  async getUserById(id: string): Promise<{ id: string; email: string; firstName: string; lastName: string; roles: string[] } | undefined> {
+    const roles = await db.select().from(userRoles).where(eq(userRoles.userId, id));
+    if (roles.length === 0) return undefined;
+    
+    return {
+      id,
+      email: "",
+      firstName: "",
+      lastName: "",
+      roles: roles.map(r => r.role),
+    };
+  }
+
+  async getUserRoles(userId: string): Promise<UserRole[]> {
+    return db.select().from(userRoles).where(eq(userRoles.userId, userId));
+  }
+
+  async addUserRole(userId: string, role: string): Promise<UserRole> {
+    const [created] = await db.insert(userRoles).values({ userId, role }).returning();
+    return created;
+  }
+
+  async removeUserRole(userId: string, role: string): Promise<void> {
+    await db.delete(userRoles).where(and(eq(userRoles.userId, userId), eq(userRoles.role, role)));
+  }
+
+  async getAllRestaurants(): Promise<Restaurant[]> {
+    return db.select().from(restaurants).orderBy(desc(restaurants.createdAt));
+  }
+
+  async getAllOrders(): Promise<Order[]> {
+    return db.select().from(orders).orderBy(desc(orders.createdAt));
+  }
+
+  async getAllBookings(): Promise<Booking[]> {
+    return db.select().from(bookings).orderBy(desc(bookings.createdAt));
+  }
+
+  async getAllEvents(): Promise<Event[]> {
+    return db.select().from(events).orderBy(desc(events.createdAt));
+  }
+
+  async getAllBusinesses(): Promise<Business[]> {
+    return db.select().from(businesses).orderBy(desc(businesses.createdAt));
+  }
+
+  async getAllAnnouncements(): Promise<Announcement[]> {
+    return db.select().from(announcements).orderBy(desc(announcements.createdAt));
+  }
+
+  async getAllServiceProviders(): Promise<ServiceProvider[]> {
+    return db.select().from(serviceProviders).orderBy(desc(serviceProviders.createdAt));
+  }
+
+  async getAllReviews(): Promise<Review[]> {
+    return db.select().from(reviews).orderBy(desc(reviews.createdAt));
+  }
+
+  async deleteReview(id: string): Promise<void> {
+    await db.delete(reviews).where(eq(reviews.id, id));
   }
 }
 
