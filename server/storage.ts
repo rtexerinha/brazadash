@@ -35,6 +35,7 @@ export interface IStorage {
   getOrders(customerId: string): Promise<(Order & { restaurant?: { name: string } })[]>;
   getOrder(id: string): Promise<(Order & { restaurant?: { name: string }; hasReview?: boolean }) | undefined>;
   getOrdersByRestaurant(restaurantId: string): Promise<Order[]>;
+  getOrderByStripeSession(sessionId: string): Promise<Order | undefined>;
   createOrder(order: InsertOrder): Promise<Order>;
   updateOrderStatus(id: string, status: string): Promise<Order | undefined>;
   
@@ -169,6 +170,11 @@ class DatabaseStorage implements IStorage {
 
   async getOrdersByRestaurant(restaurantId: string): Promise<Order[]> {
     return db.select().from(orders).where(eq(orders.restaurantId, restaurantId)).orderBy(desc(orders.createdAt));
+  }
+
+  async getOrderByStripeSession(sessionId: string): Promise<Order | undefined> {
+    const [order] = await db.select().from(orders).where(eq(orders.stripeSessionId, sessionId));
+    return order;
   }
 
   async createOrder(order: InsertOrder): Promise<Order> {

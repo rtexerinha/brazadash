@@ -14,6 +14,7 @@ import RestaurantsPage from "@/pages/restaurants";
 import RestaurantDetailPage from "@/pages/restaurant-detail";
 import CartPage from "@/pages/cart";
 import CheckoutPage from "@/pages/checkout";
+import CheckoutSuccessPage from "@/pages/checkout-success";
 import OrdersPage from "@/pages/orders";
 import OrderDetailPage from "@/pages/order-detail";
 import VendorPage from "@/pages/vendor";
@@ -53,6 +54,7 @@ function AppContent() {
         <Route path="/restaurant/:id" component={RestaurantDetailPage} />
         <Route path="/cart" component={CartPage} />
         <Route path="/checkout" component={CheckoutPage} />
+        <Route path="/checkout/success" component={CheckoutSuccessPage} />
         <Route path="/orders" component={OrdersPage} />
         <Route path="/orders/:id" component={OrderDetailPage} />
         <Route path="/vendor" component={VendorPage} />

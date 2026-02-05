@@ -8,6 +8,7 @@ import {
   serviceCategories
 } from "@shared/schema";
 import { z } from "zod";
+import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -848,6 +849,201 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error updating booking:", error);
       res.status(500).json({ message: "Failed to update booking" });
+    }
+  });
+
+  // =================
+  // STRIPE PAYMENT ROUTES
+  // =================
+
+  // Get Stripe publishable key
+  app.get("/api/stripe/config", async (req, res) => {
+    try {
+      const publishableKey = await getStripePublishableKey();
+      res.json({ publishableKey });
+    } catch (error) {
+      console.error("Error getting Stripe config:", error);
+      res.status(500).json({ message: "Failed to get Stripe configuration" });
+    }
+  });
+
+  // Create checkout session for food order
+  app.post("/api/checkout/create-session", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { items, restaurantId, deliveryAddress, notes, tip } = req.body;
+
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: "Cart is empty" });
+      }
+
+      if (!deliveryAddress || deliveryAddress.trim().length < 5) {
+        return res.status(400).json({ message: "Delivery address is required" });
+      }
+
+      const restaurant = await storage.getRestaurant(restaurantId);
+      if (!restaurant) {
+        return res.status(404).json({ message: "Restaurant not found" });
+      }
+
+      // Calculate totals
+      let subtotal = 0;
+      const lineItems = [];
+
+      for (const item of items) {
+        const menuItem = await storage.getMenuItem(item.menuItemId);
+        if (!menuItem) {
+          return res.status(400).json({ message: `Menu item not found: ${item.menuItemId}` });
+        }
+
+        const itemTotal = parseFloat(menuItem.price) * item.quantity;
+        subtotal += itemTotal;
+
+        lineItems.push({
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: menuItem.name,
+              description: menuItem.description || undefined,
+            },
+            unit_amount: Math.round(parseFloat(menuItem.price) * 100),
+          },
+          quantity: item.quantity,
+        });
+      }
+
+      // Add delivery fee
+      const deliveryFee = restaurant.deliveryFee ? parseFloat(restaurant.deliveryFee) : 3.99;
+      lineItems.push({
+        price_data: {
+          currency: 'usd',
+          product_data: {
+            name: 'Delivery Fee',
+          },
+          unit_amount: Math.round(deliveryFee * 100),
+        },
+        quantity: 1,
+      });
+
+      // Add tip if provided
+      const tipAmount = tip ? parseFloat(tip) : 0;
+      if (tipAmount > 0) {
+        lineItems.push({
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: 'Tip',
+            },
+            unit_amount: Math.round(tipAmount * 100),
+          },
+          quantity: 1,
+        });
+      }
+
+      const stripe = await getUncachableStripeClient();
+
+      // Create checkout session
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: lineItems,
+        mode: 'payment',
+        success_url: `${req.protocol}://${req.get('host')}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${req.protocol}://${req.get('host')}/checkout`,
+        metadata: {
+          userId,
+          restaurantId,
+          deliveryAddress,
+          notes: notes || '',
+          items: JSON.stringify(items),
+          tip: tipAmount.toString(),
+        },
+      });
+
+      res.json({ sessionId: session.id, url: session.url });
+    } catch (error) {
+      console.error("Error creating checkout session:", error);
+      res.status(500).json({ message: "Failed to create checkout session" });
+    }
+  });
+
+  // Handle successful payment - create order
+  app.post("/api/checkout/complete", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { sessionId } = req.body;
+
+      if (!sessionId) {
+        return res.status(400).json({ message: "Session ID required" });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+
+      if (session.payment_status !== 'paid') {
+        return res.status(400).json({ message: "Payment not completed" });
+      }
+
+      // Verify user matches
+      if (session.metadata?.userId !== userId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      // Check if order already created for this session
+      const existingOrder = await storage.getOrderByStripeSession(sessionId);
+      if (existingOrder) {
+        return res.json(existingOrder);
+      }
+
+      // Create order from session metadata
+      const items = JSON.parse(session.metadata?.items || '[]');
+      const total = session.amount_total ? session.amount_total / 100 : 0;
+      const tipAmount = parseFloat(session.metadata?.tip || '0');
+      
+      // Calculate subtotal and delivery fee from total
+      const deliveryFee = 3.99;
+      const subtotal = total - deliveryFee - tipAmount;
+
+      const order = await storage.createOrder({
+        customerId: userId,
+        restaurantId: session.metadata?.restaurantId || '',
+        items,
+        subtotal: subtotal.toFixed(2),
+        deliveryFee: deliveryFee.toFixed(2),
+        tip: tipAmount.toFixed(2),
+        total: total.toFixed(2),
+        deliveryAddress: session.metadata?.deliveryAddress || '',
+        notes: session.metadata?.notes || '',
+        stripeSessionId: sessionId,
+      });
+
+      // Create notification
+      await storage.createNotification({
+        userId,
+        title: "Order Placed",
+        message: `Your order #${order.id.slice(0, 8)} has been placed successfully!`,
+        type: "order",
+      });
+
+      res.json(order);
+    } catch (error) {
+      console.error("Error completing checkout:", error);
+      res.status(500).json({ message: "Failed to complete checkout" });
+    }
+  });
+
+  // Get checkout session status
+  app.get("/api/checkout/session/:sessionId", isAuthenticated, async (req: any, res) => {
+    try {
+      const stripe = await getUncachableStripeClient();
+      const session = await stripe.checkout.sessions.retrieve(req.params.sessionId);
+      
+      res.json({
+        status: session.payment_status,
+        customerEmail: session.customer_email,
+      });
+    } catch (error) {
+      console.error("Error getting session:", error);
+      res.status(500).json({ message: "Failed to get session" });
     }
   });
 

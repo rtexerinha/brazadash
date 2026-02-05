@@ -9,12 +9,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { useCart } from "@/lib/cart-context";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Loader2, MapPin, CreditCard, CheckCircle } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+import { Loader2, MapPin, CreditCard, Lock } from "lucide-react";
 
 export default function CheckoutPage() {
   const [, navigate] = useLocation();
-  const { items, getSubtotal, clearCart, getRestaurantId } = useCart();
+  const { items, getSubtotal, getRestaurantId } = useCart();
   const { toast } = useToast();
   
   const [address, setAddress] = useState("");
@@ -26,9 +26,9 @@ export default function CheckoutPage() {
   const tipAmount = parseFloat(tip) || 0;
   const total = subtotal + deliveryFee + tipAmount;
 
-  const createOrder = useMutation({
+  const createCheckoutSession = useMutation({
     mutationFn: async () => {
-      const orderData = {
+      const response = await apiRequest("POST", "/api/checkout/create-session", {
         restaurantId: getRestaurantId(),
         items: items.map((item) => ({
           menuItemId: item.menuItemId,
@@ -36,29 +36,21 @@ export default function CheckoutPage() {
           price: item.price,
           quantity: item.quantity,
         })),
-        subtotal: subtotal.toFixed(2),
-        deliveryFee: deliveryFee.toFixed(2),
-        tip: tipAmount.toFixed(2),
-        total: total.toFixed(2),
         deliveryAddress: address,
         notes,
-      };
-      return apiRequest("POST", "/api/orders", orderData);
-    },
-    onSuccess: async (res) => {
-      const order = await res.json();
-      clearCart();
-      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
-      toast({
-        title: "Order placed!",
-        description: "Your order has been submitted successfully.",
+        tip: tipAmount,
       });
-      navigate(`/orders/${order.id}`);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data.url) {
+        window.location.href = data.url;
+      }
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to place order. Please try again.",
+        description: "Failed to create checkout session. Please try again.",
         variant: "destructive",
       });
     },
@@ -75,9 +67,7 @@ export default function CheckoutPage() {
         <h1 className="text-3xl font-bold mb-8">Checkout</h1>
 
         <div className="grid lg:grid-cols-3 gap-8">
-          {/* Checkout Form */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Delivery Address */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -111,7 +101,6 @@ export default function CheckoutPage() {
               </CardContent>
             </Card>
 
-            {/* Payment Method */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -121,18 +110,21 @@ export default function CheckoutPage() {
               </CardHeader>
               <CardContent>
                 <div className="p-4 border rounded-md bg-muted/50 flex items-center gap-3">
-                  <CheckCircle className="h-5 w-5 text-primary" />
+                  <Lock className="h-5 w-5 text-primary" />
                   <div>
-                    <p className="font-medium">Cash on Delivery</p>
+                    <p className="font-medium">Secure Card Payment</p>
                     <p className="text-sm text-muted-foreground">
-                      Pay when you receive your order
+                      You'll be redirected to Stripe's secure checkout
                     </p>
                   </div>
+                </div>
+                <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
+                  <img src="https://upload.wikimedia.org/wikipedia/commons/b/ba/Stripe_Logo%2C_revised_2016.svg" alt="Stripe" className="h-6" />
+                  <span>Powered by Stripe</span>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Tip */}
             <Card>
               <CardHeader>
                 <CardTitle>Add a Tip</CardTitle>
@@ -166,7 +158,6 @@ export default function CheckoutPage() {
             </Card>
           </div>
 
-          {/* Order Summary */}
           <div>
             <Card className="sticky top-24">
               <CardHeader>
@@ -206,17 +197,20 @@ export default function CheckoutPage() {
                 <Button
                   className="w-full"
                   size="lg"
-                  onClick={() => createOrder.mutate()}
-                  disabled={!address.trim() || createOrder.isPending}
+                  onClick={() => createCheckoutSession.mutate()}
+                  disabled={!address.trim() || address.length < 5 || createCheckoutSession.isPending}
                   data-testid="button-place-order"
                 >
-                  {createOrder.isPending ? (
+                  {createCheckoutSession.isPending ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Placing Order...
+                      Redirecting to Payment...
                     </>
                   ) : (
-                    "Place Order"
+                    <>
+                      <Lock className="mr-2 h-4 w-4" />
+                      Pay ${total.toFixed(2)}
+                    </>
                   )}
                 </Button>
               </CardFooter>

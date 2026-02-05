@@ -61,6 +61,7 @@ export const orders = pgTable("orders", {
   total: decimal("total", { precision: 10, scale: 2 }).notNull(),
   deliveryAddress: text("delivery_address"),
   notes: text("notes"),
+  stripeSessionId: varchar("stripe_session_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
