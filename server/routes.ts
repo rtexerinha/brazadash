@@ -1047,5 +1047,182 @@ export async function registerRoutes(
     }
   });
 
+  // ============================================
+  // COMMUNITY HUB ROUTES (EPIC 6)
+  // ============================================
+
+  // Events - Public
+  app.get("/api/community/events", async (req, res) => {
+    try {
+      const category = req.query.category as string | undefined;
+      const events = await storage.getEvents(category);
+      res.json(events);
+    } catch (error) {
+      console.error("Error fetching events:", error);
+      res.status(500).json({ message: "Failed to fetch events" });
+    }
+  });
+
+  app.get("/api/community/events/upcoming", async (req, res) => {
+    try {
+      const events = await storage.getUpcomingEvents();
+      res.json(events);
+    } catch (error) {
+      console.error("Error fetching upcoming events:", error);
+      res.status(500).json({ message: "Failed to fetch upcoming events" });
+    }
+  });
+
+  app.get("/api/community/events/featured", async (req, res) => {
+    try {
+      const events = await storage.getFeaturedEvents();
+      res.json(events);
+    } catch (error) {
+      console.error("Error fetching featured events:", error);
+      res.status(500).json({ message: "Failed to fetch featured events" });
+    }
+  });
+
+  app.get("/api/community/events/:id", async (req, res) => {
+    try {
+      const event = await storage.getEvent(req.params.id);
+      if (!event) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+      res.json(event);
+    } catch (error) {
+      console.error("Error fetching event:", error);
+      res.status(500).json({ message: "Failed to fetch event" });
+    }
+  });
+
+  // Events - Protected (RSVP)
+  app.post("/api/community/events/:id/rsvp", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const eventId = req.params.id;
+      const { status } = req.body;
+
+      const existing = await storage.getEventRsvp(eventId, userId);
+      if (existing) {
+        const updated = await storage.updateEventRsvp(eventId, userId, status);
+        return res.json(updated);
+      }
+
+      const rsvp = await storage.createEventRsvp({
+        eventId,
+        userId,
+        status: status || "going",
+      });
+      res.json(rsvp);
+    } catch (error) {
+      console.error("Error RSVPing to event:", error);
+      res.status(500).json({ message: "Failed to RSVP" });
+    }
+  });
+
+  app.get("/api/community/events/:id/rsvp", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const rsvp = await storage.getEventRsvp(req.params.id, userId);
+      res.json(rsvp || null);
+    } catch (error) {
+      console.error("Error fetching RSVP:", error);
+      res.status(500).json({ message: "Failed to fetch RSVP" });
+    }
+  });
+
+  // Businesses - Public
+  app.get("/api/community/businesses", async (req, res) => {
+    try {
+      const category = req.query.category as string | undefined;
+      const search = req.query.search as string | undefined;
+      
+      let businesses;
+      if (search) {
+        businesses = await storage.searchBusinesses(search, category);
+      } else {
+        businesses = await storage.getBusinesses(category);
+      }
+      res.json(businesses);
+    } catch (error) {
+      console.error("Error fetching businesses:", error);
+      res.status(500).json({ message: "Failed to fetch businesses" });
+    }
+  });
+
+  app.get("/api/community/businesses/:id", async (req, res) => {
+    try {
+      const business = await storage.getBusiness(req.params.id);
+      if (!business) {
+        return res.status(404).json({ message: "Business not found" });
+      }
+      res.json(business);
+    } catch (error) {
+      console.error("Error fetching business:", error);
+      res.status(500).json({ message: "Failed to fetch business" });
+    }
+  });
+
+  // Announcements - Public
+  app.get("/api/community/announcements", async (req, res) => {
+    try {
+      const announcements = await storage.getActiveAnnouncements();
+      res.json(announcements);
+    } catch (error) {
+      console.error("Error fetching announcements:", error);
+      res.status(500).json({ message: "Failed to fetch announcements" });
+    }
+  });
+
+  app.get("/api/community/announcements/:id", async (req, res) => {
+    try {
+      const announcement = await storage.getAnnouncement(req.params.id);
+      if (!announcement) {
+        return res.status(404).json({ message: "Announcement not found" });
+      }
+      // Increment view count
+      await storage.incrementAnnouncementViews(req.params.id);
+      res.json(announcement);
+    } catch (error) {
+      console.error("Error fetching announcement:", error);
+      res.status(500).json({ message: "Failed to fetch announcement" });
+    }
+  });
+
+  // Event categories
+  app.get("/api/community/event-categories", (req, res) => {
+    const categories = [
+      { id: "festival", name: "Festivals", icon: "party-popper" },
+      { id: "concert", name: "Concerts", icon: "music" },
+      { id: "meetup", name: "Meetups", icon: "users" },
+      { id: "sports", name: "Sports", icon: "dumbbell" },
+      { id: "cultural", name: "Cultural", icon: "landmark" },
+      { id: "food", name: "Food Events", icon: "utensils" },
+      { id: "workshop", name: "Workshops", icon: "graduation-cap" },
+      { id: "other", name: "Other", icon: "calendar" },
+    ];
+    res.json(categories);
+  });
+
+  // Business categories
+  app.get("/api/community/business-categories", (req, res) => {
+    const categories = [
+      { id: "restaurant", name: "Restaurants", icon: "utensils" },
+      { id: "grocery", name: "Grocery Stores", icon: "shopping-cart" },
+      { id: "beauty", name: "Beauty & Spa", icon: "sparkles" },
+      { id: "fitness", name: "Fitness", icon: "dumbbell" },
+      { id: "auto", name: "Auto Services", icon: "car" },
+      { id: "legal", name: "Legal Services", icon: "scale" },
+      { id: "real-estate", name: "Real Estate", icon: "home" },
+      { id: "education", name: "Education", icon: "graduation-cap" },
+      { id: "healthcare", name: "Healthcare", icon: "heart-pulse" },
+      { id: "retail", name: "Retail", icon: "shopping-bag" },
+      { id: "professional", name: "Professional Services", icon: "briefcase" },
+      { id: "other", name: "Other", icon: "building" },
+    ];
+    res.json(categories);
+  });
+
   return httpServer;
 }

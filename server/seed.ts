@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { restaurants, menuItems, serviceProviders, services } from "@shared/schema";
+import { restaurants, menuItems, serviceProviders, services, events, businesses, announcements } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
 export async function seedDatabase() {
@@ -408,6 +408,194 @@ export async function seedDatabase() {
         { providerId: immigration1.id, name: "Visa Consultation", description: "Personalized visa pathway assessment", price: "100.00", priceType: "fixed", duration: 60 },
         { providerId: immigration1.id, name: "Application Assistance", description: "Help with form preparation and documentation", price: "300.00", priceType: "fixed" },
         { providerId: immigration1.id, name: "Green Card Process", description: "Full green card application support", price: "1500.00", priceType: "fixed" },
+      ]);
+    }
+
+    // Seed Community Hub data
+    const existingEvents = await db.select().from(events);
+    const needsCommunitySeeding = existingEvents.length === 0;
+
+    if (needsCommunitySeeding) {
+      console.log("Seeding community hub data...");
+
+      // Seed Events
+      await db.insert(events).values([
+        {
+          createdBy: "system",
+          title: "Brazilian Independence Day Festival",
+          description: "Celebrate Brazilian Independence Day with live music, traditional food, capoeira performances, and family activities. Join the largest Brazilian celebration in California!",
+          category: "festival",
+          venue: "MacArthur Park",
+          address: "2230 W 6th St",
+          city: "Los Angeles, CA",
+          eventDate: new Date("2026-09-07T10:00:00"),
+          endDate: new Date("2026-09-07T20:00:00"),
+          startTime: "10:00 AM",
+          endTime: "8:00 PM",
+          isFree: true,
+          isFeatured: true,
+          isApproved: true,
+        },
+        {
+          createdBy: "system",
+          title: "Samba Night - Live Music",
+          description: "Experience the rhythm of Brazil with live samba bands, dance performances, and authentic Brazilian drinks. Dance the night away!",
+          category: "concert",
+          venue: "Brasil Brasil Cultural Center",
+          address: "456 Music Blvd",
+          city: "San Francisco, CA",
+          eventDate: new Date("2026-03-15T20:00:00"),
+          startTime: "8:00 PM",
+          endTime: "2:00 AM",
+          ticketPrice: "$25-45",
+          ticketUrl: "https://example.com/tickets",
+          isFeatured: true,
+          isApproved: true,
+        },
+        {
+          createdBy: "system",
+          title: "Brazilian Jiu-Jitsu Tournament",
+          description: "Annual BJJ championship featuring competitors from all over California. All belt levels welcome. Spectators free!",
+          category: "sports",
+          venue: "California Sports Arena",
+          address: "789 Sports Way",
+          city: "San Diego, CA",
+          eventDate: new Date("2026-04-20T08:00:00"),
+          endDate: new Date("2026-04-20T18:00:00"),
+          startTime: "8:00 AM",
+          endTime: "6:00 PM",
+          ticketPrice: "Spectators Free",
+          isApproved: true,
+        },
+        {
+          createdBy: "system",
+          title: "Brazilian Cooking Workshop",
+          description: "Learn to make traditional Brazilian dishes including feijoada, pao de queijo, and brigadeiros. All ingredients provided.",
+          category: "workshop",
+          venue: "Community Kitchen",
+          address: "321 Culinary St",
+          city: "Oakland, CA",
+          eventDate: new Date("2026-03-28T14:00:00"),
+          startTime: "2:00 PM",
+          endTime: "5:00 PM",
+          ticketPrice: "$45",
+          isApproved: true,
+        },
+        {
+          createdBy: "system",
+          title: "Brazilian Business Network Meetup",
+          description: "Connect with Brazilian entrepreneurs and professionals in California. Networking, presentations, and happy hour.",
+          category: "meetup",
+          venue: "Downtown Business Center",
+          address: "100 Business Park",
+          city: "San Jose, CA",
+          eventDate: new Date("2026-03-10T18:00:00"),
+          startTime: "6:00 PM",
+          endTime: "9:00 PM",
+          isFree: true,
+          isApproved: true,
+        },
+      ]);
+
+      // Seed Businesses
+      await db.insert(businesses).values([
+        {
+          name: "Mercado Brasil",
+          description: "Your one-stop shop for authentic Brazilian groceries, fresh produce, and imported products from Brazil.",
+          category: "grocery",
+          address: "1234 Market St",
+          city: "Los Angeles",
+          state: "CA",
+          zipCode: "90012",
+          phone: "(213) 555-0100",
+          website: "https://mercadobrasil.example.com",
+          isBrazilianOwned: true,
+          isVerified: true,
+          isActive: true,
+        },
+        {
+          name: "Padaria Brasileira",
+          description: "Traditional Brazilian bakery serving fresh pao de queijo, coxinha, and pastries daily. Coffee and acai also available.",
+          category: "restaurant",
+          address: "567 Bakery Ave",
+          city: "San Francisco",
+          state: "CA",
+          zipCode: "94110",
+          phone: "(415) 555-0200",
+          isBrazilianOwned: true,
+          isVerified: true,
+          isActive: true,
+        },
+        {
+          name: "Beleza Brazilian Beauty",
+          description: "Full-service salon specializing in Brazilian blowouts, waxing, and beauty treatments. Portuguese-speaking staff.",
+          category: "beauty",
+          address: "890 Beauty Blvd",
+          city: "San Diego",
+          state: "CA",
+          zipCode: "92101",
+          phone: "(619) 555-0300",
+          email: "beleza@example.com",
+          isBrazilianOwned: true,
+          isVerified: true,
+          isActive: true,
+        },
+        {
+          name: "Brasil Fitness Academy",
+          description: "Gym offering capoeira, Brazilian jiu-jitsu, and functional training. Classes in Portuguese and English.",
+          category: "fitness",
+          address: "234 Fitness Way",
+          city: "Oakland",
+          state: "CA",
+          zipCode: "94612",
+          phone: "(510) 555-0400",
+          website: "https://brasilfitness.example.com",
+          isBrazilianOwned: true,
+          isActive: true,
+        },
+        {
+          name: "Advogados Brasil-EUA",
+          description: "Immigration and business law firm specializing in US-Brazil matters. Free initial consultation.",
+          category: "legal",
+          address: "500 Legal Center",
+          city: "San Jose",
+          state: "CA",
+          zipCode: "95110",
+          phone: "(408) 555-0500",
+          email: "legal@brasilusa.example.com",
+          isBrazilianOwned: true,
+          isVerified: true,
+          isActive: true,
+        },
+      ]);
+
+      // Seed Announcements
+      await db.insert(announcements).values([
+        {
+          createdBy: "system",
+          title: "Welcome to BrazaDash Community!",
+          content: "We're excited to launch the Brazilian Community Hub! Discover local events, find Brazilian-owned businesses, and connect with our community. More features coming soon!",
+          type: "news",
+          isPinned: true,
+          isActive: true,
+        },
+        {
+          createdBy: "system",
+          title: "Independence Day Festival - September 7th",
+          content: "Mark your calendars! The biggest Brazilian celebration in California is coming. Live music, food, capoeira, and more at MacArthur Park, Los Angeles.",
+          type: "news",
+          isActive: true,
+        },
+        {
+          createdBy: "system",
+          title: "New Vendor Promo - 20% Off First Order",
+          content: "Use code BRAZADASH20 on your first food order for 20% off! Valid for new customers only. Expires March 31st, 2026.",
+          type: "promo",
+          linkUrl: "/restaurants",
+          linkText: "Order Now",
+          isActive: true,
+          expiresAt: new Date("2026-03-31"),
+        },
       ]);
     }
 

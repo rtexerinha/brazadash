@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/use-auth";
 import { useCart } from "@/lib/cart-context";
 import { useTheme } from "@/components/theme-provider";
-import { ShoppingCart, Sun, Moon, User, LogOut, Store, Bell, Menu, Briefcase, Calendar } from "lucide-react";
+import { ShoppingCart, Sun, Moon, User, LogOut, Store, Bell, Menu, Briefcase, Calendar, Users } from "lucide-react";
 import { useState } from "react";
 
 export function Navbar() {
@@ -68,6 +68,18 @@ export function Navbar() {
                 data-testid="link-services"
               >
                 Services
+              </span>
+            </Link>
+            <Link href="/community">
+              <span
+                className={`text-sm font-medium transition-colors cursor-pointer ${
+                  location.startsWith("/community") || location.startsWith("/events") || location.startsWith("/businesses") 
+                    ? "text-primary" 
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                data-testid="link-community"
+              >
+                Community
               </span>
             </Link>
             <Link href="/orders">

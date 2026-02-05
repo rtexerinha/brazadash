@@ -24,6 +24,9 @@ import ProviderDetailPage from "@/pages/provider-detail";
 import BookingsPage from "@/pages/bookings";
 import BookingDetailPage from "@/pages/booking-detail";
 import ProviderPortalPage from "@/pages/provider-portal";
+import CommunityPage from "@/pages/community";
+import EventsPage from "@/pages/events";
+import BusinessesPage from "@/pages/businesses";
 
 function AppContent() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -64,6 +67,9 @@ function AppContent() {
         <Route path="/bookings" component={BookingsPage} />
         <Route path="/bookings/:id" component={BookingDetailPage} />
         <Route path="/provider-portal" component={ProviderPortalPage} />
+        <Route path="/community" component={CommunityPage} />
+        <Route path="/events" component={EventsPage} />
+        <Route path="/businesses" component={BusinessesPage} />
         <Route component={NotFound} />
       </Switch>
     </div>
