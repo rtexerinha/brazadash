@@ -52,74 +52,44 @@ export default function AdminPage() {
     retry: false,
   });
 
-  useEffect(() => {
-    if (statsError) {
-      setAccessDenied(true);
-    }
-  }, [statsError]);
-
-  if (accessDenied) {
-    return (
-      <div className="min-h-screen flex items-center justify-center py-8">
-        <Card className="max-w-md w-full mx-4">
-          <CardHeader className="text-center">
-            <div className="mx-auto mb-4 p-4 rounded-full bg-destructive/10 w-fit">
-              <AlertTriangle className="h-8 w-8 text-destructive" />
-            </div>
-            <CardTitle>Access Denied</CardTitle>
-            <CardDescription>
-              You don't have permission to access the admin dashboard. 
-              This area is restricted to administrators only.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex justify-center">
-            <Button onClick={() => setLocation("/")} data-testid="button-go-home">
-              Go to Home
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   const { data: restaurants } = useQuery<Restaurant[]>({
     queryKey: ["/api/admin/restaurants"],
-    enabled: activeTab === "restaurants",
+    enabled: activeTab === "restaurants" && !accessDenied,
   });
 
   const { data: orders } = useQuery<Order[]>({
     queryKey: ["/api/admin/orders"],
-    enabled: activeTab === "orders",
+    enabled: activeTab === "orders" && !accessDenied,
   });
 
   const { data: providers } = useQuery<ServiceProvider[]>({
     queryKey: ["/api/admin/providers"],
-    enabled: activeTab === "providers",
+    enabled: activeTab === "providers" && !accessDenied,
   });
 
   const { data: bookingsData } = useQuery<Booking[]>({
     queryKey: ["/api/admin/bookings"],
-    enabled: activeTab === "bookings",
+    enabled: activeTab === "bookings" && !accessDenied,
   });
 
   const { data: events } = useQuery<Event[]>({
     queryKey: ["/api/admin/events"],
-    enabled: activeTab === "events",
+    enabled: activeTab === "events" && !accessDenied,
   });
 
   const { data: businessesData } = useQuery<Business[]>({
     queryKey: ["/api/admin/businesses"],
-    enabled: activeTab === "businesses",
+    enabled: activeTab === "businesses" && !accessDenied,
   });
 
   const { data: announcementsData } = useQuery<Announcement[]>({
     queryKey: ["/api/admin/announcements"],
-    enabled: activeTab === "announcements",
+    enabled: activeTab === "announcements" && !accessDenied,
   });
 
   const { data: reviewsData } = useQuery<Review[]>({
     queryKey: ["/api/admin/reviews"],
-    enabled: activeTab === "reviews",
+    enabled: activeTab === "reviews" && !accessDenied,
   });
 
   const updateRestaurantMutation = useMutation({
@@ -205,6 +175,36 @@ export default function AdminPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/reviews"] });
     },
   });
+
+  useEffect(() => {
+    if (statsError) {
+      setAccessDenied(true);
+    }
+  }, [statsError]);
+
+  if (accessDenied) {
+    return (
+      <div className="min-h-screen flex items-center justify-center py-8">
+        <Card className="max-w-md w-full mx-4">
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-4 p-4 rounded-full bg-destructive/10 w-fit">
+              <AlertTriangle className="h-8 w-8 text-destructive" />
+            </div>
+            <CardTitle>Access Denied</CardTitle>
+            <CardDescription>
+              You don't have permission to access the admin dashboard. 
+              This area is restricted to administrators only.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex justify-center">
+            <Button onClick={() => setLocation("/")} data-testid="button-go-home">
+              Go to Home
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen py-8">
