@@ -5,7 +5,7 @@ import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integra
 import { 
   insertOrderSchema, insertReviewSchema, insertRestaurantSchema, insertMenuItemSchema,
   insertServiceProviderSchema, insertServiceSchema, insertBookingSchema, insertServiceReviewSchema, insertMessageSchema,
-  serviceCategories
+  insertPushTokenSchema, serviceCategories
 } from "@shared/schema";
 import { z } from "zod";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
@@ -1461,6 +1461,122 @@ export async function registerRoutes(
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ error: "Failed to delete review" });
+    }
+  });
+
+  // =================
+  // MOBILE API ROUTES
+  // =================
+
+  // Register push notification token
+  app.post("/api/mobile/push-token", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const parsed = insertPushTokenSchema.safeParse({
+        ...req.body,
+        userId,
+        isActive: true,
+      });
+
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid push token data", errors: parsed.error.flatten().fieldErrors });
+      }
+
+      const existing = await storage.getPushTokenByToken(parsed.data.token);
+      const pushToken = await storage.registerPushToken(parsed.data);
+
+      res.status(existing ? 200 : 201).json(pushToken);
+    } catch (error) {
+      console.error("Error registering push token:", error);
+      res.status(500).json({ message: "Failed to register push token" });
+    }
+  });
+
+  // Deactivate push notification token (logout/uninstall)
+  app.delete("/api/mobile/push-token", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { token } = req.body;
+      if (!token) {
+        return res.status(400).json({ message: "Token is required" });
+      }
+
+      const existing = await storage.getPushTokenByToken(token);
+      if (existing && existing.userId !== userId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      await storage.deactivatePushToken(token);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deactivating push token:", error);
+      res.status(500).json({ message: "Failed to deactivate push token" });
+    }
+  });
+
+  // Mobile user profile - returns user data with roles, stats, and active tokens
+  app.get("/api/mobile/profile", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const claims = req.user.claims;
+
+      const [roles, ordersList, bookingsList, pushTokensList] = await Promise.all([
+        storage.getUserRoles(userId),
+        storage.getOrders(userId),
+        storage.getBookings(userId),
+        storage.getPushTokens(userId),
+      ]);
+
+      res.json({
+        id: userId,
+        email: claims.email || null,
+        firstName: claims.first_name || null,
+        lastName: claims.last_name || null,
+        profileImageUrl: claims.profile_image_url || null,
+        roles: roles.map((r) => r.role),
+        stats: {
+          totalOrders: ordersList.length,
+          totalBookings: bookingsList.length,
+          activeDevices: pushTokensList.length,
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching mobile profile:", error);
+      res.status(500).json({ message: "Failed to fetch profile" });
+    }
+  });
+
+  // Mobile home feed - combined data for the mobile app home screen
+  app.get("/api/mobile/home", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+
+      const [
+        restaurantsList,
+        upcomingEvents,
+        activeAnnouncements,
+        notificationsList,
+        featuredProviders,
+      ] = await Promise.all([
+        storage.getRestaurants(),
+        storage.getUpcomingEvents(),
+        storage.getActiveAnnouncements(),
+        storage.getNotifications(userId),
+        storage.getServiceProviders(),
+      ]);
+
+      const unreadNotifications = notificationsList.filter((n) => !n.isRead).length;
+
+      res.json({
+        restaurants: restaurantsList.slice(0, 6),
+        upcomingEvents: upcomingEvents.slice(0, 5),
+        announcements: activeAnnouncements.slice(0, 3),
+        featuredProviders: featuredProviders.slice(0, 6),
+        unreadNotifications,
+      });
+    } catch (error) {
+      console.error("Error fetching mobile home:", error);
+      res.status(500).json({ message: "Failed to fetch home feed" });
     }
   });
 

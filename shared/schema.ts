@@ -374,3 +374,23 @@ export type InsertEventRsvp = z.infer<typeof insertEventRsvpSchema>;
 export type EventRsvp = typeof eventRsvps.$inferSelect;
 
 export type EventCategory = typeof eventCategories[number];
+
+// ============================================
+// MOBILE SUPPORT TABLES
+// ============================================
+
+export const pushTokens = pgTable("push_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  token: varchar("token", { length: 512 }).notNull(),
+  platform: varchar("platform", { enum: ["ios", "android", "web"] }).notNull(),
+  deviceId: varchar("device_id", { length: 255 }),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPushTokenSchema = createInsertSchema(pushTokens).omit({ id: true, createdAt: true, updatedAt: true });
+
+export type InsertPushToken = z.infer<typeof insertPushTokenSchema>;
+export type PushToken = typeof pushTokens.$inferSelect;

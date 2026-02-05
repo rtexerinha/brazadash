@@ -115,6 +115,9 @@ A Brazilian community marketplace platform serving the Brazilian community in Ca
 - **service_reviews**: Customer reviews for completed service bookings
 - **messages**: In-app messaging between users (supports booking-linked conversations)
 
+### Mobile Support Tables
+- **push_tokens**: Push notification tokens for mobile devices (userId, token, platform, deviceId, isActive)
+
 ## API Endpoints
 
 ### Public
@@ -178,6 +181,12 @@ A Brazilian community marketplace platform serving the Brazilian community in Ca
 - `GET /api/community/announcements` - Get active announcements
 - `GET /api/community/event-categories` - List event categories
 - `GET /api/community/business-categories` - List business categories
+
+### Mobile API (Protected)
+- `POST /api/mobile/push-token` - Register push notification token (body: {token, platform: "ios"|"android"|"web", deviceId?})
+- `DELETE /api/mobile/push-token` - Deactivate push token on logout/uninstall (body: {token})
+- `GET /api/mobile/profile` - Get mobile user profile with roles, stats, and active devices
+- `GET /api/mobile/home` - Combined home feed (restaurants, events, announcements, providers, unread count)
 
 ### Admin Platform (Protected - Admin role required)
 - `GET /api/admin/stats` - Dashboard statistics

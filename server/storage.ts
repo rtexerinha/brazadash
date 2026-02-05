@@ -1,7 +1,7 @@
 import { 
   restaurants, menuItems, orders, reviews, notifications, userRoles,
   serviceProviders, services, bookings, serviceReviews, messages,
-  events, businesses, announcements, eventRsvps,
+  events, businesses, announcements, eventRsvps, pushTokens,
   type Restaurant, type InsertRestaurant,
   type MenuItem, type InsertMenuItem,
   type Order, type InsertOrder,
@@ -16,7 +16,8 @@ import {
   type Event, type InsertEvent,
   type Business, type InsertBusiness,
   type Announcement, type InsertAnnouncement,
-  type EventRsvp, type InsertEventRsvp
+  type EventRsvp, type InsertEventRsvp,
+  type PushToken, type InsertPushToken
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql, or, ilike } from "drizzle-orm";
@@ -125,6 +126,13 @@ export interface IStorage {
   updateAnnouncement(id: string, data: Partial<InsertAnnouncement>): Promise<Announcement | undefined>;
   deleteAnnouncement(id: string): Promise<void>;
   incrementAnnouncementViews(id: string): Promise<void>;
+
+  // Push Tokens (Mobile)
+  getPushTokens(userId: string): Promise<PushToken[]>;
+  getPushTokenByToken(token: string): Promise<PushToken | undefined>;
+  registerPushToken(data: InsertPushToken): Promise<PushToken>;
+  deactivatePushToken(token: string): Promise<void>;
+  deactivateUserPushTokens(userId: string): Promise<void>;
 
   // Admin Methods
   getAdminStats(): Promise<{
@@ -794,6 +802,38 @@ class DatabaseStorage implements IStorage {
 
   async deleteReview(id: string): Promise<void> {
     await db.delete(reviews).where(eq(reviews.id, id));
+  }
+
+  // Push Tokens (Mobile)
+  async getPushTokens(userId: string): Promise<PushToken[]> {
+    return db.select().from(pushTokens)
+      .where(and(eq(pushTokens.userId, userId), eq(pushTokens.isActive, true)));
+  }
+
+  async getPushTokenByToken(token: string): Promise<PushToken | undefined> {
+    const [existing] = await db.select().from(pushTokens).where(eq(pushTokens.token, token));
+    return existing;
+  }
+
+  async registerPushToken(data: InsertPushToken): Promise<PushToken> {
+    const existing = await this.getPushTokenByToken(data.token);
+    if (existing) {
+      const [updated] = await db.update(pushTokens)
+        .set({ userId: data.userId, isActive: true, platform: data.platform, deviceId: data.deviceId, updatedAt: new Date() })
+        .where(eq(pushTokens.token, data.token))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(pushTokens).values(data).returning();
+    return created;
+  }
+
+  async deactivatePushToken(token: string): Promise<void> {
+    await db.update(pushTokens).set({ isActive: false, updatedAt: new Date() }).where(eq(pushTokens.token, token));
+  }
+
+  async deactivateUserPushTokens(userId: string): Promise<void> {
+    await db.update(pushTokens).set({ isActive: false, updatedAt: new Date() }).where(eq(pushTokens.userId, userId));
   }
 }
 
