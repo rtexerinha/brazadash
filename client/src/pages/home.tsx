@@ -9,9 +9,9 @@ import { useAuth } from "@/hooks/use-auth";
 import { 
   Star, Clock, MapPin, ChevronRight, Utensils, Quote,
   Sparkles, Home, Scissors, Scale, Dumbbell, Car, GraduationCap,
-  Hammer, Camera, Languages, Users
+  Hammer, Camera, Languages, Users, Calendar, Building2, Megaphone
 } from "lucide-react";
-import type { Restaurant, ServiceProvider } from "@shared/schema";
+import type { Restaurant, ServiceProvider, Event, Business, Announcement, Review, ServiceReview } from "@shared/schema";
 
 const serviceCategories = [
   { id: "cleaning", name: "Limpeza", nameEn: "Cleaning", icon: Sparkles, color: "bg-blue-500" },
@@ -218,6 +218,138 @@ function ProviderCard({ provider }: { provider: ServiceProvider }) {
   );
 }
 
+function EventCard({ event }: { event: Event }) {
+  const eventDate = new Date(event.eventDate);
+  const month = eventDate.toLocaleDateString('en-US', { month: 'short' });
+  const day = eventDate.getDate();
+  
+  return (
+    <Link href={`/events?id=${event.id}`}>
+      <Card className="overflow-hidden hover-elevate cursor-pointer h-full" data-testid={`card-event-${event.id}`}>
+        <CardContent className="p-4">
+          <div className="flex gap-4">
+            <div className="flex flex-col items-center justify-center bg-primary/10 rounded-lg p-3 min-w-[60px]">
+              <span className="text-xs font-medium text-primary uppercase">{month}</span>
+              <span className="text-2xl font-bold text-primary">{day}</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold line-clamp-1">{event.title}</h3>
+              <p className="text-sm text-muted-foreground line-clamp-1 mt-1">{event.description}</p>
+              <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
+                <MapPin className="h-3 w-3" />
+                <span className="line-clamp-1">{event.venue || event.city || "TBA"}</span>
+              </div>
+              <Badge variant="secondary" className="mt-2 text-xs capitalize">{event.category}</Badge>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
+  );
+}
+
+function BusinessCard({ business }: { business: Business }) {
+  return (
+    <Link href={`/businesses?id=${business.id}`}>
+      <Card className="overflow-hidden hover-elevate cursor-pointer h-full" data-testid={`card-business-${business.id}`}>
+        <CardContent className="p-4">
+          <div className="flex items-start gap-3">
+            <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Building2 className="h-6 w-6 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold line-clamp-1">{business.name}</h3>
+                {business.isVerified && (
+                  <Badge variant="secondary" className="text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">Verified</Badge>
+                )}
+              </div>
+              <p className="text-sm text-muted-foreground line-clamp-1 mt-1">{business.description}</p>
+              <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
+                <MapPin className="h-3 w-3" />
+                <span className="line-clamp-1">{business.city}, {business.state}</span>
+              </div>
+              <Badge variant="outline" className="mt-2 text-xs capitalize">{business.category}</Badge>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
+  );
+}
+
+function AnnouncementCard({ announcement }: { announcement: Announcement }) {
+  const typeColors = {
+    news: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+    promo: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+    update: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
+    alert: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+  };
+  
+  return (
+    <Card className="overflow-hidden" data-testid={`card-announcement-${announcement.id}`}>
+      <CardContent className="p-4">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center">
+            <Megaphone className="h-5 w-5 text-yellow-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <h4 className="font-semibold line-clamp-1">{announcement.title}</h4>
+              <Badge className={`text-xs ${typeColors[announcement.type as keyof typeof typeColors] || typeColors.news}`}>
+                {announcement.type}
+              </Badge>
+            </div>
+            <p className="text-sm text-muted-foreground line-clamp-2">{announcement.content}</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ReviewCard({ review, type }: { review: Review | ServiceReview, type: 'food' | 'service' }) {
+  const photos = review.photoUrls || [];
+  
+  return (
+    <Card className="h-full" data-testid={`card-review-${review.id}`}>
+      <CardContent className="p-4">
+        <div className="flex items-center gap-3 mb-3">
+          <Avatar className="h-10 w-10">
+            <AvatarFallback className="bg-primary/10 text-primary">
+              {(review as any).userName?.substring(0, 2).toUpperCase() || "U"}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-sm">{(review as any).userName || "Customer"}</p>
+            <div className="flex items-center gap-1">
+              {[...Array(5)].map((_, i) => (
+                <Star key={i} className={`h-3 w-3 ${i < review.rating ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30'}`} />
+              ))}
+            </div>
+          </div>
+          <Badge variant="outline" className="text-xs">{type === 'food' ? 'Food' : 'Service'}</Badge>
+        </div>
+        <p className="text-sm text-muted-foreground line-clamp-3">{review.comment}</p>
+        {photos.length > 0 && (
+          <div className="flex gap-1 mt-3">
+            {photos.slice(0, 3).map((photo: string, i: number) => (
+              <div key={i} className="w-12 h-12 rounded overflow-hidden">
+                <img src={photo} alt="" className="w-full h-full object-cover" />
+              </div>
+            ))}
+            {photos.length > 3 && (
+              <div className="w-12 h-12 rounded bg-muted flex items-center justify-center text-xs text-muted-foreground">
+                +{photos.length - 3}
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function HomePage() {
   const { user } = useAuth();
   
@@ -229,8 +361,37 @@ export default function HomePage() {
     queryKey: ["/api/services/providers"],
   });
 
+  const { data: upcomingEvents } = useQuery<Event[]>({
+    queryKey: ["/api/community/events/upcoming"],
+  });
+
+  const { data: businesses } = useQuery<Business[]>({
+    queryKey: ["/api/community/businesses"],
+  });
+
+  const { data: announcements } = useQuery<Announcement[]>({
+    queryKey: ["/api/community/announcements"],
+  });
+
+  const { data: recentReviews } = useQuery<Review[]>({
+    queryKey: ["/api/reviews/recent"],
+  });
+
+  const { data: recentServiceReviews } = useQuery<ServiceReview[]>({
+    queryKey: ["/api/services/reviews/recent"],
+  });
+
   const featuredRestaurants = restaurants?.slice(0, 6) || [];
   const featuredProviders = providers?.slice(0, 4) || [];
+  const featuredEvents = upcomingEvents?.slice(0, 3) || [];
+  const featuredBusinesses = businesses?.slice(0, 4) || [];
+  const activeAnnouncements = announcements?.slice(0, 2) || [];
+  
+  // Combine and sort reviews
+  const allReviews = [
+    ...(recentReviews?.map(r => ({ ...r, type: 'food' as const })) || []),
+    ...(recentServiceReviews?.map(r => ({ ...r, type: 'service' as const })) || [])
+  ].slice(0, 4);
 
   return (
     <div className="min-h-screen">
@@ -380,6 +541,123 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Community Hub Section */}
+      <section className="py-12 bg-muted/30">
+        <div className="container mx-auto px-4">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <Badge className="mb-2 bg-blue-500/20 text-blue-700 dark:text-blue-400 border-blue-500/30">
+                <Users className="h-3 w-3 mr-1" />
+                Comunidade Brasileira
+              </Badge>
+              <h2 className="text-2xl font-bold mb-1">Community Hub</h2>
+              <p className="text-muted-foreground">Connect with the Brazilian community in California</p>
+            </div>
+            <Button variant="ghost" asChild data-testid="button-view-community">
+              <Link href="/community">
+                Explorar
+                <ChevronRight className="ml-1 h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
+
+          {/* Announcements */}
+          {activeAnnouncements.length > 0 && (
+            <div className="mb-8">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <Megaphone className="h-5 w-5 text-yellow-600" />
+                Anuncios / Announcements
+              </h3>
+              <div className="grid md:grid-cols-2 gap-4">
+                {activeAnnouncements.map((announcement) => (
+                  <AnnouncementCard key={announcement.id} announcement={announcement} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="grid lg:grid-cols-2 gap-8">
+            {/* Upcoming Events */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Calendar className="h-5 w-5 text-primary" />
+                  Proximos Eventos / Upcoming Events
+                </h3>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/events">
+                    Ver Todos
+                    <ChevronRight className="ml-1 h-4 w-4" />
+                  </Link>
+                </Button>
+              </div>
+              {featuredEvents.length > 0 ? (
+                <div className="space-y-4">
+                  {featuredEvents.map((event) => (
+                    <EventCard key={event.id} event={event} />
+                  ))}
+                </div>
+              ) : (
+                <Card className="p-8 text-center">
+                  <Calendar className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+                  <p className="text-muted-foreground">Nenhum evento proximo / No upcoming events</p>
+                </Card>
+              )}
+            </div>
+
+            {/* Featured Businesses */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Building2 className="h-5 w-5 text-primary" />
+                  Negocios em Destaque / Featured Businesses
+                </h3>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/businesses">
+                    Ver Todos
+                    <ChevronRight className="ml-1 h-4 w-4" />
+                  </Link>
+                </Button>
+              </div>
+              {featuredBusinesses.length > 0 ? (
+                <div className="space-y-4">
+                  {featuredBusinesses.slice(0, 3).map((business) => (
+                    <BusinessCard key={business.id} business={business} />
+                  ))}
+                </div>
+              ) : (
+                <Card className="p-8 text-center">
+                  <Building2 className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+                  <p className="text-muted-foreground">Nenhum negocio ainda / No businesses yet</p>
+                </Card>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Recent Reviews Section */}
+      {allReviews.length > 0 && (
+        <section className="py-12">
+          <div className="container mx-auto px-4">
+            <div className="text-center mb-10">
+              <Badge className="mb-4 bg-green-500/20 text-green-700 dark:text-green-400 border-green-500/30">
+                <Star className="h-3 w-3 mr-1 fill-current" />
+                Avaliacoes Recentes
+              </Badge>
+              <h2 className="text-2xl md:text-3xl font-bold mb-2">Recent Reviews</h2>
+              <p className="text-muted-foreground">See what customers are saying about our vendors</p>
+            </div>
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {allReviews.map((review) => (
+                <ReviewCard key={`${review.type}-${review.id}`} review={review} type={review.type} />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Quick Categories */}
       <section className="py-12 bg-muted/30">
