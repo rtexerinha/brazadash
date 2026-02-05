@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import {
-  View, Text, ScrollView, FlatList, StyleSheet, TouchableOpacity,
-  Image, TextInput, RefreshControl, Linking,
+  View, Text, FlatList, StyleSheet, TouchableOpacity,
+  Image, TextInput, RefreshControl, Linking, Modal, Pressable,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
@@ -157,6 +157,7 @@ export default function CommunityScreen() {
   const [activeTab, setActiveTab] = useState<Tab>("events");
   const [eventCategory, setEventCategory] = useState<string | null>(null);
   const [businessSearch, setBusinessSearch] = useState("");
+  const [showEventDropdown, setShowEventDropdown] = useState(false);
 
   const { data: events, isLoading: loadingEvents, refetch: refetchEvents, isRefetching: refetchingEvents } = useQuery({
     queryKey: ["events", eventCategory],
@@ -182,6 +183,10 @@ export default function CommunityScreen() {
     { key: "announcements", label: "News", icon: "megaphone" },
   ];
 
+  const selectedEventLabel = eventCategory
+    ? EVENT_CATEGORIES.find(c => c.id === eventCategory)?.label || "All Categories"
+    : "All Categories";
+
   return (
     <View style={styles.container}>
       <View style={styles.tabBar}>
@@ -203,31 +208,43 @@ export default function CommunityScreen() {
 
       {activeTab === "events" && (
         <>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoryFilter}
+          <TouchableOpacity
+            style={styles.dropdown}
+            onPress={() => setShowEventDropdown(true)}
+            activeOpacity={0.7}
           >
-            <TouchableOpacity
-              style={[styles.filterChip, !eventCategory && styles.filterChipActive]}
-              onPress={() => setEventCategory(null)}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.filterChipText, !eventCategory && styles.filterChipTextActive]}>All</Text>
-            </TouchableOpacity>
-            {EVENT_CATEGORIES.map((cat) => (
-              <TouchableOpacity
-                key={cat.id}
-                style={[styles.filterChip, eventCategory === cat.id && styles.filterChipActive]}
-                onPress={() => setEventCategory(eventCategory === cat.id ? null : cat.id)}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.filterChipText, eventCategory === cat.id && styles.filterChipTextActive]}>
-                  {cat.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+            <Ionicons name="filter-outline" size={16} color={colors.textSecondary} />
+            <Text style={styles.dropdownText}>{selectedEventLabel}</Text>
+            <Ionicons name="chevron-down" size={16} color={colors.textSecondary} />
+          </TouchableOpacity>
+
+          <Modal visible={showEventDropdown} transparent animationType="fade">
+            <Pressable style={styles.modalOverlay} onPress={() => setShowEventDropdown(false)}>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>Select Category</Text>
+                <TouchableOpacity
+                  style={[styles.modalItem, !eventCategory && styles.modalItemActive]}
+                  onPress={() => { setEventCategory(null); setShowEventDropdown(false); }}
+                >
+                  <Text style={[styles.modalItemText, !eventCategory && styles.modalItemTextActive]}>All Categories</Text>
+                  {!eventCategory && <Ionicons name="checkmark" size={18} color={colors.primary} />}
+                </TouchableOpacity>
+                {EVENT_CATEGORIES.map((cat) => (
+                  <TouchableOpacity
+                    key={cat.id}
+                    style={[styles.modalItem, eventCategory === cat.id && styles.modalItemActive]}
+                    onPress={() => { setEventCategory(cat.id); setShowEventDropdown(false); }}
+                  >
+                    <Text style={[styles.modalItemText, eventCategory === cat.id && styles.modalItemTextActive]}>
+                      {cat.label}
+                    </Text>
+                    {eventCategory === cat.id && <Ionicons name="checkmark" size={18} color={colors.primary} />}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </Pressable>
+          </Modal>
+
           {loadingEvents ? (
             <LoadingScreen />
           ) : (
@@ -332,35 +349,73 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: fontWeight.semibold,
   },
-  categoryFilter: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    gap: spacing.sm,
-  },
-  filterChip: {
+
+  dropdown: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.full,
+    paddingVertical: spacing.md,
     backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
     borderWidth: 1,
     borderColor: colors.border,
+    gap: spacing.sm,
   },
-  filterChipActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  filterChipText: {
-    fontSize: fontSize.sm,
-    color: colors.textSecondary,
+  dropdownText: {
+    flex: 1,
+    fontSize: fontSize.md,
+    color: colors.text,
     fontWeight: fontWeight.medium,
   },
-  filterChipTextActive: {
-    color: colors.white,
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    paddingHorizontal: spacing.xxl,
   },
+  modalContent: {
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.sm,
+    maxHeight: "70%",
+  },
+  modalTitle: {
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.semibold,
+    color: colors.text,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
+  },
+  modalItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  modalItemActive: {
+    backgroundColor: colors.primaryLight,
+  },
+  modalItemText: {
+    fontSize: fontSize.md,
+    color: colors.text,
+  },
+  modalItemTextActive: {
+    color: colors.primary,
+    fontWeight: fontWeight.semibold,
+  },
+
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    margin: spacing.lg,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
     marginBottom: spacing.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,

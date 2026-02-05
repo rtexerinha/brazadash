@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import {
   View, Text, FlatList, StyleSheet, TouchableOpacity,
-  Image, TextInput, ScrollView, RefreshControl,
+  Image, TextInput, RefreshControl, Modal, Pressable,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
@@ -18,6 +18,7 @@ export default function ServicesScreen() {
   const navigation = useNavigation<any>();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [showDropdown, setShowDropdown] = useState(false);
 
   const { data: providers, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ["providers", selectedCategory, search],
@@ -26,6 +27,10 @@ export default function ServicesScreen() {
       search: search || undefined,
     }),
   });
+
+  const selectedLabel = selectedCategory
+    ? SERVICE_CATEGORIES.find(c => c.id === selectedCategory)?.label || "All Categories"
+    : "All Categories";
 
   if (isLoading) return <LoadingScreen />;
 
@@ -47,31 +52,42 @@ export default function ServicesScreen() {
         )}
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.categoriesContainer}
+      <TouchableOpacity
+        style={styles.dropdown}
+        onPress={() => setShowDropdown(true)}
+        activeOpacity={0.7}
       >
-        <TouchableOpacity
-          style={[styles.categoryChip, !selectedCategory && styles.categoryChipActive]}
-          onPress={() => setSelectedCategory(null)}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.categoryChipText, !selectedCategory && styles.categoryChipTextActive]}>All</Text>
-        </TouchableOpacity>
-        {SERVICE_CATEGORIES.map((cat) => (
-          <TouchableOpacity
-            key={cat.id}
-            style={[styles.categoryChip, selectedCategory === cat.id && styles.categoryChipActive]}
-            onPress={() => setSelectedCategory(selectedCategory === cat.id ? null : cat.id)}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.categoryChipText, selectedCategory === cat.id && styles.categoryChipTextActive]}>
-              {cat.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+        <Ionicons name="filter-outline" size={16} color={colors.textSecondary} />
+        <Text style={styles.dropdownText}>{selectedLabel}</Text>
+        <Ionicons name="chevron-down" size={16} color={colors.textSecondary} />
+      </TouchableOpacity>
+
+      <Modal visible={showDropdown} transparent animationType="fade">
+        <Pressable style={styles.modalOverlay} onPress={() => setShowDropdown(false)}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Select Category</Text>
+            <TouchableOpacity
+              style={[styles.modalItem, !selectedCategory && styles.modalItemActive]}
+              onPress={() => { setSelectedCategory(null); setShowDropdown(false); }}
+            >
+              <Text style={[styles.modalItemText, !selectedCategory && styles.modalItemTextActive]}>All Categories</Text>
+              {!selectedCategory && <Ionicons name="checkmark" size={18} color={colors.primary} />}
+            </TouchableOpacity>
+            {SERVICE_CATEGORIES.map((cat) => (
+              <TouchableOpacity
+                key={cat.id}
+                style={[styles.modalItem, selectedCategory === cat.id && styles.modalItemActive]}
+                onPress={() => { setSelectedCategory(cat.id); setShowDropdown(false); }}
+              >
+                <Text style={[styles.modalItemText, selectedCategory === cat.id && styles.modalItemTextActive]}>
+                  {cat.label}
+                </Text>
+                {selectedCategory === cat.id && <Ionicons name="checkmark" size={18} color={colors.primary} />}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </Pressable>
+      </Modal>
 
       <FlatList
         data={providers}
@@ -151,7 +167,8 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    margin: spacing.lg,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.lg,
     marginBottom: spacing.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
@@ -167,31 +184,66 @@ const styles = StyleSheet.create({
     color: colors.text,
     paddingVertical: spacing.xs,
   },
-  categoriesContainer: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
-    gap: spacing.sm,
-  },
-  categoryChip: {
+  dropdown: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.full,
+    paddingVertical: spacing.md,
     backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
     borderWidth: 1,
     borderColor: colors.border,
+    gap: spacing.sm,
   },
-  categoryChipActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  categoryChipText: {
-    fontSize: fontSize.sm,
-    color: colors.textSecondary,
+  dropdownText: {
+    flex: 1,
+    fontSize: fontSize.md,
+    color: colors.text,
     fontWeight: fontWeight.medium,
   },
-  categoryChipTextActive: {
-    color: colors.white,
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    paddingHorizontal: spacing.xxl,
   },
+  modalContent: {
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.sm,
+    maxHeight: "70%",
+  },
+  modalTitle: {
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.semibold,
+    color: colors.text,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
+  },
+  modalItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  modalItemActive: {
+    backgroundColor: colors.primaryLight,
+  },
+  modalItemText: {
+    fontSize: fontSize.md,
+    color: colors.text,
+  },
+  modalItemTextActive: {
+    color: colors.primary,
+    fontWeight: fontWeight.semibold,
+  },
+
   listContent: {
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xxxl,
