@@ -2,6 +2,9 @@
 
 A Brazilian community marketplace platform serving the Brazilian community in California. Enables users to discover and order authentic Brazilian food, find Brazilian services, and connect with the community.
 
+**Live URL**: https://brazadash.replit.app (also https://brazadash.com)
+**GitHub**: https://github.com/rtexerinha/brazadash
+
 ## Project Overview
 
 **Purpose**: Mobile-first marketplace combining food delivery (DoorDash-style), services marketplace (Thumbtack-style), and community directory features.
@@ -17,7 +20,9 @@ A Brazilian community marketplace platform serving the Brazilian community in Ca
 - **Backend**: Express.js with TypeScript
 - **Database**: PostgreSQL with Drizzle ORM
 - **Authentication**: Replit Auth (OpenID Connect)
+- **Payments**: Stripe integration for secure checkout
 - **Styling**: Tailwind CSS with shadcn/ui components
+- **Version Control**: GitHub integration via Octokit
 
 ## Project Structure
 
@@ -42,12 +47,21 @@ A Brazilian community marketplace platform serving the Brazilian community in Ca
 
 ## Key Features (MVP)
 
+### Home Page
+- **Bilingual Hero Section**: Welcome in Portuguese and English with CTAs for Food, Services, Community
+- **Popular Services**: 6 service categories with icons (Cleaning, Beauty, Legal, Fitness, Auto, Construction)
+- **Featured Providers**: Top service providers from the database
+- **Featured Restaurants**: Top-rated Brazilian restaurants
+- **Customer Testimonials**: 4 community reviews in Portuguese with English translations
+- **Food Categories**: Visual category cards (Churrasco, Acai, Salgados, Pao de Queijo)
+- **Vendor CTA**: Calls-to-action for restaurants and service providers to join
+
 ### Food Marketplace
 1. **User Authentication**: Replit Auth with Google, GitHub, email login
 2. **Food Ordering**: Browse restaurants, view menus, add to cart, checkout
 3. **Order Tracking**: Real-time order status updates
 4. **Vendor Portal**: Manage restaurant, menu items, process orders
-5. **Reviews**: Rate and review orders after delivery
+5. **Reviews**: Rate and review orders with photos and detailed ratings (food quality, delivery, value)
 6. **Notifications**: Order updates and system notifications
 
 ### Services Marketplace (Epic 4)
@@ -55,8 +69,14 @@ A Brazilian community marketplace platform serving the Brazilian community in Ca
 2. **Provider Profiles**: View provider details, services offered, reviews, ratings
 3. **Booking System**: Request service bookings with date/time/location
 4. **Provider Portal**: Manage services, respond to bookings, track status
-5. **Service Reviews**: Rate completed services with detailed feedback
+5. **Service Reviews**: Rate completed services with photos and detailed ratings (professionalism, communication, value)
 6. **Messaging**: In-app messaging between customers and providers
+
+### Reviews System (Epic 5)
+1. **Star Rating Component**: Reusable interactive star display
+2. **Food Reviews**: Photo uploads (up to 5), ratings for food quality, delivery, value
+3. **Service Reviews**: Photo uploads (up to 5), ratings for professionalism, communication, value
+4. **Review Display**: Expandable photo galleries, detailed sub-ratings, timestamps
 
 ### Community Hub (Epic 6)
 1. **Events Discovery**: Browse community events by category (festivals, concerts, meetups, sports, cultural, food, workshops)
