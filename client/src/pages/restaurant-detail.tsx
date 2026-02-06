@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ReviewDisplay } from "@/components/review-display";
 import { useCart } from "@/lib/cart-context";
 import { useToast } from "@/hooks/use-toast";
-import { Star, Clock, MapPin, Phone, Plus, Minus, ChevronLeft, Utensils } from "lucide-react";
+import { Star, Clock, MapPin, Phone, Plus, Minus, ChevronLeft, Utensils, AlertTriangle } from "lucide-react";
 import { useState } from "react";
 import type { Restaurant, MenuItem, Review } from "@shared/schema";
 
@@ -19,7 +19,21 @@ function MenuItemCard({ item, restaurant }: { item: MenuItem; restaurant: Restau
   const cartItem = items.find((i) => i.menuItemId === item.id);
   const currentQuantityInCart = cartItem?.quantity || 0;
 
+  const stockQty = item.quantity ?? -1;
+  const isOutOfStock = stockQty === 0;
+  const hasLimitedStock = stockQty > 0;
+  const maxAllowed = hasLimitedStock ? Math.max(0, stockQty - currentQuantityInCart) : Infinity;
+  const canOrder = item.isAvailable && !isOutOfStock && maxAllowed > 0;
+
   const handleAddToCart = () => {
+    if (hasLimitedStock && quantity > maxAllowed) {
+      toast({
+        title: "Limited availability",
+        description: `Only ${maxAllowed} more available`,
+        variant: "destructive",
+      });
+      return;
+    }
     addItem({
       menuItemId: item.id,
       name: item.name,
@@ -36,7 +50,7 @@ function MenuItemCard({ item, restaurant }: { item: MenuItem; restaurant: Restau
   };
 
   return (
-    <Card className="overflow-hidden" data-testid={`card-menu-item-${item.id}`}>
+    <Card className={`overflow-hidden ${isOutOfStock ? "opacity-60" : ""}`} data-testid={`card-menu-item-${item.id}`}>
       <div className="flex flex-col sm:flex-row">
         {item.imageUrl && (
           <div className="sm:w-32 sm:h-32 h-40 shrink-0 overflow-hidden bg-muted">
@@ -51,21 +65,33 @@ function MenuItemCard({ item, restaurant }: { item: MenuItem; restaurant: Restau
           <div>
             <div className="flex items-start justify-between gap-2 mb-1">
               <h4 className="font-semibold" data-testid={`text-menu-item-name-${item.id}`}>{item.name}</h4>
-              {!item.isAvailable && (
+              {isOutOfStock ? (
+                <Badge variant="destructive" data-testid={`badge-out-of-stock-${item.id}`}>
+                  <AlertTriangle className="h-3 w-3 mr-1" />
+                  Item Not Available
+                </Badge>
+              ) : !item.isAvailable ? (
                 <Badge variant="secondary">Unavailable</Badge>
-              )}
+              ) : null}
             </div>
             {item.description && (
               <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
                 {item.description}
               </p>
             )}
-            <p className="font-bold text-primary" data-testid={`text-menu-item-price-${item.id}`}>
-              ${parseFloat(item.price).toFixed(2)}
-            </p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="font-bold text-primary" data-testid={`text-menu-item-price-${item.id}`}>
+                ${parseFloat(item.price).toFixed(2)}
+              </p>
+              {hasLimitedStock && !isOutOfStock && (
+                <span className="text-xs text-muted-foreground" data-testid={`text-stock-${item.id}`}>
+                  {stockQty} left
+                </span>
+              )}
+            </div>
           </div>
           
-          {item.isAvailable && (
+          {canOrder && (
             <div className="flex items-center gap-3 mt-3">
               <div className="flex items-center gap-2 bg-muted rounded-md">
                 <Button
@@ -82,7 +108,7 @@ function MenuItemCard({ item, restaurant }: { item: MenuItem; restaurant: Restau
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8"
-                  onClick={() => setQuantity(quantity + 1)}
+                  onClick={() => setQuantity(Math.min(hasLimitedStock ? maxAllowed : quantity + 1, quantity + 1))}
                   data-testid={`button-increase-${item.id}`}
                 >
                   <Plus className="h-4 w-4" />

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,7 +17,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/lib/language-context";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Store, Plus, Utensils, Package, Star, DollarSign, Loader2, Pencil, Trash2, Clock, CheckCircle, Truck, MapPin, XCircle, ChefHat } from "lucide-react";
+import { Store, Plus, Utensils, Package, Star, DollarSign, Loader2, Pencil, Trash2, Clock, CheckCircle, Truck, MapPin, XCircle, ChefHat, Upload, ImageIcon, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 import { z } from "zod";
 import type { Restaurant, MenuItem, Order } from "@shared/schema";
@@ -40,6 +40,7 @@ const menuItemSchema = z.object({
   price: z.string().min(1, "Price is required"),
   category: z.string().optional(),
   imageUrl: z.string().optional(),
+  quantity: z.string().optional(),
 });
 
 function CreateRestaurantDialog({ onSuccess, variant = "header" }: { onSuccess: () => void; variant?: "header" | "empty-state" }) {
@@ -216,6 +217,9 @@ function CreateRestaurantDialog({ onSuccess, variant = "header" }: { onSuccess: 
 
 function AddMenuItemDialog({ restaurantId, onSuccess }: { restaurantId: string; onSuccess: () => void }) {
   const [open, setOpen] = useState(false);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const { t } = useLanguage();
   
@@ -227,34 +231,64 @@ function AddMenuItemDialog({ restaurantId, onSuccess }: { restaurantId: string; 
       price: "",
       category: "",
       imageUrl: "",
+      quantity: "",
     },
   });
 
+  const handleImageUpload = async (file: File) => {
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+      if (!response.ok) throw new Error("Upload failed");
+      const data = await response.json();
+      form.setValue("imageUrl", data.url);
+      setImagePreview(data.url);
+      toast({ title: t("vendor.imageUploaded") });
+    } catch {
+      toast({ title: t("vendor.imageUploadError"), variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const createMenuItem = useMutation({
     mutationFn: async (data: z.infer<typeof menuItemSchema>) => {
-      return apiRequest("POST", `/api/vendor/restaurants/${restaurantId}/menu`, data);
+      const payload = {
+        ...data,
+        quantity: data.quantity ? parseInt(data.quantity, 10) : -1,
+      };
+      return apiRequest("POST", `/api/vendor/restaurants/${restaurantId}/menu`, payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vendor/restaurants", restaurantId, "menu"] });
-      toast({ title: "Menu item added!" });
+      toast({ title: t("vendor.menuItemAdded") });
       setOpen(false);
       form.reset();
+      setImagePreview(null);
       onSuccess();
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to add menu item.", variant: "destructive" });
+      toast({ title: "Error", description: t("vendor.menuItemError"), variant: "destructive" });
     },
   });
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(o) => {
+      setOpen(o);
+      if (!o) { setImagePreview(null); form.reset(); }
+    }}>
       <DialogTrigger asChild>
         <Button size="sm" data-testid="button-add-menu-item">
           <Plus className="mr-2 h-4 w-4" />
           {t("vendor.addMenuItem")}
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{t("vendor.addMenuItem")}</DialogTitle>
         </DialogHeader>
@@ -316,19 +350,71 @@ function AddMenuItemDialog({ restaurantId, onSuccess }: { restaurantId: string; 
             </div>
             <FormField
               control={form.control}
-              name="imageUrl"
+              name="quantity"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Image URL (Optional)</FormLabel>
+                  <FormLabel>{t("vendor.quantity")}</FormLabel>
                   <FormControl>
-                    <Input {...field} placeholder="https://..." data-testid="input-menu-item-image" />
+                    <Input {...field} type="number" min="0" placeholder={t("vendor.quantityPlaceholder")} data-testid="input-menu-item-quantity" />
                   </FormControl>
+                  <p className="text-xs text-muted-foreground">{t("vendor.quantityHint")}</p>
                   <FormMessage />
                 </FormItem>
               )}
             />
+            <div>
+              <FormLabel>{t("vendor.itemImage")}</FormLabel>
+              <div className="mt-2 space-y-3">
+                {imagePreview ? (
+                  <div className="relative w-full h-40 rounded-md overflow-hidden bg-muted">
+                    <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="absolute top-2 right-2"
+                      onClick={() => {
+                        setImagePreview(null);
+                        form.setValue("imageUrl", "");
+                        if (fileInputRef.current) fileInputRef.current.value = "";
+                      }}
+                      data-testid="button-remove-image"
+                    >
+                      <XCircle className="h-4 w-4 mr-1" /> {t("vendor.removeImage")}
+                    </Button>
+                  </div>
+                ) : (
+                  <div
+                    className="border-2 border-dashed rounded-md p-6 text-center cursor-pointer hover-elevate transition-colors"
+                    onClick={() => fileInputRef.current?.click()}
+                    data-testid="dropzone-menu-item-image"
+                  >
+                    {uploading ? (
+                      <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+                    ) : (
+                      <>
+                        <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                        <p className="text-sm text-muted-foreground">{t("vendor.uploadImage")}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{t("vendor.uploadImageHint")}</p>
+                      </>
+                    )}
+                  </div>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  data-testid="input-menu-item-file"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleImageUpload(file);
+                  }}
+                />
+              </div>
+            </div>
             <DialogFooter>
-              <Button type="submit" disabled={createMenuItem.isPending} data-testid="button-submit-menu-item">
+              <Button type="submit" disabled={createMenuItem.isPending || uploading} data-testid="button-submit-menu-item">
                 {createMenuItem.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {t("vendor.save")}
               </Button>
@@ -397,7 +483,7 @@ function VendorDashboard({ restaurant }: { restaurant: Restaurant }) {
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <Switch
-              checked={restaurant.isOpen}
+              checked={restaurant.isOpen ?? false}
               onCheckedChange={() => toggleOpen.mutate()}
               data-testid="switch-restaurant-open"
             />
@@ -697,34 +783,59 @@ function VendorDashboard({ restaurant }: { restaurant: Restaurant }) {
             </div>
           ) : menuItems && menuItems.length > 0 ? (
             <div className="space-y-3">
-              {menuItems.map((item) => (
-                <Card key={item.id} data-testid={`vendor-menu-item-${item.id}`}>
-                  <CardContent className="p-4 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      {item.imageUrl && (
-                        <img
-                          src={item.imageUrl}
-                          alt={item.name}
-                          className="h-16 w-16 rounded-md object-cover"
-                        />
-                      )}
-                      <div>
-                        <p className="font-medium">{item.name}</p>
-                        <p className="text-sm text-muted-foreground">{item.category}</p>
-                        <p className="font-semibold text-primary">${parseFloat(item.price).toFixed(2)}</p>
+              {menuItems.map((item) => {
+                const qty = item.quantity ?? -1;
+                const isOutOfStock = qty === 0;
+                const showQuantity = qty >= 0;
+                return (
+                  <Card key={item.id} className={isOutOfStock ? "opacity-60" : ""} data-testid={`vendor-menu-item-${item.id}`}>
+                    <CardContent className="p-4 flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-4 min-w-0">
+                        {item.imageUrl ? (
+                          <img
+                            src={item.imageUrl}
+                            alt={item.name}
+                            className="h-16 w-16 rounded-md object-cover shrink-0"
+                          />
+                        ) : (
+                          <div className="h-16 w-16 rounded-md bg-muted flex items-center justify-center shrink-0">
+                            <ImageIcon className="h-6 w-6 text-muted-foreground" />
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <p className="font-medium truncate">{item.name}</p>
+                          <p className="text-sm text-muted-foreground">{item.category}</p>
+                          <div className="flex items-center gap-2 flex-wrap mt-1">
+                            <p className="font-semibold text-primary">${parseFloat(item.price).toFixed(2)}</p>
+                            {showQuantity && (
+                              <span className="text-xs text-muted-foreground" data-testid={`text-menu-qty-${item.id}`}>
+                                {isOutOfStock ? "" : `${qty} ${t("vendor.inStock")}`}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                    <Badge variant={item.isAvailable ? "secondary" : "outline"}>
-                      {item.isAvailable ? "Available" : "Unavailable"}
-                    </Badge>
-                  </CardContent>
-                </Card>
-              ))}
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        {isOutOfStock ? (
+                          <Badge variant="destructive" data-testid={`badge-unavailable-${item.id}`}>
+                            <AlertTriangle className="h-3 w-3 mr-1" />
+                            {t("vendor.outOfStock")}
+                          </Badge>
+                        ) : (
+                          <Badge variant={item.isAvailable ? "secondary" : "outline"}>
+                            {item.isAvailable ? t("vendor.available") : t("vendor.unavailable")}
+                          </Badge>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           ) : (
             <Card className="p-8 text-center">
               <Utensils className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-              <p className="text-muted-foreground">No menu items yet</p>
+              <p className="text-muted-foreground">{t("vendor.noMenuItems")}</p>
             </Card>
           )}
         </TabsContent>

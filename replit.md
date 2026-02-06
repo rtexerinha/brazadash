@@ -27,7 +27,7 @@ The BrazaDash platform is built with a modern full-stack architecture:
 **Core Features Implemented:**
 
 -   **Home Page**: Language-aware hero section, popular services, featured providers and restaurants, customer testimonials, and food categories.
--   **Food Marketplace**: User authentication, food ordering, order tracking, vendor portal for menu and order management, and a robust review system with photo uploads and detailed ratings.
+-   **Food Marketplace**: User authentication, food ordering, order tracking, vendor portal for menu and order management, and a robust review system with photo uploads and detailed ratings. Menu items support quantity/availability tracking (quantity field: -1=unlimited, 0=out of stock, >0=limited). Items with 0 quantity display "Item Not Available" to customers. Vendors can upload images from their computer (multer-based upload to /uploads/ directory, max 5MB, JPEG/PNG/WebP/GIF). Order status progression: pending → confirmed → preparing → ready → out_for_delivery → delivered (or cancelled), with customer notifications at each stage.
 -   **Services Marketplace**: Service discovery across various categories, detailed provider profiles, a booking system, a provider portal for managing services and bookings, and service-specific reviews.
 -   **Community Hub**: Discovery of local events with RSVP functionality, a business directory for Brazilian-owned businesses, and platform-wide announcements.
 -   **Admin Platform**: Comprehensive dashboard for managing users, restaurants, service providers, orders, bookings, events, businesses, and platform announcements, including content moderation.
