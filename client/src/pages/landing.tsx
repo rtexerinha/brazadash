@@ -3,9 +3,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { UtensilsCrossed, MapPin, Star, Clock, Shield, Heart } from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
 import { LanguageToggle } from "@/components/language-toggle";
+import { AuthDialog, useAuthDialog } from "@/components/auth-dialog";
 
 export default function LandingPage() {
   const { t } = useLanguage();
+  const { openAuthDialog, authDialogProps } = useAuthDialog();
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -22,8 +24,8 @@ export default function LandingPage() {
           </div>
           <div className="flex items-center gap-2">
             <LanguageToggle />
-            <Button asChild data-testid="button-login">
-              <a href="/api/login">{t("nav.getStarted")}</a>
+            <Button onClick={openAuthDialog} data-testid="button-login">
+              {t("nav.getStarted")}
             </Button>
           </div>
         </div>
@@ -52,11 +54,9 @@ export default function LandingPage() {
               </p>
               
               <div className="flex flex-col sm:flex-row gap-4">
-                <Button size="lg" asChild className="text-base" data-testid="button-hero-cta">
-                  <a href="/api/login">
-                    <UtensilsCrossed className="mr-2 h-5 w-5" />
-                    {t("landing.orderNow")}
-                  </a>
+                <Button size="lg" className="text-base" onClick={openAuthDialog} data-testid="button-hero-cta">
+                  <UtensilsCrossed className="mr-2 h-5 w-5" />
+                  {t("landing.orderNow")}
                 </Button>
                 <Button size="lg" variant="outline" asChild className="text-base" data-testid="button-learn-more">
                   <a href="#features">{t("landing.learnMore")}</a>
@@ -198,10 +198,8 @@ export default function LandingPage() {
               <p className="text-primary-foreground/80 max-w-xl mx-auto mb-8">
                 {t("landing.readyToTasteDesc")}
               </p>
-              <Button size="lg" variant="secondary" asChild data-testid="button-cta-bottom">
-                <a href="/api/login">
-                  {t("landing.getStartedFree")}
-                </a>
+              <Button size="lg" variant="secondary" onClick={openAuthDialog} data-testid="button-cta-bottom">
+                {t("landing.getStartedFree")}
               </Button>
             </div>
           </div>
@@ -223,6 +221,8 @@ export default function LandingPage() {
           </div>
         </div>
       </footer>
+
+      <AuthDialog {...authDialogProps} />
     </div>
   );
 }

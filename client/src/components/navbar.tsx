@@ -17,6 +17,7 @@ import { useLanguage } from "@/lib/language-context";
 import { LanguageToggle } from "@/components/language-toggle";
 import { ShoppingCart, Sun, Moon, LogOut, Store, Bell, Briefcase, Calendar, Shield } from "lucide-react";
 import { useState } from "react";
+import { AuthDialog, useAuthDialog } from "@/components/auth-dialog";
 
 export function Navbar() {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -25,6 +26,7 @@ export function Navbar() {
   const { t } = useLanguage();
   const [location] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { openAuthDialog, authDialogProps } = useAuthDialog();
   const itemCount = getItemCount();
 
   const { data: roleData } = useQuery<{ roles: string[] }>({
@@ -258,12 +260,13 @@ export function Navbar() {
           )}
 
           {!isLoading && !isAuthenticated && (
-            <Button asChild data-testid="button-login">
-              <a href="/api/login">{t("nav.getStarted")}</a>
+            <Button onClick={openAuthDialog} data-testid="button-login">
+              {t("nav.getStarted")}
             </Button>
           )}
         </div>
       </div>
+      <AuthDialog {...authDialogProps} />
     </header>
   );
 }

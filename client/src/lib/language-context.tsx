@@ -316,6 +316,12 @@ const translations: Record<Language, Record<string, string>> = {
 
     "onboarding.pendingToast": "Registration Submitted",
     "onboarding.pendingToastDesc": "Your registration is pending admin approval. You'll be notified once approved.",
+
+    "authDialog.title": "Welcome to BrazaDash",
+    "authDialog.description": "Sign in to order food, book services, and connect with the Brazilian community in California.",
+    "authDialog.login": "Log In",
+    "authDialog.register": "Create Account",
+    "authDialog.secure": "Secured by Replit Authentication",
   },
   pt: {
     "nav.home": "Inicio",
@@ -624,6 +630,12 @@ const translations: Record<Language, Record<string, string>> = {
 
     "onboarding.pendingToast": "Registro Enviado",
     "onboarding.pendingToastDesc": "Seu registro esta aguardando aprovacao do administrador. Voce sera notificado quando aprovado.",
+
+    "authDialog.title": "Bem-vindo ao BrazaDash",
+    "authDialog.description": "Entre para pedir comida, reservar servicos e se conectar com a comunidade brasileira na California.",
+    "authDialog.login": "Entrar",
+    "authDialog.register": "Criar Conta",
+    "authDialog.secure": "Protegido pela Autenticacao Replit",
   },
 };
 
