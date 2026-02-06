@@ -318,6 +318,9 @@ const translations: Record<Language, Record<string, string>> = {
     "checkout.returnToCart": "Return to Cart",
     "checkout.initError": "Failed to initialize payment. Please try again.",
     "checkout.orderCreateError": "Payment was successful but order creation failed. Please contact support.",
+    "checkout.paymentLoadError": "Could not load payment system. Please try again.",
+    "checkout.retryPayment": "Try Again",
+    "checkout.paymentInitError": "Could not set up payment. Please try again.",
 
     "notifications.title": "Notifications",
     "notifications.noNotifications": "No notifications",
@@ -685,6 +688,9 @@ const translations: Record<Language, Record<string, string>> = {
     "checkout.returnToCart": "Voltar ao Carrinho",
     "checkout.initError": "Falha ao inicializar pagamento. Por favor, tente novamente.",
     "checkout.orderCreateError": "Pagamento realizado com sucesso, mas a criacao do pedido falhou. Entre em contato com o suporte.",
+    "checkout.paymentLoadError": "Nao foi possivel carregar o sistema de pagamento. Por favor, tente novamente.",
+    "checkout.retryPayment": "Tentar Novamente",
+    "checkout.paymentInitError": "Nao foi possivel configurar o pagamento. Por favor, tente novamente.",
 
     "notifications.title": "Notificacoes",
     "notifications.noNotifications": "Nenhuma notificacao",

@@ -118,8 +118,11 @@ export default function CheckoutPage() {
   const tipAmount = parseFloat(tip) || 0;
   const total = subtotal + deliveryFee + tipAmount;
 
-  const { data: stripeConfig } = useQuery<{ publishableKey: string }>({
+  const { data: stripeConfig, isError: stripeConfigError, refetch: refetchStripeConfig } = useQuery<{ publishableKey: string }>({
     queryKey: ["/api/stripe/config"],
+    retry: 3,
+    retryDelay: 1000,
+    staleTime: 1000 * 60 * 10,
   });
 
   const createPaymentIntent = useMutation({
@@ -173,10 +176,10 @@ export default function CheckoutPage() {
   });
 
   useEffect(() => {
-    if (address.trim().length >= 5 && items.length > 0 && !clientSecret && !createPaymentIntent.isPending) {
+    if (address.trim().length >= 5 && items.length > 0 && !clientSecret && !createPaymentIntent.isPending && !createPaymentIntent.isError) {
       createPaymentIntent.mutate();
     }
-  }, [address, clientSecret]);
+  }, [address, clientSecret, createPaymentIntent.isError]);
 
   if (items.length === 0 && !orderComplete) {
     navigate("/cart");
@@ -307,7 +310,14 @@ export default function CheckoutPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {!publishableKey ? (
+                {stripeConfigError ? (
+                  <div className="flex flex-col items-center justify-center py-6 gap-3">
+                    <p className="text-sm text-destructive">{t("checkout.paymentLoadError")}</p>
+                    <Button variant="outline" onClick={() => refetchStripeConfig()} data-testid="button-retry-payment">
+                      {t("checkout.retryPayment")}
+                    </Button>
+                  </div>
+                ) : !publishableKey ? (
                   <div className="flex items-center justify-center py-6">
                     <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                     <span className="ml-2 text-sm text-muted-foreground">{t("checkout.loadingPayment")}</span>
@@ -317,6 +327,16 @@ export default function CheckoutPage() {
                     <p className="text-sm text-muted-foreground">
                       {t("checkout.enterAddress")}
                     </p>
+                  </div>
+                ) : createPaymentIntent.isError ? (
+                  <div className="flex flex-col items-center justify-center py-6 gap-3">
+                    <p className="text-sm text-destructive">{t("checkout.paymentInitError")}</p>
+                    <Button variant="outline" onClick={() => {
+                      setClientSecret(null);
+                      createPaymentIntent.reset();
+                    }} data-testid="button-retry-payment-init">
+                      {t("checkout.retryPayment")}
+                    </Button>
                   </div>
                 ) : !clientSecret ? (
                   <div className="flex items-center justify-center py-6">
