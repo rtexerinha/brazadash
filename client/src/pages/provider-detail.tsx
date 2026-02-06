@@ -38,8 +38,10 @@ function BookingDialog({ provider, service }: { provider: ServiceProvider; servi
   const { t } = useLanguage();
 
   const servicePrice = parseFloat(service?.price || "0");
-  const bookingFee = Math.round(servicePrice * PLATFORM_FEE_PERCENT * 100) / 100;
-  const totalAmount = servicePrice + bookingFee;
+  const platformFee = Math.round(servicePrice * PLATFORM_FEE_PERCENT * 100) / 100;
+  const providerBookingFee = parseFloat(provider.bookingFee || "0");
+  const totalFees = platformFee + providerBookingFee;
+  const totalAmount = servicePrice + totalFees;
 
   const createBookingCheckout = useMutation({
     mutationFn: async () => {
@@ -146,9 +148,15 @@ function BookingDialog({ provider, service }: { provider: ServiceProvider; servi
                   <span data-testid="text-service-price">${servicePrice.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-sm text-muted-foreground">
-                  <span>{t("booking.bookingFee")} (8%)</span>
-                  <span data-testid="text-booking-fee">${bookingFee.toFixed(2)}</span>
+                  <span>{t("booking.platformFee")} (8%)</span>
+                  <span data-testid="text-platform-fee">${platformFee.toFixed(2)}</span>
                 </div>
+                {providerBookingFee > 0 && (
+                  <div className="flex justify-between text-sm text-muted-foreground">
+                    <span>{t("booking.bookingFee")}</span>
+                    <span data-testid="text-booking-fee">${providerBookingFee.toFixed(2)}</span>
+                  </div>
+                )}
                 <div className="border-t pt-2 flex justify-between font-semibold">
                   <span>{t("booking.total")}</span>
                   <span data-testid="text-booking-total">${totalAmount.toFixed(2)}</span>

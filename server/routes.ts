@@ -1291,8 +1291,10 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Service has no price set. Cannot process payment." });
       }
 
-      const bookingFee = Math.round(servicePrice * PLATFORM_FEE_PERCENT * 100) / 100;
-      const totalAmount = servicePrice + bookingFee;
+      const providerBookingFee = parseFloat(provider.bookingFee || "0");
+      const platformFee = Math.round(servicePrice * PLATFORM_FEE_PERCENT * 100) / 100;
+      const totalBookingFee = providerBookingFee + platformFee;
+      const totalAmount = servicePrice + totalBookingFee;
 
       const stripe = await getUncachableStripeClient();
 
@@ -1310,15 +1312,29 @@ export async function registerRoutes(
         },
       ];
 
-      if (bookingFee > 0) {
+      if (platformFee > 0) {
+        lineItems.push({
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: 'Platform Fee',
+              description: 'Platform fee (8%)',
+            },
+            unit_amount: Math.round(platformFee * 100),
+          },
+          quantity: 1,
+        });
+      }
+
+      if (providerBookingFee > 0) {
         lineItems.push({
           price_data: {
             currency: 'usd',
             product_data: {
               name: 'Booking Fee',
-              description: 'Platform fee (8%)',
+              description: `Reservation fee set by ${provider.businessName}`,
             },
-            unit_amount: Math.round(bookingFee * 100),
+            unit_amount: Math.round(providerBookingFee * 100),
           },
           quantity: 1,
         });
@@ -1337,7 +1353,9 @@ export async function registerRoutes(
           serviceId: serviceId || '',
           serviceName,
           servicePrice: servicePrice.toString(),
-          bookingFee: bookingFee.toString(),
+          bookingFee: totalBookingFee.toString(),
+          platformFee: platformFee.toString(),
+          providerBookingFee: providerBookingFee.toString(),
           totalAmount: totalAmount.toString(),
           requestedDate: requestedDate || '',
           requestedTime: requestedTime || '',

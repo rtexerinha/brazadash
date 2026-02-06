@@ -141,6 +141,7 @@ export const serviceProviders = pgTable("service_providers", {
   rating: decimal("rating", { precision: 2, scale: 1 }).default("0"),
   reviewCount: integer("review_count").default(0),
   priceRange: varchar("price_range", { length: 20 }).default("$$"), // $, $$, $$$
+  bookingFee: decimal("booking_fee", { precision: 10, scale: 2 }).default("0"),
   availability: jsonb("availability"), // {monday: {start: "09:00", end: "17:00"}, ...}
   bankName: varchar("bank_name", { length: 255 }),
   routingNumber: varchar("routing_number", { length: 20 }),

@@ -16,7 +16,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLanguage } from "@/lib/language-context";
-import { Briefcase, Plus, Star, Calendar, DollarSign, Users, Loader2, Check, X, Upload, ImageIcon, XCircle } from "lucide-react";
+import { Briefcase, Plus, Star, Calendar, DollarSign, Users, Loader2, Check, X, Upload, ImageIcon, XCircle, Filter } from "lucide-react";
+import { startOfDay, startOfWeek, startOfMonth, isWithinInterval, addDays, addWeeks, addMonths } from "date-fns";
 import { z } from "zod";
 import type { ServiceProvider, Service, Booking } from "@shared/schema";
 
@@ -354,7 +355,9 @@ function AddServiceDialog({ onSuccess }: { onSuccess: () => void }) {
 }
 
 function ProviderDashboard({ provider }: { provider: ServiceProvider }) {
+  const { t } = useLanguage();
   const { toast } = useToast();
+  const [dateFilter, setDateFilter] = useState<"all" | "today" | "week" | "month">("all");
 
   const { data: services, isLoading: servicesLoading } = useQuery<Service[]>({
     queryKey: ["/api/provider/services"],
@@ -370,11 +373,34 @@ function ProviderDashboard({ provider }: { provider: ServiceProvider }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/provider/bookings"] });
-      toast({ title: "Booking updated!" });
+      toast({ title: t("provider.bookingUpdated") });
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to update booking.", variant: "destructive" });
+      toast({ title: t("common.error"), description: t("provider.bookingUpdateFailed"), variant: "destructive" });
     },
+  });
+
+  const filteredBookings = (bookings || []).filter(b => {
+    if (dateFilter === "all") return true;
+    const bookingDate = b.requestedDate ? new Date(b.requestedDate) : null;
+    if (!bookingDate) return false;
+    const now = new Date();
+    if (dateFilter === "today") {
+      const start = startOfDay(now);
+      const end = addDays(start, 1);
+      return isWithinInterval(bookingDate, { start, end });
+    }
+    if (dateFilter === "week") {
+      const start = startOfWeek(now);
+      const end = addWeeks(start, 1);
+      return isWithinInterval(bookingDate, { start, end });
+    }
+    if (dateFilter === "month") {
+      const start = startOfMonth(now);
+      const end = addMonths(start, 1);
+      return isWithinInterval(bookingDate, { start, end });
+    }
+    return true;
   });
 
   const pendingBookings = bookings?.filter(b => b.status === "pending") || [];
@@ -451,15 +477,50 @@ function ProviderDashboard({ provider }: { provider: ServiceProvider }) {
         </TabsList>
 
         <TabsContent value="bookings" className="mt-6">
+          <div className="flex items-center gap-2 mb-4 flex-wrap">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <Button
+              variant={dateFilter === "all" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setDateFilter("all")}
+              data-testid="filter-all"
+            >
+              {t("provider.filterAll")}
+            </Button>
+            <Button
+              variant={dateFilter === "today" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setDateFilter("today")}
+              data-testid="filter-today"
+            >
+              {t("provider.filterToday")}
+            </Button>
+            <Button
+              variant={dateFilter === "week" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setDateFilter("week")}
+              data-testid="filter-week"
+            >
+              {t("provider.filterWeek")}
+            </Button>
+            <Button
+              variant={dateFilter === "month" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setDateFilter("month")}
+              data-testid="filter-month"
+            >
+              {t("provider.filterMonth")}
+            </Button>
+          </div>
           {bookingsLoading ? (
             <div className="space-y-4">
               {[...Array(3)].map((_, i) => (
                 <Skeleton key={i} className="h-24" />
               ))}
             </div>
-          ) : bookings && bookings.length > 0 ? (
+          ) : filteredBookings.length > 0 ? (
             <div className="space-y-4">
-              {bookings.map((booking) => (
+              {filteredBookings.map((booking) => (
                 <Card key={booking.id} data-testid={`provider-booking-${booking.id}`}>
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between gap-4">
@@ -767,7 +828,9 @@ function ProviderImageSettings({ provider }: { provider: ServiceProvider }) {
 }
 
 function ProviderBankSettings({ provider }: { provider: ServiceProvider }) {
+  const { t } = useLanguage();
   const { toast } = useToast();
+  const [bookingFeeAmount, setBookingFeeAmount] = useState(provider.bookingFee || "0");
   const [bankName, setBankName] = useState(provider.bankName || "");
   const [routingNumber, setRoutingNumber] = useState(provider.routingNumber || "");
   const [bankAccountNumber, setBankAccountNumber] = useState(provider.bankAccountNumber || "");
@@ -777,6 +840,7 @@ function ProviderBankSettings({ provider }: { provider: ServiceProvider }) {
   const updateBankInfo = useMutation({
     mutationFn: async () => {
       return apiRequest("PATCH", "/api/provider/profile", {
+        bookingFee: bookingFeeAmount || "0",
         bankName: bankName || null,
         routingNumber: routingNumber || null,
         bankAccountNumber: bankAccountNumber || null,
@@ -786,51 +850,69 @@ function ProviderBankSettings({ provider }: { provider: ServiceProvider }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/provider/profile"] });
-      toast({ title: "Payment info saved", description: "Your payment information has been updated." });
+      toast({ title: t("settings.paymentInfoSaved"), description: t("settings.paymentInfoSavedDesc") });
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to save payment info.", variant: "destructive" });
+      toast({ title: t("common.error"), description: t("settings.paymentInfoFailed"), variant: "destructive" });
     },
   });
 
   return (
     <Card>
       <CardContent className="p-6">
-        <h3 className="text-lg font-semibold mb-2">Payment Information</h3>
+        <h3 className="text-lg font-semibold mb-2">{t("settings.paymentInfo")}</h3>
         <p className="text-sm text-muted-foreground mb-6">
-          Provide your bank details so you can receive payments from bookings.
+          {t("settings.paymentInfoDesc")}
         </p>
         <div className="space-y-4">
           <div>
-            <Label htmlFor="provider-settings-bank-name">Bank Name</Label>
+            <Label htmlFor="provider-settings-booking-fee">{t("settings.bookingFeeLabel")}</Label>
+            <div className="flex items-center gap-2 mt-1.5">
+              <span className="text-sm font-medium">$</span>
+              <Input
+                id="provider-settings-booking-fee"
+                type="number"
+                min="0"
+                step="0.01"
+                value={bookingFeeAmount}
+                onChange={(e) => setBookingFeeAmount(e.target.value)}
+                placeholder="0.00"
+                className="max-w-[200px]"
+                data-testid="input-provider-booking-fee"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">{t("settings.bookingFeeDesc")}</p>
+          </div>
+          <div className="border-t pt-4">
+            <Label htmlFor="provider-settings-bank-name">{t("onboarding.bankName")}</Label>
             <Input
               id="provider-settings-bank-name"
               value={bankName}
               onChange={(e) => setBankName(e.target.value)}
-              placeholder="e.g. Bank of America, Chase"
+              placeholder={t("onboarding.bankNamePlaceholder")}
               className="mt-1.5"
               data-testid="input-provider-settings-bank-name"
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="provider-settings-routing">Routing Number</Label>
+              <Label htmlFor="provider-settings-routing">{t("onboarding.routingNumber")}</Label>
               <Input
                 id="provider-settings-routing"
                 value={routingNumber}
                 onChange={(e) => setRoutingNumber(e.target.value)}
-                placeholder="9-digit routing number"
+                placeholder={t("onboarding.routingNumberPlaceholder")}
                 className="mt-1.5"
                 data-testid="input-provider-settings-routing"
               />
             </div>
             <div>
-              <Label htmlFor="provider-settings-account">Account Number</Label>
+              <Label htmlFor="provider-settings-account">{t("onboarding.bankAccountNumber")}</Label>
               <Input
                 id="provider-settings-account"
                 value={bankAccountNumber}
                 onChange={(e) => setBankAccountNumber(e.target.value)}
-                placeholder="Bank account number"
+                placeholder={t("onboarding.bankAccountPlaceholder")}
                 className="mt-1.5"
                 data-testid="input-provider-settings-account"
               />
@@ -838,23 +920,23 @@ function ProviderBankSettings({ provider }: { provider: ServiceProvider }) {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="provider-settings-zelle">Zelle (Email or Phone)</Label>
+              <Label htmlFor="provider-settings-zelle">{t("onboarding.zelleInfo")}</Label>
               <Input
                 id="provider-settings-zelle"
                 value={zelleInfo}
                 onChange={(e) => setZelleInfo(e.target.value)}
-                placeholder="Zelle email or phone number"
+                placeholder={t("onboarding.zelleInfoPlaceholder")}
                 className="mt-1.5"
                 data-testid="input-provider-settings-zelle"
               />
             </div>
             <div>
-              <Label htmlFor="provider-settings-venmo">Venmo Username</Label>
+              <Label htmlFor="provider-settings-venmo">{t("onboarding.venmoInfo")}</Label>
               <Input
                 id="provider-settings-venmo"
                 value={venmoInfo}
                 onChange={(e) => setVenmoInfo(e.target.value)}
-                placeholder="@username"
+                placeholder={t("onboarding.venmoInfoPlaceholder")}
                 className="mt-1.5"
                 data-testid="input-provider-settings-venmo"
               />
@@ -865,7 +947,7 @@ function ProviderBankSettings({ provider }: { provider: ServiceProvider }) {
             disabled={updateBankInfo.isPending}
             data-testid="button-provider-save-bank-info"
           >
-            {updateBankInfo.isPending ? "Saving..." : "Save Payment Info"}
+            {updateBankInfo.isPending ? t("common.saving") : t("vendor.saveBankInfo")}
           </Button>
         </div>
       </CardContent>
