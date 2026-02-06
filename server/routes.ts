@@ -969,7 +969,8 @@ export async function registerRoutes(
 
       const deliveryFee = restaurant.deliveryFee ? parseFloat(restaurant.deliveryFee) : 3.99;
       const tipAmount = tip ? parseFloat(tip) : 0;
-      const total = subtotal + deliveryFee + tipAmount;
+      const platformFee = Math.round(subtotal * 0.08 * 100) / 100;
+      const total = subtotal + deliveryFee + tipAmount + platformFee;
       const amountInCents = Math.round(total * 100);
 
       const stripe = await getUncachableStripeClient();
@@ -987,6 +988,7 @@ export async function registerRoutes(
           tip: tipAmount.toString(),
           subtotal: subtotal.toFixed(2),
           deliveryFee: deliveryFee.toFixed(2),
+          platformFee: platformFee.toFixed(2),
         },
       });
 
@@ -1114,6 +1116,22 @@ export async function registerRoutes(
         quantity: 1,
       });
 
+      // Add platform fee (8%)
+      const platformFee = Math.round(subtotal * 0.08 * 100) / 100;
+      if (platformFee > 0) {
+        lineItems.push({
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: 'Platform Fee',
+              description: 'Platform fee (8%)',
+            },
+            unit_amount: Math.round(platformFee * 100),
+          },
+          quantity: 1,
+        });
+      }
+
       // Add tip if provided
       const tipAmount = tip ? parseFloat(tip) : 0;
       if (tipAmount > 0) {
@@ -1145,6 +1163,7 @@ export async function registerRoutes(
           notes: notes || '',
           items: JSON.stringify(items),
           tip: tipAmount.toString(),
+          platformFee: platformFee.toFixed(2),
         },
       });
 
@@ -1240,7 +1259,7 @@ export async function registerRoutes(
   // BOOKING CHECKOUT (Stripe payment for services)
   // ============================================
 
-  const BOOKING_FEE_PERCENT = 0.05; // 5% platform booking fee
+  const PLATFORM_FEE_PERCENT = 0.08; // 8% platform fee
 
   app.post("/api/bookings/checkout", isAuthenticated, async (req: any, res) => {
     try {
@@ -1272,7 +1291,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Service has no price set. Cannot process payment." });
       }
 
-      const bookingFee = Math.round(servicePrice * BOOKING_FEE_PERCENT * 100) / 100;
+      const bookingFee = Math.round(servicePrice * PLATFORM_FEE_PERCENT * 100) / 100;
       const totalAmount = servicePrice + bookingFee;
 
       const stripe = await getUncachableStripeClient();
@@ -1297,7 +1316,7 @@ export async function registerRoutes(
             currency: 'usd',
             product_data: {
               name: 'Booking Fee',
-              description: 'Platform booking fee (5%)',
+              description: 'Platform fee (8%)',
             },
             unit_amount: Math.round(bookingFee * 100),
           },
@@ -1651,6 +1670,11 @@ export async function registerRoutes(
             address: businessInfo.address || null,
             city: businessInfo.city || null,
             phone: businessInfo.phone || null,
+            bankName: businessInfo.bankName || null,
+            routingNumber: businessInfo.routingNumber || null,
+            bankAccountNumber: businessInfo.bankAccountNumber || null,
+            zelleInfo: businessInfo.zelleInfo || null,
+            venmoInfo: businessInfo.venmoInfo || null,
             isActive: false,
           });
         }
@@ -1670,6 +1694,11 @@ export async function registerRoutes(
             email: businessInfo.email || null,
             einNumber: businessInfo.einNumber || null,
             imageUrl: businessInfo.imageUrl || null,
+            bankName: businessInfo.bankName || null,
+            routingNumber: businessInfo.routingNumber || null,
+            bankAccountNumber: businessInfo.bankAccountNumber || null,
+            zelleInfo: businessInfo.zelleInfo || null,
+            venmoInfo: businessInfo.venmoInfo || null,
             isActive: false,
           });
         }

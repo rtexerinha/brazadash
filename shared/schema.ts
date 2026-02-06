@@ -29,6 +29,11 @@ export const restaurants = pgTable("restaurants", {
   reviewCount: integer("review_count").default(0),
   deliveryFee: decimal("delivery_fee", { precision: 10, scale: 2 }).default("3.99"),
   deliveryTime: varchar("delivery_time", { length: 50 }).default("30-45 min"),
+  bankName: varchar("bank_name", { length: 255 }),
+  routingNumber: varchar("routing_number", { length: 20 }),
+  bankAccountNumber: varchar("bank_account_number", { length: 30 }),
+  zelleInfo: varchar("zelle_info", { length: 255 }),
+  venmoInfo: varchar("venmo_info", { length: 255 }),
   isOpen: boolean("is_open").default(true),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
@@ -136,6 +141,11 @@ export const serviceProviders = pgTable("service_providers", {
   reviewCount: integer("review_count").default(0),
   priceRange: varchar("price_range", { length: 20 }).default("$$"), // $, $$, $$$
   availability: jsonb("availability"), // {monday: {start: "09:00", end: "17:00"}, ...}
+  bankName: varchar("bank_name", { length: 255 }),
+  routingNumber: varchar("routing_number", { length: 20 }),
+  bankAccountNumber: varchar("bank_account_number", { length: 30 }),
+  zelleInfo: varchar("zelle_info", { length: 255 }),
+  venmoInfo: varchar("venmo_info", { length: 255 }),
   isVerified: boolean("is_verified").default(false),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),

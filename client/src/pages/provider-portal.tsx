@@ -444,6 +444,9 @@ function ProviderDashboard({ provider }: { provider: ServiceProvider }) {
           <TabsTrigger value="services" data-testid="tab-services">
             Services ({services?.length || 0})
           </TabsTrigger>
+          <TabsTrigger value="settings" data-testid="tab-settings">
+            Settings
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="bookings" className="mt-6">
@@ -573,8 +576,119 @@ function ProviderDashboard({ provider }: { provider: ServiceProvider }) {
             </Card>
           )}
         </TabsContent>
+
+        <TabsContent value="settings" className="mt-6">
+          <ProviderBankSettings provider={provider} />
+        </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+function ProviderBankSettings({ provider }: { provider: ServiceProvider }) {
+  const { toast } = useToast();
+  const [bankName, setBankName] = useState(provider.bankName || "");
+  const [routingNumber, setRoutingNumber] = useState(provider.routingNumber || "");
+  const [bankAccountNumber, setBankAccountNumber] = useState(provider.bankAccountNumber || "");
+  const [zelleInfo, setZelleInfo] = useState(provider.zelleInfo || "");
+  const [venmoInfo, setVenmoInfo] = useState(provider.venmoInfo || "");
+
+  const updateBankInfo = useMutation({
+    mutationFn: async () => {
+      return apiRequest("PATCH", "/api/provider/profile", {
+        bankName: bankName || null,
+        routingNumber: routingNumber || null,
+        bankAccountNumber: bankAccountNumber || null,
+        zelleInfo: zelleInfo || null,
+        venmoInfo: venmoInfo || null,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/provider/profile"] });
+      toast({ title: "Payment info saved", description: "Your payment information has been updated." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to save payment info.", variant: "destructive" });
+    },
+  });
+
+  return (
+    <Card>
+      <CardContent className="p-6">
+        <h3 className="text-lg font-semibold mb-2">Payment Information</h3>
+        <p className="text-sm text-muted-foreground mb-6">
+          Provide your bank details so you can receive payments from bookings.
+        </p>
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="provider-settings-bank-name">Bank Name</Label>
+            <Input
+              id="provider-settings-bank-name"
+              value={bankName}
+              onChange={(e) => setBankName(e.target.value)}
+              placeholder="e.g. Bank of America, Chase"
+              className="mt-1.5"
+              data-testid="input-provider-settings-bank-name"
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="provider-settings-routing">Routing Number</Label>
+              <Input
+                id="provider-settings-routing"
+                value={routingNumber}
+                onChange={(e) => setRoutingNumber(e.target.value)}
+                placeholder="9-digit routing number"
+                className="mt-1.5"
+                data-testid="input-provider-settings-routing"
+              />
+            </div>
+            <div>
+              <Label htmlFor="provider-settings-account">Account Number</Label>
+              <Input
+                id="provider-settings-account"
+                value={bankAccountNumber}
+                onChange={(e) => setBankAccountNumber(e.target.value)}
+                placeholder="Bank account number"
+                className="mt-1.5"
+                data-testid="input-provider-settings-account"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="provider-settings-zelle">Zelle (Email or Phone)</Label>
+              <Input
+                id="provider-settings-zelle"
+                value={zelleInfo}
+                onChange={(e) => setZelleInfo(e.target.value)}
+                placeholder="Zelle email or phone number"
+                className="mt-1.5"
+                data-testid="input-provider-settings-zelle"
+              />
+            </div>
+            <div>
+              <Label htmlFor="provider-settings-venmo">Venmo Username</Label>
+              <Input
+                id="provider-settings-venmo"
+                value={venmoInfo}
+                onChange={(e) => setVenmoInfo(e.target.value)}
+                placeholder="@username"
+                className="mt-1.5"
+                data-testid="input-provider-settings-venmo"
+              />
+            </div>
+          </div>
+          <Button
+            onClick={() => updateBankInfo.mutate()}
+            disabled={updateBankInfo.isPending}
+            data-testid="button-provider-save-bank-info"
+          >
+            {updateBankInfo.isPending ? "Saving..." : "Save Payment Info"}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

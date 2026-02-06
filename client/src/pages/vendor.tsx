@@ -591,6 +591,7 @@ function VendorDashboard({ restaurant }: { restaurant: Restaurant }) {
         <TabsList>
           <TabsTrigger value="orders" data-testid="tab-orders">{t("vendor.orders")}</TabsTrigger>
           <TabsTrigger value="menu" data-testid="tab-menu">{t("vendor.menu")}</TabsTrigger>
+          <TabsTrigger value="settings" data-testid="tab-settings">{t("vendor.settings")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="orders" className="mt-6">
@@ -968,8 +969,142 @@ function VendorDashboard({ restaurant }: { restaurant: Restaurant }) {
             </Card>
           )}
         </TabsContent>
+
+        <TabsContent value="settings" className="mt-6">
+          <BankInfoSettings
+            type="restaurant"
+            entityId={restaurant.id}
+            initialData={{
+              bankName: restaurant.bankName || "",
+              routingNumber: restaurant.routingNumber || "",
+              bankAccountNumber: restaurant.bankAccountNumber || "",
+              zelleInfo: restaurant.zelleInfo || "",
+              venmoInfo: restaurant.venmoInfo || "",
+            }}
+          />
+        </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+function BankInfoSettings({ type, entityId, initialData }: {
+  type: "restaurant" | "provider";
+  entityId: string;
+  initialData: {
+    bankName: string;
+    routingNumber: string;
+    bankAccountNumber: string;
+    zelleInfo: string;
+    venmoInfo: string;
+  };
+}) {
+  const { t } = useLanguage();
+  const { toast } = useToast();
+  const [bankName, setBankName] = useState(initialData.bankName);
+  const [routingNumber, setRoutingNumber] = useState(initialData.routingNumber);
+  const [bankAccountNumber, setBankAccountNumber] = useState(initialData.bankAccountNumber);
+  const [zelleInfo, setZelleInfo] = useState(initialData.zelleInfo);
+  const [venmoInfo, setVenmoInfo] = useState(initialData.venmoInfo);
+
+  const updateBankInfo = useMutation({
+    mutationFn: async () => {
+      const endpoint = type === "restaurant"
+        ? `/api/vendor/restaurants/${entityId}`
+        : "/api/provider/profile";
+      return apiRequest("PATCH", endpoint, {
+        bankName: bankName || null,
+        routingNumber: routingNumber || null,
+        bankAccountNumber: bankAccountNumber || null,
+        zelleInfo: zelleInfo || null,
+        venmoInfo: venmoInfo || null,
+      });
+    },
+    onSuccess: () => {
+      const key = type === "restaurant" ? "/api/vendor/restaurants" : "/api/provider/profile";
+      queryClient.invalidateQueries({ queryKey: [key] });
+      toast({ title: t("vendor.bankInfoSaved"), description: t("vendor.bankInfoSavedDesc") });
+    },
+    onError: () => {
+      toast({ title: t("common.error"), description: t("vendor.bankInfoSaveFailed"), variant: "destructive" });
+    },
+  });
+
+  return (
+    <Card>
+      <CardContent className="p-6">
+        <h3 className="text-lg font-semibold mb-2">{t("onboarding.bankInfoTitle")}</h3>
+        <p className="text-sm text-muted-foreground mb-6">{t("onboarding.bankInfoDesc")}</p>
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="settings-bank-name">{t("onboarding.bankName")}</Label>
+            <Input
+              id="settings-bank-name"
+              value={bankName}
+              onChange={(e) => setBankName(e.target.value)}
+              placeholder={t("onboarding.bankNamePlaceholder")}
+              className="mt-1.5"
+              data-testid="input-settings-bank-name"
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="settings-routing">{t("onboarding.routingNumber")}</Label>
+              <Input
+                id="settings-routing"
+                value={routingNumber}
+                onChange={(e) => setRoutingNumber(e.target.value)}
+                placeholder={t("onboarding.routingNumberPlaceholder")}
+                className="mt-1.5"
+                data-testid="input-settings-routing-number"
+              />
+            </div>
+            <div>
+              <Label htmlFor="settings-account">{t("onboarding.bankAccountNumber")}</Label>
+              <Input
+                id="settings-account"
+                value={bankAccountNumber}
+                onChange={(e) => setBankAccountNumber(e.target.value)}
+                placeholder={t("onboarding.bankAccountPlaceholder")}
+                className="mt-1.5"
+                data-testid="input-settings-bank-account"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="settings-zelle">{t("onboarding.zelleInfo")}</Label>
+              <Input
+                id="settings-zelle"
+                value={zelleInfo}
+                onChange={(e) => setZelleInfo(e.target.value)}
+                placeholder={t("onboarding.zelleInfoPlaceholder")}
+                className="mt-1.5"
+                data-testid="input-settings-zelle"
+              />
+            </div>
+            <div>
+              <Label htmlFor="settings-venmo">{t("onboarding.venmoInfo")}</Label>
+              <Input
+                id="settings-venmo"
+                value={venmoInfo}
+                onChange={(e) => setVenmoInfo(e.target.value)}
+                placeholder={t("onboarding.venmoInfoPlaceholder")}
+                className="mt-1.5"
+                data-testid="input-settings-venmo"
+              />
+            </div>
+          </div>
+          <Button
+            onClick={() => updateBankInfo.mutate()}
+            disabled={updateBankInfo.isPending}
+            data-testid="button-save-bank-info"
+          >
+            {updateBankInfo.isPending ? t("common.saving") : t("vendor.saveBankInfo")}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

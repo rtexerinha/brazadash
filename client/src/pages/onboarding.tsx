@@ -19,6 +19,11 @@ interface VendorInfo {
   city: string;
   address: string;
   phone: string;
+  bankName: string;
+  routingNumber: string;
+  bankAccountNumber: string;
+  zelleInfo: string;
+  venmoInfo: string;
 }
 
 interface ProviderInfo {
@@ -31,6 +36,11 @@ interface ProviderInfo {
   email: string;
   einNumber: string;
   imageUrl: string;
+  bankName: string;
+  routingNumber: string;
+  bankAccountNumber: string;
+  zelleInfo: string;
+  venmoInfo: string;
 }
 
 export default function OnboardingPage() {
@@ -46,6 +56,11 @@ export default function OnboardingPage() {
     city: "",
     address: "",
     phone: "",
+    bankName: "",
+    routingNumber: "",
+    bankAccountNumber: "",
+    zelleInfo: "",
+    venmoInfo: "",
   });
 
   const [providerInfo, setProviderInfo] = useState<ProviderInfo>({
@@ -58,6 +73,11 @@ export default function OnboardingPage() {
     email: "",
     einNumber: "",
     imageUrl: "",
+    bankName: "",
+    routingNumber: "",
+    bankAccountNumber: "",
+    zelleInfo: "",
+    venmoInfo: "",
   });
   const [uploading, setUploading] = useState(false);
 
@@ -353,6 +373,72 @@ export default function OnboardingPage() {
                     />
                   </div>
                 </div>
+
+                <div className="border-t pt-4 mt-4">
+                  <h3 className="text-sm font-semibold mb-3">{t("onboarding.bankInfoTitle")}</h3>
+                  <p className="text-xs text-muted-foreground mb-4">{t("onboarding.bankInfoDesc")}</p>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="vendor-bank-name">{t("onboarding.bankName")}</Label>
+                      <Input
+                        id="vendor-bank-name"
+                        value={vendorInfo.bankName}
+                        onChange={(e) => setVendorInfo({ ...vendorInfo, bankName: e.target.value })}
+                        placeholder={t("onboarding.bankNamePlaceholder")}
+                        className="mt-1.5"
+                        data-testid="input-vendor-bank-name"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="vendor-routing">{t("onboarding.routingNumber")}</Label>
+                        <Input
+                          id="vendor-routing"
+                          value={vendorInfo.routingNumber}
+                          onChange={(e) => setVendorInfo({ ...vendorInfo, routingNumber: e.target.value })}
+                          placeholder={t("onboarding.routingNumberPlaceholder")}
+                          className="mt-1.5"
+                          data-testid="input-vendor-routing-number"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="vendor-account">{t("onboarding.bankAccountNumber")}</Label>
+                        <Input
+                          id="vendor-account"
+                          value={vendorInfo.bankAccountNumber}
+                          onChange={(e) => setVendorInfo({ ...vendorInfo, bankAccountNumber: e.target.value })}
+                          placeholder={t("onboarding.bankAccountPlaceholder")}
+                          className="mt-1.5"
+                          data-testid="input-vendor-bank-account"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="vendor-zelle">{t("onboarding.zelleInfo")}</Label>
+                        <Input
+                          id="vendor-zelle"
+                          value={vendorInfo.zelleInfo}
+                          onChange={(e) => setVendorInfo({ ...vendorInfo, zelleInfo: e.target.value })}
+                          placeholder={t("onboarding.zelleInfoPlaceholder")}
+                          className="mt-1.5"
+                          data-testid="input-vendor-zelle"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="vendor-venmo">{t("onboarding.venmoInfo")}</Label>
+                        <Input
+                          id="vendor-venmo"
+                          value={vendorInfo.venmoInfo}
+                          onChange={(e) => setVendorInfo({ ...vendorInfo, venmoInfo: e.target.value })}
+                          placeholder={t("onboarding.venmoInfoPlaceholder")}
+                          className="mt-1.5"
+                          data-testid="input-vendor-venmo"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
@@ -503,6 +589,73 @@ export default function OnboardingPage() {
                     />
                     <p className="text-xs text-muted-foreground mt-1">{t("onboarding.einNumberDesc")}</p>
                   </div>
+
+                  <div className="border-t pt-4 mt-4">
+                    <h3 className="text-sm font-semibold mb-3">{t("onboarding.bankInfoTitle")}</h3>
+                    <p className="text-xs text-muted-foreground mb-4">{t("onboarding.bankInfoDesc")}</p>
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="provider-bank-name">{t("onboarding.bankName")}</Label>
+                        <Input
+                          id="provider-bank-name"
+                          value={providerInfo.bankName}
+                          onChange={(e) => setProviderInfo({ ...providerInfo, bankName: e.target.value })}
+                          placeholder={t("onboarding.bankNamePlaceholder")}
+                          className="mt-1.5"
+                          data-testid="input-provider-bank-name"
+                        />
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="provider-routing">{t("onboarding.routingNumber")}</Label>
+                          <Input
+                            id="provider-routing"
+                            value={providerInfo.routingNumber}
+                            onChange={(e) => setProviderInfo({ ...providerInfo, routingNumber: e.target.value })}
+                            placeholder={t("onboarding.routingNumberPlaceholder")}
+                            className="mt-1.5"
+                            data-testid="input-provider-routing-number"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="provider-account">{t("onboarding.bankAccountNumber")}</Label>
+                          <Input
+                            id="provider-account"
+                            value={providerInfo.bankAccountNumber}
+                            onChange={(e) => setProviderInfo({ ...providerInfo, bankAccountNumber: e.target.value })}
+                            placeholder={t("onboarding.bankAccountPlaceholder")}
+                            className="mt-1.5"
+                            data-testid="input-provider-bank-account"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="provider-zelle">{t("onboarding.zelleInfo")}</Label>
+                          <Input
+                            id="provider-zelle"
+                            value={providerInfo.zelleInfo}
+                            onChange={(e) => setProviderInfo({ ...providerInfo, zelleInfo: e.target.value })}
+                            placeholder={t("onboarding.zelleInfoPlaceholder")}
+                            className="mt-1.5"
+                            data-testid="input-provider-zelle"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="provider-venmo">{t("onboarding.venmoInfo")}</Label>
+                          <Input
+                            id="provider-venmo"
+                            value={providerInfo.venmoInfo}
+                            onChange={(e) => setProviderInfo({ ...providerInfo, venmoInfo: e.target.value })}
+                            placeholder={t("onboarding.venmoInfoPlaceholder")}
+                            className="mt-1.5"
+                            data-testid="input-provider-venmo"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   <div>
                     <Label>{t("onboarding.businessImage")}</Label>
                     <div className="mt-1.5">

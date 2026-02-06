@@ -116,7 +116,8 @@ export default function CheckoutPage() {
   const subtotal = getSubtotal();
   const deliveryFee = 3.99;
   const tipAmount = parseFloat(tip) || 0;
-  const total = subtotal + deliveryFee + tipAmount;
+  const platformFee = Math.round(subtotal * 0.08 * 100) / 100;
+  const total = subtotal + deliveryFee + tipAmount + platformFee;
 
   const { data: stripeConfig, isError: stripeConfigError, refetch: refetchStripeConfig } = useQuery<{ publishableKey: string }>({
     queryKey: ["/api/stripe/config"],
@@ -394,6 +395,10 @@ export default function CheckoutPage() {
                 <div className="flex justify-between gap-1">
                   <span className="text-muted-foreground">{t("cart.deliveryFee")}</span>
                   <span>${deliveryFee.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between gap-1">
+                  <span className="text-muted-foreground">{t("checkout.platformFee")} (8%)</span>
+                  <span data-testid="text-platform-fee">${platformFee.toFixed(2)}</span>
                 </div>
                 {tipAmount > 0 && (
                   <div className="flex justify-between gap-1">

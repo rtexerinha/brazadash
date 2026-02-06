@@ -25,7 +25,7 @@ import { format } from "date-fns";
 import { useLanguage } from "@/lib/language-context";
 import type { ServiceProvider, Service, ServiceReview } from "@shared/schema";
 
-const BOOKING_FEE_PERCENT = 0.05;
+const PLATFORM_FEE_PERCENT = 0.08;
 
 function BookingDialog({ provider, service }: { provider: ServiceProvider; service?: Service }) {
   const [open, setOpen] = useState(false);
@@ -38,7 +38,7 @@ function BookingDialog({ provider, service }: { provider: ServiceProvider; servi
   const { t } = useLanguage();
 
   const servicePrice = parseFloat(service?.price || "0");
-  const bookingFee = Math.round(servicePrice * BOOKING_FEE_PERCENT * 100) / 100;
+  const bookingFee = Math.round(servicePrice * PLATFORM_FEE_PERCENT * 100) / 100;
   const totalAmount = servicePrice + bookingFee;
 
   const createBookingCheckout = useMutation({
@@ -146,7 +146,7 @@ function BookingDialog({ provider, service }: { provider: ServiceProvider; servi
                   <span data-testid="text-service-price">${servicePrice.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-sm text-muted-foreground">
-                  <span>{t("booking.bookingFee")} (5%)</span>
+                  <span>{t("booking.bookingFee")} (8%)</span>
                   <span data-testid="text-booking-fee">${bookingFee.toFixed(2)}</span>
                 </div>
                 <div className="border-t pt-2 flex justify-between font-semibold">
