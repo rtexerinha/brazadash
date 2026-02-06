@@ -60,6 +60,17 @@ interface PendingApproval {
   createdAt: string;
   userName: string;
   userEmail: string;
+  businessInfo?: {
+    name?: string;
+    businessName?: string;
+    description?: string;
+    cuisine?: string;
+    category?: string;
+    city?: string;
+    address?: string;
+    phone?: string;
+    email?: string;
+  } | null;
 }
 
 const ALL_ROLES = ["customer", "vendor", "service_provider", "admin"] as const;
@@ -488,6 +499,11 @@ export default function AdminPage() {
                         <div>
                           <p className="font-medium" data-testid={`text-approval-name-${approval.id}`}>{approval.userName}</p>
                           <p className="text-sm text-muted-foreground">{approval.userEmail}</p>
+                          {approval.businessInfo && (
+                            <p className="text-sm font-medium text-primary mt-1" data-testid={`text-approval-business-${approval.id}`}>
+                              {approval.businessInfo.name || approval.businessInfo.businessName}
+                            </p>
+                          )}
                           <Badge variant="outline" className="mt-1">
                             {approval.role === "vendor" ? "Restaurant / Food Vendor" : "Service Provider"}
                           </Badge>
@@ -541,36 +557,86 @@ export default function AdminPage() {
                 ) : (
                   <div className="space-y-4">
                     {pendingApprovals.map((approval) => (
-                      <div key={approval.id} className="flex items-center justify-between gap-4 p-4 rounded-md border" data-testid={`card-approval-${approval.id}`}>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="font-medium" data-testid={`text-approval-name-full-${approval.id}`}>{approval.userName}</p>
-                            <Badge variant="outline">
-                              {approval.role === "vendor" ? "Restaurant / Food Vendor" : "Service Provider"}
-                            </Badge>
+                      <div key={approval.id} className="p-4 rounded-md border" data-testid={`card-approval-${approval.id}`}>
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-medium" data-testid={`text-approval-name-full-${approval.id}`}>{approval.userName}</p>
+                              <Badge variant="outline">
+                                {approval.role === "vendor" ? "Restaurant / Food Vendor" : "Service Provider"}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-1">{approval.userEmail}</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Registered: {new Date(approval.createdAt).toLocaleDateString()}
+                            </p>
                           </div>
-                          <p className="text-sm text-muted-foreground mt-1">{approval.userEmail}</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Registered: {new Date(approval.createdAt).toLocaleDateString()}
-                          </p>
+                          <div className="flex gap-2 flex-shrink-0">
+                            <Button
+                              onClick={() => approvalMutation.mutate({ userId: approval.userId, role: approval.role, status: "approved" })}
+                              disabled={approvalMutation.isPending}
+                              data-testid={`button-approve-full-${approval.id}`}
+                            >
+                              <CheckCircle className="h-4 w-4 mr-1" /> Approve
+                            </Button>
+                            <Button
+                              variant="outline"
+                              onClick={() => approvalMutation.mutate({ userId: approval.userId, role: approval.role, status: "rejected" })}
+                              disabled={approvalMutation.isPending}
+                              data-testid={`button-reject-full-${approval.id}`}
+                            >
+                              <XCircle className="h-4 w-4 mr-1" /> Reject
+                            </Button>
+                          </div>
                         </div>
-                        <div className="flex gap-2 flex-shrink-0">
-                          <Button
-                            onClick={() => approvalMutation.mutate({ userId: approval.userId, role: approval.role, status: "approved" })}
-                            disabled={approvalMutation.isPending}
-                            data-testid={`button-approve-full-${approval.id}`}
-                          >
-                            <CheckCircle className="h-4 w-4 mr-1" /> Approve
-                          </Button>
-                          <Button
-                            variant="outline"
-                            onClick={() => approvalMutation.mutate({ userId: approval.userId, role: approval.role, status: "rejected" })}
-                            disabled={approvalMutation.isPending}
-                            data-testid={`button-reject-full-${approval.id}`}
-                          >
-                            <XCircle className="h-4 w-4 mr-1" /> Reject
-                          </Button>
-                        </div>
+                        {approval.businessInfo && (
+                          <div className="mt-3 p-3 rounded-md bg-muted/50 text-sm" data-testid={`card-approval-business-${approval.id}`}>
+                            <p className="font-medium text-primary mb-2">
+                              {approval.businessInfo.name || approval.businessInfo.businessName}
+                            </p>
+                            {approval.businessInfo.description && (
+                              <p className="text-muted-foreground mb-2">{approval.businessInfo.description}</p>
+                            )}
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                              {approval.businessInfo.cuisine && (
+                                <>
+                                  <span className="text-muted-foreground">Cuisine:</span>
+                                  <span>{approval.businessInfo.cuisine}</span>
+                                </>
+                              )}
+                              {approval.businessInfo.category && (
+                                <>
+                                  <span className="text-muted-foreground">Category:</span>
+                                  <span className="capitalize">{approval.businessInfo.category}</span>
+                                </>
+                              )}
+                              {approval.businessInfo.city && (
+                                <>
+                                  <span className="text-muted-foreground">City:</span>
+                                  <span>{approval.businessInfo.city}</span>
+                                </>
+                              )}
+                              {approval.businessInfo.phone && (
+                                <>
+                                  <span className="text-muted-foreground">Phone:</span>
+                                  <span>{approval.businessInfo.phone}</span>
+                                </>
+                              )}
+                              {approval.businessInfo.address && (
+                                <>
+                                  <span className="text-muted-foreground">Address:</span>
+                                  <span>{approval.businessInfo.address}</span>
+                                </>
+                              )}
+                              {approval.businessInfo.email && (
+                                <>
+                                  <span className="text-muted-foreground">Email:</span>
+                                  <span>{approval.businessInfo.email}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

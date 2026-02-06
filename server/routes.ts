@@ -1413,7 +1413,7 @@ export async function registerRoutes(
         return res.status(401).json({ error: "Unauthorized" });
       }
 
-      const { role } = req.body;
+      const { role, businessInfo } = req.body;
       const validRoles = ["customer", "vendor", "service_provider"];
       if (!validRoles.includes(role)) {
         return res.status(400).json({ error: "Invalid role. Must be: customer, vendor, or service_provider" });
@@ -1429,6 +1429,40 @@ export async function registerRoutes(
       const created = await storage.addUserRole(userId, role);
       if (approvalStatus === "pending") {
         await storage.updateUserRoleApproval(userId, role, "pending");
+      }
+
+      if (role === "vendor" && businessInfo) {
+        const existingRestaurants = await storage.getRestaurantsByOwner(userId);
+        const existing = existingRestaurants.length > 0 ? existingRestaurants[0] : null;
+        if (!existing) {
+          await storage.createRestaurant({
+            ownerId: userId,
+            name: businessInfo.name || "Unnamed Restaurant",
+            description: businessInfo.description || null,
+            cuisine: businessInfo.cuisine || null,
+            address: businessInfo.address || null,
+            city: businessInfo.city || null,
+            phone: businessInfo.phone || null,
+            isActive: false,
+          });
+        }
+      }
+
+      if (role === "service_provider" && businessInfo) {
+        const existing = await storage.getServiceProviderByUser(userId);
+        if (!existing) {
+          await storage.createServiceProvider({
+            userId: userId,
+            businessName: businessInfo.businessName || "Unnamed Business",
+            description: businessInfo.description || null,
+            category: businessInfo.category || "other",
+            address: businessInfo.address || null,
+            city: businessInfo.city || null,
+            phone: businessInfo.phone || null,
+            email: businessInfo.email || null,
+            isActive: false,
+          });
+        }
       }
 
       const allRoles = await storage.getUserRoles(userId);
@@ -1530,10 +1564,41 @@ export async function registerRoutes(
       const pending = await storage.getPendingApprovals();
       const enriched = await Promise.all(pending.map(async (p) => {
         const user = await storage.getUserById(p.userId);
+        let businessInfo: Record<string, any> | null = null;
+
+        if (p.role === "vendor") {
+          const restaurants = await storage.getRestaurantsByOwner(p.userId);
+          if (restaurants.length > 0) {
+            const r = restaurants[0];
+            businessInfo = {
+              name: r.name,
+              description: r.description,
+              cuisine: r.cuisine,
+              city: r.city,
+              address: r.address,
+              phone: r.phone,
+            };
+          }
+        } else if (p.role === "service_provider") {
+          const provider = await storage.getServiceProviderByUser(p.userId);
+          if (provider) {
+            businessInfo = {
+              businessName: provider.businessName,
+              description: provider.description,
+              category: provider.category,
+              city: provider.city,
+              address: provider.address,
+              phone: provider.phone,
+              email: provider.email,
+            };
+          }
+        }
+
         return {
           ...p,
           userName: user ? `${user.firstName} ${user.lastName}`.trim() : "Unknown",
           userEmail: user?.email || "",
+          businessInfo,
         };
       }));
       res.json(enriched);
@@ -1552,6 +1617,21 @@ export async function registerRoutes(
       if (!updated) {
         return res.status(404).json({ error: "Role not found" });
       }
+
+      if (status === "approved") {
+        if (role === "vendor") {
+          const restaurants = await storage.getRestaurantsByOwner(userId);
+          if (restaurants.length > 0 && !restaurants[0].isActive) {
+            await storage.updateRestaurant(restaurants[0].id, { isActive: true });
+          }
+        } else if (role === "service_provider") {
+          const provider = await storage.getServiceProviderByUser(userId);
+          if (provider && !provider.isActive) {
+            await storage.updateServiceProvider(provider.id, { isActive: true });
+          }
+        }
+      }
+
       res.json(updated);
     } catch (error) {
       res.status(500).json({ error: "Failed to update approval status" });
