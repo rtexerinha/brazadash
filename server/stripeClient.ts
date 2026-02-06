@@ -5,6 +5,31 @@ let cachedCredentials: { publishableKey: string; secretKey: string } | null = nu
 let credentialsCacheTime = 0;
 const CREDENTIALS_CACHE_TTL = 5 * 60 * 1000;
 
+async function fetchCredentialsForEnvironment(hostname: string, xReplitToken: string, environment: string) {
+  const url = new URL(`https://${hostname}/api/v2/connection`);
+  url.searchParams.set('include_secrets', 'true');
+  url.searchParams.set('connector_names', 'stripe');
+  url.searchParams.set('environment', environment);
+
+  const response = await fetch(url.toString(), {
+    headers: {
+      'Accept': 'application/json',
+      'X_REPLIT_TOKEN': xReplitToken
+    }
+  });
+
+  const data = await response.json();
+  const conn = data.items?.[0];
+
+  if (conn?.settings?.publishable && conn?.settings?.secret) {
+    return {
+      publishableKey: conn.settings.publishable,
+      secretKey: conn.settings.secret,
+    };
+  }
+  return null;
+}
+
 async function getCredentials() {
   if (cachedCredentials && Date.now() - credentialsCacheTime < CREDENTIALS_CACHE_TTL) {
     return cachedCredentials;
@@ -21,34 +46,21 @@ async function getCredentials() {
     throw new Error('X_REPLIT_TOKEN not found for repl/depl');
   }
 
-  const connectorName = 'stripe';
   const isProduction = process.env.REPLIT_DEPLOYMENT === '1';
-  const targetEnvironment = isProduction ? 'production' : 'development';
+  const primaryEnv = isProduction ? 'production' : 'development';
 
-  const url = new URL(`https://${hostname}/api/v2/connection`);
-  url.searchParams.set('include_secrets', 'true');
-  url.searchParams.set('connector_names', connectorName);
-  url.searchParams.set('environment', targetEnvironment);
+  let creds = await fetchCredentialsForEnvironment(hostname!, xReplitToken, primaryEnv);
 
-  const response = await fetch(url.toString(), {
-    headers: {
-      'Accept': 'application/json',
-      'X_REPLIT_TOKEN': xReplitToken
-    }
-  });
-
-  const data = await response.json();
-  
-  connectionSettings = data.items?.[0];
-
-  if (!connectionSettings || (!connectionSettings.settings.publishable || !connectionSettings.settings.secret)) {
-    throw new Error(`Stripe ${targetEnvironment} connection not found`);
+  if (!creds && isProduction) {
+    console.log('Production Stripe credentials not found, falling back to development credentials');
+    creds = await fetchCredentialsForEnvironment(hostname!, xReplitToken, 'development');
   }
 
-  cachedCredentials = {
-    publishableKey: connectionSettings.settings.publishable,
-    secretKey: connectionSettings.settings.secret,
-  };
+  if (!creds) {
+    throw new Error(`Stripe connection not found for ${primaryEnv}`);
+  }
+
+  cachedCredentials = creds;
   credentialsCacheTime = Date.now();
 
   return cachedCredentials;
