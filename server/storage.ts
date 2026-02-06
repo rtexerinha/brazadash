@@ -777,14 +777,15 @@ class DatabaseStorage implements IStorage {
   }
 
   async getAllOrders(): Promise<(Order & { restaurant?: { name: string } })[]> {
-    const orderList = await db.select().from(orders).orderBy(desc(orders.createdAt));
-    const result = await Promise.all(
-      orderList.map(async (order) => {
-        const restaurant = await this.getRestaurant(order.restaurantId);
-        return { ...order, restaurant: restaurant ? { name: restaurant.name } : undefined };
-      })
-    );
-    return result;
+    const [orderList, allRestaurants] = await Promise.all([
+      db.select().from(orders).orderBy(desc(orders.createdAt)),
+      db.select().from(restaurants),
+    ]);
+    const restaurantMap = new Map(allRestaurants.map(r => [r.id, r.name]));
+    return orderList.map((order) => ({
+      ...order,
+      restaurant: restaurantMap.has(order.restaurantId) ? { name: restaurantMap.get(order.restaurantId)! } : undefined,
+    }));
   }
 
   async getAllBookings(): Promise<Booking[]> {

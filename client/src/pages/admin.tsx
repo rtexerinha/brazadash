@@ -84,7 +84,7 @@ export default function AdminPage() {
     enabled: activeTab === "restaurants" && !accessDenied,
   });
 
-  const { data: orders } = useQuery<Order[]>({
+  const { data: orders } = useQuery<(Order & { restaurant?: { name: string } })[]>({
     queryKey: ["/api/admin/orders"],
     enabled: activeTab === "orders" && !accessDenied,
   });
@@ -563,35 +563,62 @@ export default function AdminPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Order Management</CardTitle>
-                <CardDescription>View all food orders</CardDescription>
+                <CardDescription>View all food orders grouped by restaurant</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {orders?.slice(0, 20).map((order) => (
-                    <div
-                      key={order.id}
-                      className="flex items-center justify-between gap-4 p-4 border rounded-lg"
-                      data-testid={`row-order-${order.id}`}
-                    >
-                      <div>
-                        <p className="font-mono text-sm">{order.id.slice(0, 8)}...</p>
-                        <p className="text-sm text-muted-foreground">
-                          ${order.total} - {new Date(order.createdAt!).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <Badge variant={
-                        order.status === "delivered" ? "default" :
-                        order.status === "cancelled" ? "destructive" :
-                        "secondary"
-                      }>
-                        {order.status}
-                      </Badge>
+                {(() => {
+                  if (!orders || orders.length === 0) {
+                    return <p className="text-center text-muted-foreground py-8">No orders found</p>;
+                  }
+                  const grouped: Record<string, { name: string; orders: typeof orders }> = {};
+                  for (const order of orders) {
+                    const key = order.restaurantId;
+                    if (!grouped[key]) {
+                      grouped[key] = { name: order.restaurant?.name || "Unknown Restaurant", orders: [] };
+                    }
+                    grouped[key].orders.push(order);
+                  }
+                  return (
+                    <div className="space-y-6">
+                      {Object.entries(grouped).map(([restaurantId, group]) => (
+                        <div key={restaurantId} data-testid={`admin-group-restaurant-${restaurantId}`}>
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className="h-8 w-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
+                              <Store className="h-4 w-4 text-primary" />
+                            </div>
+                            <div>
+                              <h3 className="font-semibold" data-testid={`admin-group-name-${restaurantId}`}>{group.name}</h3>
+                              <p className="text-xs text-muted-foreground">{group.orders.length} order{group.orders.length !== 1 ? "s" : ""}</p>
+                            </div>
+                          </div>
+                          <div className="space-y-2 ml-11">
+                            {group.orders.map((order) => (
+                              <div
+                                key={order.id}
+                                className="flex items-center justify-between gap-4 p-3 border rounded-md"
+                                data-testid={`row-order-${order.id}`}
+                              >
+                                <div>
+                                  <p className="font-mono text-sm">{order.id.slice(0, 8)}...</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    ${order.total} - {new Date(order.createdAt!).toLocaleDateString()}
+                                  </p>
+                                </div>
+                                <Badge variant={
+                                  order.status === "delivered" ? "default" :
+                                  order.status === "cancelled" ? "destructive" :
+                                  "secondary"
+                                }>
+                                  {order.status}
+                                </Badge>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                  {orders?.length === 0 && (
-                    <p className="text-center text-muted-foreground py-8">No orders found</p>
-                  )}
-                </div>
+                  );
+                })()}
               </CardContent>
             </Card>
           </TabsContent>
