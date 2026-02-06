@@ -1,0 +1,154 @@
+import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { ShoppingBag, Store, Briefcase, ArrowRight, CheckCircle } from "lucide-react";
+
+const roles = [
+  {
+    id: "customer",
+    title: "Customer",
+    subtitle: "Comprar / Buy",
+    description: "Browse restaurants, order food, book services, and explore the community.",
+    icon: ShoppingBag,
+    color: "text-blue-600 dark:text-blue-400",
+    bgColor: "bg-blue-50 dark:bg-blue-950/30",
+    borderColor: "border-blue-200 dark:border-blue-800",
+    selectedBg: "bg-blue-50 dark:bg-blue-950/40",
+  },
+  {
+    id: "vendor",
+    title: "Restaurant / Food Vendor",
+    subtitle: "Vender Comida / Sell Food",
+    description: "Manage your restaurant, create menus, and process food orders from customers.",
+    icon: Store,
+    color: "text-primary",
+    bgColor: "bg-primary/5",
+    borderColor: "border-primary/30",
+    selectedBg: "bg-primary/10",
+  },
+  {
+    id: "service_provider",
+    title: "Service Provider",
+    subtitle: "Oferecer Servi\u00e7os / Offer Services",
+    description: "List your professional services, manage bookings, and grow your client base.",
+    icon: Briefcase,
+    color: "text-amber-600 dark:text-amber-400",
+    bgColor: "bg-amber-50 dark:bg-amber-950/30",
+    borderColor: "border-amber-200 dark:border-amber-800",
+    selectedBg: "bg-amber-50 dark:bg-amber-950/40",
+  },
+];
+
+export default function OnboardingPage() {
+  const [selectedRole, setSelectedRole] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  const setRoleMutation = useMutation({
+    mutationFn: async (role: string) => {
+      const res = await apiRequest("POST", "/api/user/role", { role });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user/role"] });
+      toast({
+        title: "Welcome to BrazaDash!",
+        description: "Your account is ready. Let's get started!",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Something went wrong",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <div className="w-full max-w-2xl">
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-md bg-primary">
+              <span className="text-2xl font-bold text-primary-foreground">B</span>
+            </div>
+          </div>
+          <h1 className="text-3xl font-bold mb-2" data-testid="text-onboarding-title">
+            Bem-vindo ao BrazaDash!
+          </h1>
+          <p className="text-lg text-muted-foreground" data-testid="text-onboarding-subtitle">
+            Welcome! How would you like to use the platform?
+          </p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Como voc\u00ea gostaria de usar a plataforma?
+          </p>
+        </div>
+
+        <div className="space-y-3 mb-8">
+          {roles.map((role) => {
+            const isSelected = selectedRole === role.id;
+            const Icon = role.icon;
+            return (
+              <Card
+                key={role.id}
+                className={`cursor-pointer transition-all border-2 ${
+                  isSelected
+                    ? `${role.borderColor} ${role.selectedBg}`
+                    : "border-transparent hover-elevate"
+                }`}
+                onClick={() => setSelectedRole(role.id)}
+                data-testid={`card-role-${role.id}`}
+              >
+                <CardContent className="flex items-center gap-4 p-5">
+                  <div className={`flex-shrink-0 p-3 rounded-lg ${role.bgColor}`}>
+                    <Icon className={`h-6 w-6 ${role.color}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-semibold text-lg" data-testid={`text-role-title-${role.id}`}>
+                        {role.title}
+                      </h3>
+                      <span className="text-sm text-muted-foreground">({role.subtitle})</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">{role.description}</p>
+                  </div>
+                  <div className="flex-shrink-0">
+                    {isSelected ? (
+                      <CheckCircle className={`h-6 w-6 ${role.color}`} data-testid={`icon-role-selected-${role.id}`} />
+                    ) : (
+                      <div className="h-6 w-6 rounded-full border-2 border-muted" />
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+
+        <Button
+          className="w-full"
+          size="lg"
+          disabled={!selectedRole || setRoleMutation.isPending}
+          onClick={() => selectedRole && setRoleMutation.mutate(selectedRole)}
+          data-testid="button-continue-onboarding"
+        >
+          {setRoleMutation.isPending ? (
+            "Setting up your account..."
+          ) : (
+            <>
+              Continue
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </>
+          )}
+        </Button>
+
+        <p className="text-center text-xs text-muted-foreground mt-4">
+          You can contact support later if you need to change your role.
+        </p>
+      </div>
+    </div>
+  );
+}

@@ -11,13 +11,25 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
-import type { Restaurant, Order, ServiceProvider, Booking, Event, Business, Announcement, Review } from "@shared/schema";
+import type { Restaurant, Order, ServiceProvider, Booking, Event, Business, Announcement, Review, ServiceReview } from "@shared/schema";
 import {
-  Users, Store, ShoppingBag, Briefcase, Calendar, Building2, Megaphone, 
-  Star, DollarSign, TrendingUp, CheckCircle, XCircle, Shield, Plus, AlertTriangle
+  Users, Store, ShoppingBag, Briefcase, Calendar, Building2, Megaphone,
+  Star, DollarSign, CheckCircle, XCircle, Shield, Plus, AlertTriangle,
+  Trash2, UserPlus, UserMinus
 } from "lucide-react";
 
 interface AdminStats {
@@ -30,6 +42,16 @@ interface AdminStats {
   totalBusinesses: number;
   revenue: number;
 }
+
+interface AdminUser {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  roles: string[];
+}
+
+const ALL_ROLES = ["customer", "vendor", "service_provider", "admin"] as const;
 
 export default function AdminPage() {
   const { user } = useAuth();
@@ -50,6 +72,11 @@ export default function AdminPage() {
   const { data: stats, isLoading: statsLoading, error: statsError } = useQuery<AdminStats>({
     queryKey: ["/api/admin/stats"],
     retry: false,
+  });
+
+  const { data: usersData } = useQuery<AdminUser[]>({
+    queryKey: ["/api/admin/users"],
+    enabled: activeTab === "users" && !accessDenied,
   });
 
   const { data: restaurants } = useQuery<Restaurant[]>({
@@ -92,6 +119,25 @@ export default function AdminPage() {
     enabled: activeTab === "reviews" && !accessDenied,
   });
 
+  const { data: serviceReviewsData } = useQuery<ServiceReview[]>({
+    queryKey: ["/api/admin/service-reviews"],
+    enabled: activeTab === "reviews" && !accessDenied,
+  });
+
+  const updateUserRoleMutation = useMutation({
+    mutationFn: async ({ id, role, action }: { id: string; role: string; action: "add" | "remove" }) => {
+      const res = await apiRequest("PATCH", `/api/admin/users/${id}/roles`, { role, action });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Updated", description: "User role updated successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update user role", variant: "destructive" });
+    },
+  });
+
   const updateRestaurantMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<Restaurant> }) => {
       const res = await apiRequest("PATCH", `/api/admin/restaurants/${id}`, data);
@@ -100,6 +146,17 @@ export default function AdminPage() {
     onSuccess: () => {
       toast({ title: "Updated", description: "Restaurant updated successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/restaurants"] });
+    },
+  });
+
+  const deleteRestaurantMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/admin/restaurants/${id}`);
+    },
+    onSuccess: () => {
+      toast({ title: "Deleted", description: "Restaurant deleted" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/restaurants"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
     },
   });
 
@@ -114,6 +171,17 @@ export default function AdminPage() {
     },
   });
 
+  const deleteProviderMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/admin/providers/${id}`);
+    },
+    onSuccess: () => {
+      toast({ title: "Deleted", description: "Provider deleted" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/providers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
+    },
+  });
+
   const updateEventMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<Event> }) => {
       const res = await apiRequest("PATCH", `/api/admin/events/${id}`, data);
@@ -125,6 +193,17 @@ export default function AdminPage() {
     },
   });
 
+  const deleteEventMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/admin/events/${id}`);
+    },
+    onSuccess: () => {
+      toast({ title: "Deleted", description: "Event deleted" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/events"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
+    },
+  });
+
   const updateBusinessMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<Business> }) => {
       const res = await apiRequest("PATCH", `/api/admin/businesses/${id}`, data);
@@ -133,6 +212,17 @@ export default function AdminPage() {
     onSuccess: () => {
       toast({ title: "Updated", description: "Business updated successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/businesses"] });
+    },
+  });
+
+  const deleteBusinessMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/admin/businesses/${id}`);
+    },
+    onSuccess: () => {
+      toast({ title: "Deleted", description: "Business deleted" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/businesses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
     },
   });
 
@@ -176,6 +266,16 @@ export default function AdminPage() {
     },
   });
 
+  const deleteServiceReviewMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/admin/service-reviews/${id}`);
+    },
+    onSuccess: () => {
+      toast({ title: "Deleted", description: "Service review removed" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/service-reviews"] });
+    },
+  });
+
   useEffect(() => {
     if (statsError) {
       setAccessDenied(true);
@@ -192,7 +292,7 @@ export default function AdminPage() {
             </div>
             <CardTitle>Access Denied</CardTitle>
             <CardDescription>
-              You don't have permission to access the admin dashboard. 
+              You don't have permission to access the admin dashboard.
               This area is restricted to administrators only.
             </CardDescription>
           </CardHeader>
@@ -220,8 +320,9 @@ export default function AdminPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid grid-cols-4 lg:grid-cols-9 gap-1 mb-6 h-auto">
+          <TabsList className="grid grid-cols-5 lg:grid-cols-10 gap-1 mb-6 h-auto">
             <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
+            <TabsTrigger value="users" data-testid="tab-users">Users</TabsTrigger>
             <TabsTrigger value="restaurants" data-testid="tab-restaurants">Restaurants</TabsTrigger>
             <TabsTrigger value="orders" data-testid="tab-orders">Orders</TabsTrigger>
             <TabsTrigger value="providers" data-testid="tab-providers">Providers</TabsTrigger>
@@ -249,7 +350,7 @@ export default function AdminPage() {
             ) : stats ? (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Total Users</CardTitle>
                     <Users className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
@@ -258,7 +359,7 @@ export default function AdminPage() {
                   </CardContent>
                 </Card>
                 <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Restaurants</CardTitle>
                     <Store className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
@@ -267,7 +368,7 @@ export default function AdminPage() {
                   </CardContent>
                 </Card>
                 <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Food Orders</CardTitle>
                     <ShoppingBag className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
@@ -276,7 +377,7 @@ export default function AdminPage() {
                   </CardContent>
                 </Card>
                 <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Service Providers</CardTitle>
                     <Briefcase className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
@@ -285,7 +386,7 @@ export default function AdminPage() {
                   </CardContent>
                 </Card>
                 <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Bookings</CardTitle>
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
@@ -294,7 +395,7 @@ export default function AdminPage() {
                   </CardContent>
                 </Card>
                 <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Community Events</CardTitle>
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
@@ -303,7 +404,7 @@ export default function AdminPage() {
                   </CardContent>
                 </Card>
                 <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Businesses</CardTitle>
                     <Building2 className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
@@ -312,7 +413,7 @@ export default function AdminPage() {
                   </CardContent>
                 </Card>
                 <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
                     <DollarSign className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
@@ -322,6 +423,73 @@ export default function AdminPage() {
                 </Card>
               </div>
             ) : null}
+          </TabsContent>
+
+          <TabsContent value="users">
+            <Card>
+              <CardHeader>
+                <CardTitle>User Management</CardTitle>
+                <CardDescription>Manage user roles and permissions</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {usersData?.map((u) => (
+                    <div
+                      key={u.id}
+                      className="flex items-center justify-between gap-4 p-4 border rounded-lg"
+                      data-testid={`row-user-${u.id}`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-semibold" data-testid={`text-user-name-${u.id}`}>
+                          {u.firstName} {u.lastName}
+                        </h3>
+                        <p className="text-sm text-muted-foreground" data-testid={`text-user-email-${u.id}`}>
+                          {u.email}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-1 mt-2">
+                          {u.roles.map((role) => (
+                            <Badge key={role} variant="secondary" data-testid={`badge-role-${u.id}-${role}`}>
+                              {role}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {ALL_ROLES.map((role) => {
+                          const hasRole = u.roles.includes(role);
+                          return (
+                            <Button
+                              key={role}
+                              variant={hasRole ? "destructive" : "outline"}
+                              size="sm"
+                              disabled={updateUserRoleMutation.isPending}
+                              onClick={() =>
+                                updateUserRoleMutation.mutate({
+                                  id: u.id,
+                                  role,
+                                  action: hasRole ? "remove" : "add",
+                                })
+                              }
+                              data-testid={`button-${hasRole ? "remove" : "add"}-role-${role}-${u.id}`}
+                            >
+                              {hasRole ? (
+                                <UserMinus className="h-3 w-3 mr-1" />
+                              ) : (
+                                <UserPlus className="h-3 w-3 mr-1" />
+                              )}
+                              {role}
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                  {usersData?.length === 0 && (
+                    <p className="text-center text-muted-foreground py-8">No users found</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="restaurants">
@@ -335,19 +503,19 @@ export default function AdminPage() {
                   {restaurants?.map((restaurant) => (
                     <div
                       key={restaurant.id}
-                      className="flex items-center justify-between p-4 border rounded-lg"
+                      className="flex items-center justify-between gap-4 p-4 border rounded-lg"
                       data-testid={`row-restaurant-${restaurant.id}`}
                     >
                       <div>
                         <h3 className="font-semibold">{restaurant.name}</h3>
-                        <p className="text-sm text-muted-foreground">{restaurant.cuisine} • {restaurant.city}</p>
+                        <p className="text-sm text-muted-foreground">{restaurant.cuisine} - {restaurant.city}</p>
                       </div>
                       <div className="flex items-center gap-4">
                         <div className="flex items-center gap-2">
                           <span className="text-sm text-muted-foreground">Active</span>
                           <Switch
                             checked={restaurant.isActive || false}
-                            onCheckedChange={(checked) => 
+                            onCheckedChange={(checked) =>
                               updateRestaurantMutation.mutate({ id: restaurant.id, data: { isActive: checked } })
                             }
                             data-testid={`switch-restaurant-active-${restaurant.id}`}
@@ -356,9 +524,36 @@ export default function AdminPage() {
                         <Badge variant={restaurant.isOpen ? "default" : "secondary"}>
                           {restaurant.isOpen ? "Open" : "Closed"}
                         </Badge>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" data-testid={`button-delete-restaurant-${restaurant.id}`}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Restaurant</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete "{restaurant.name}"? This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel data-testid={`button-cancel-delete-restaurant-${restaurant.id}`}>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => deleteRestaurantMutation.mutate(restaurant.id)}
+                                data-testid={`button-confirm-delete-restaurant-${restaurant.id}`}
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </div>
                   ))}
+                  {restaurants?.length === 0 && (
+                    <p className="text-center text-muted-foreground py-8">No restaurants found</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -375,13 +570,13 @@ export default function AdminPage() {
                   {orders?.slice(0, 20).map((order) => (
                     <div
                       key={order.id}
-                      className="flex items-center justify-between p-4 border rounded-lg"
+                      className="flex items-center justify-between gap-4 p-4 border rounded-lg"
                       data-testid={`row-order-${order.id}`}
                     >
                       <div>
                         <p className="font-mono text-sm">{order.id.slice(0, 8)}...</p>
                         <p className="text-sm text-muted-foreground">
-                          ${order.total} • {new Date(order.createdAt!).toLocaleDateString()}
+                          ${order.total} - {new Date(order.createdAt!).toLocaleDateString()}
                         </p>
                       </div>
                       <Badge variant={
@@ -393,6 +588,9 @@ export default function AdminPage() {
                       </Badge>
                     </div>
                   ))}
+                  {orders?.length === 0 && (
+                    <p className="text-center text-muted-foreground py-8">No orders found</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -409,19 +607,19 @@ export default function AdminPage() {
                   {providers?.map((provider) => (
                     <div
                       key={provider.id}
-                      className="flex items-center justify-between p-4 border rounded-lg"
+                      className="flex items-center justify-between gap-4 p-4 border rounded-lg"
                       data-testid={`row-provider-${provider.id}`}
                     >
                       <div>
                         <h3 className="font-semibold">{provider.businessName}</h3>
-                        <p className="text-sm text-muted-foreground">{provider.category} • {provider.city}</p>
+                        <p className="text-sm text-muted-foreground">{provider.category} - {provider.city}</p>
                       </div>
                       <div className="flex items-center gap-4">
                         <div className="flex items-center gap-2">
                           <span className="text-sm text-muted-foreground">Verified</span>
                           <Switch
                             checked={provider.isVerified || false}
-                            onCheckedChange={(checked) => 
+                            onCheckedChange={(checked) =>
                               updateProviderMutation.mutate({ id: provider.id, data: { isVerified: checked } })
                             }
                             data-testid={`switch-provider-verified-${provider.id}`}
@@ -431,15 +629,42 @@ export default function AdminPage() {
                           <span className="text-sm text-muted-foreground">Active</span>
                           <Switch
                             checked={provider.isActive || false}
-                            onCheckedChange={(checked) => 
+                            onCheckedChange={(checked) =>
                               updateProviderMutation.mutate({ id: provider.id, data: { isActive: checked } })
                             }
                             data-testid={`switch-provider-active-${provider.id}`}
                           />
                         </div>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" data-testid={`button-delete-provider-${provider.id}`}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Provider</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete "{provider.businessName}"? This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel data-testid={`button-cancel-delete-provider-${provider.id}`}>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => deleteProviderMutation.mutate(provider.id)}
+                                data-testid={`button-confirm-delete-provider-${provider.id}`}
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </div>
                   ))}
+                  {providers?.length === 0 && (
+                    <p className="text-center text-muted-foreground py-8">No providers found</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -456,13 +681,13 @@ export default function AdminPage() {
                   {bookingsData?.slice(0, 20).map((booking) => (
                     <div
                       key={booking.id}
-                      className="flex items-center justify-between p-4 border rounded-lg"
+                      className="flex items-center justify-between gap-4 p-4 border rounded-lg"
                       data-testid={`row-booking-${booking.id}`}
                     >
                       <div>
                         <p className="font-mono text-sm">{booking.id.slice(0, 8)}...</p>
                         <p className="text-sm text-muted-foreground">
-                          {booking.price ? `$${booking.price}` : "Quote"} • {new Date(booking.createdAt!).toLocaleDateString()}
+                          {booking.price ? `$${booking.price}` : "Quote"} - {new Date(booking.createdAt!).toLocaleDateString()}
                         </p>
                       </div>
                       <Badge variant={
@@ -474,6 +699,9 @@ export default function AdminPage() {
                       </Badge>
                     </div>
                   ))}
+                  {bookingsData?.length === 0 && (
+                    <p className="text-center text-muted-foreground py-8">No bookings found</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -490,13 +718,13 @@ export default function AdminPage() {
                   {events?.map((event) => (
                     <div
                       key={event.id}
-                      className="flex items-center justify-between p-4 border rounded-lg"
+                      className="flex items-center justify-between gap-4 p-4 border rounded-lg"
                       data-testid={`row-event-${event.id}`}
                     >
                       <div>
                         <h3 className="font-semibold">{event.title}</h3>
                         <p className="text-sm text-muted-foreground">
-                          {event.category} • {new Date(event.eventDate).toLocaleDateString()}
+                          {event.category} - {new Date(event.eventDate).toLocaleDateString()}
                         </p>
                       </div>
                       <div className="flex items-center gap-4">
@@ -504,7 +732,7 @@ export default function AdminPage() {
                           <span className="text-sm text-muted-foreground">Featured</span>
                           <Switch
                             checked={event.isFeatured || false}
-                            onCheckedChange={(checked) => 
+                            onCheckedChange={(checked) =>
                               updateEventMutation.mutate({ id: event.id, data: { isFeatured: checked } })
                             }
                             data-testid={`switch-event-featured-${event.id}`}
@@ -514,15 +742,42 @@ export default function AdminPage() {
                           <span className="text-sm text-muted-foreground">Approved</span>
                           <Switch
                             checked={event.isApproved || false}
-                            onCheckedChange={(checked) => 
+                            onCheckedChange={(checked) =>
                               updateEventMutation.mutate({ id: event.id, data: { isApproved: checked } })
                             }
                             data-testid={`switch-event-approved-${event.id}`}
                           />
                         </div>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" data-testid={`button-delete-event-${event.id}`}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Event</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete "{event.title}"? This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel data-testid={`button-cancel-delete-event-${event.id}`}>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => deleteEventMutation.mutate(event.id)}
+                                data-testid={`button-confirm-delete-event-${event.id}`}
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </div>
                   ))}
+                  {events?.length === 0 && (
+                    <p className="text-center text-muted-foreground py-8">No events found</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -539,19 +794,19 @@ export default function AdminPage() {
                   {businessesData?.map((business) => (
                     <div
                       key={business.id}
-                      className="flex items-center justify-between p-4 border rounded-lg"
+                      className="flex items-center justify-between gap-4 p-4 border rounded-lg"
                       data-testid={`row-business-${business.id}`}
                     >
                       <div>
                         <h3 className="font-semibold">{business.name}</h3>
-                        <p className="text-sm text-muted-foreground">{business.category} • {business.city}</p>
+                        <p className="text-sm text-muted-foreground">{business.category} - {business.city}</p>
                       </div>
                       <div className="flex items-center gap-4">
                         <div className="flex items-center gap-2">
                           <span className="text-sm text-muted-foreground">Verified</span>
                           <Switch
                             checked={business.isVerified || false}
-                            onCheckedChange={(checked) => 
+                            onCheckedChange={(checked) =>
                               updateBusinessMutation.mutate({ id: business.id, data: { isVerified: checked } })
                             }
                             data-testid={`switch-business-verified-${business.id}`}
@@ -561,15 +816,42 @@ export default function AdminPage() {
                           <span className="text-sm text-muted-foreground">Active</span>
                           <Switch
                             checked={business.isActive || false}
-                            onCheckedChange={(checked) => 
+                            onCheckedChange={(checked) =>
                               updateBusinessMutation.mutate({ id: business.id, data: { isActive: checked } })
                             }
                             data-testid={`switch-business-active-${business.id}`}
                           />
                         </div>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" data-testid={`button-delete-business-${business.id}`}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Business</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete "{business.name}"? This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel data-testid={`button-cancel-delete-business-${business.id}`}>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => deleteBusinessMutation.mutate(business.id)}
+                                data-testid={`button-confirm-delete-business-${business.id}`}
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </div>
                   ))}
+                  {businessesData?.length === 0 && (
+                    <p className="text-center text-muted-foreground py-8">No businesses found</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -613,7 +895,7 @@ export default function AdminPage() {
                       <div>
                         <Select
                           value={newAnnouncement.type}
-                          onValueChange={(value: "news" | "promo" | "update" | "alert") => 
+                          onValueChange={(value: "news" | "promo" | "update" | "alert") =>
                             setNewAnnouncement({ ...newAnnouncement, type: value })
                           }
                         >
@@ -653,80 +935,189 @@ export default function AdminPage() {
                   {announcementsData?.map((announcement) => (
                     <div
                       key={announcement.id}
-                      className="flex items-center justify-between p-4 border rounded-lg"
+                      className="flex items-center justify-between gap-4 p-4 border rounded-lg"
                       data-testid={`row-announcement-${announcement.id}`}
                     >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
                           <h3 className="font-semibold">{announcement.title}</h3>
                           {announcement.isPinned && <Badge variant="outline">Pinned</Badge>}
                           <Badge variant="secondary">{announcement.type}</Badge>
                         </div>
                         <p className="text-sm text-muted-foreground line-clamp-1">{announcement.content}</p>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => deleteAnnouncementMutation.mutate(announcement.id)}
-                        disabled={deleteAnnouncementMutation.isPending}
-                        data-testid={`button-delete-announcement-${announcement.id}`}
-                      >
-                        <XCircle className="h-4 w-4 text-destructive" />
-                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            data-testid={`button-delete-announcement-${announcement.id}`}
+                          >
+                            <XCircle className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Announcement</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete this announcement? This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => deleteAnnouncementMutation.mutate(announcement.id)}
+                              data-testid={`button-confirm-delete-announcement-${announcement.id}`}
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   ))}
+                  {announcementsData?.length === 0 && (
+                    <p className="text-center text-muted-foreground py-8">No announcements found</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
 
           <TabsContent value="reviews">
-            <Card>
-              <CardHeader>
-                <CardTitle>Review Moderation</CardTitle>
-                <CardDescription>Moderate user reviews</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {reviewsData?.map((review) => (
-                    <div
-                      key={review.id}
-                      className="flex items-center justify-between p-4 border rounded-lg"
-                      data-testid={`row-review-${review.id}`}
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <div className="flex items-center">
-                            {Array.from({ length: 5 }).map((_, i) => (
-                              <Star
-                                key={i}
-                                className={`h-4 w-4 ${i < review.rating ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"}`}
-                              />
-                            ))}
-                          </div>
-                          <span className="text-sm text-muted-foreground">
-                            {new Date(review.createdAt!).toLocaleDateString()}
-                          </span>
-                        </div>
-                        <p className="text-sm">{review.comment || "No comment"}</p>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => deleteReviewMutation.mutate(review.id)}
-                        disabled={deleteReviewMutation.isPending}
-                        data-testid={`button-delete-review-${review.id}`}
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Food Review Moderation</CardTitle>
+                  <CardDescription>Moderate food order reviews</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {reviewsData?.map((review) => (
+                      <div
+                        key={review.id}
+                        className="flex items-center justify-between gap-4 p-4 border rounded-lg"
+                        data-testid={`row-review-${review.id}`}
                       >
-                        <XCircle className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  ))}
-                  {reviewsData?.length === 0 && (
-                    <p className="text-center text-muted-foreground py-8">No reviews to moderate</p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2 mb-1">
+                            <div className="flex items-center">
+                              {Array.from({ length: 5 }).map((_, i) => (
+                                <Star
+                                  key={i}
+                                  className={`h-4 w-4 ${i < review.rating ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"}`}
+                                />
+                              ))}
+                            </div>
+                            <span className="text-sm text-muted-foreground">
+                              {new Date(review.createdAt!).toLocaleDateString()}
+                            </span>
+                          </div>
+                          <p className="text-sm">{review.comment || "No comment"}</p>
+                        </div>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              data-testid={`button-delete-review-${review.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Review</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete this review? This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => deleteReviewMutation.mutate(review.id)}
+                                data-testid={`button-confirm-delete-review-${review.id}`}
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    ))}
+                    {reviewsData?.length === 0 && (
+                      <p className="text-center text-muted-foreground py-8">No food reviews to moderate</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Service Review Moderation</CardTitle>
+                  <CardDescription>Moderate service provider reviews</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {serviceReviewsData?.map((review) => (
+                      <div
+                        key={review.id}
+                        className="flex items-center justify-between gap-4 p-4 border rounded-lg"
+                        data-testid={`row-service-review-${review.id}`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2 mb-1">
+                            <div className="flex items-center">
+                              {Array.from({ length: 5 }).map((_, i) => (
+                                <Star
+                                  key={i}
+                                  className={`h-4 w-4 ${i < review.rating ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"}`}
+                                />
+                              ))}
+                            </div>
+                            <span className="text-sm text-muted-foreground">
+                              {new Date(review.createdAt!).toLocaleDateString()}
+                            </span>
+                          </div>
+                          <p className="text-sm">{review.comment || "No comment"}</p>
+                        </div>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              data-testid={`button-delete-service-review-${review.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Service Review</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete this service review? This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => deleteServiceReviewMutation.mutate(review.id)}
+                                data-testid={`button-confirm-delete-service-review-${review.id}`}
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    ))}
+                    {serviceReviewsData?.length === 0 && (
+                      <p className="text-center text-muted-foreground py-8">No service reviews to moderate</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
       </div>

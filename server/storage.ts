@@ -158,7 +158,11 @@ export interface IStorage {
   getAllAnnouncements(): Promise<Announcement[]>;
   getAllServiceProviders(): Promise<ServiceProvider[]>;
   getAllReviews(): Promise<Review[]>;
+  getAllServiceReviews(): Promise<ServiceReview[]>;
   deleteReview(id: string): Promise<void>;
+  deleteServiceReview(id: string): Promise<void>;
+  deleteRestaurant(id: string): Promise<void>;
+  deleteServiceProvider(id: string): Promise<void>;
 }
 
 class DatabaseStorage implements IStorage {
@@ -580,7 +584,7 @@ class DatabaseStorage implements IStorage {
 
   async updateEventRsvp(eventId: string, userId: string, status: string): Promise<EventRsvp | undefined> {
     const [updated] = await db.update(eventRsvps)
-      .set({ status })
+      .set({ status: status as any })
       .where(and(eq(eventRsvps.eventId, eventId), eq(eventRsvps.userId, userId)))
       .returning();
     return updated;
@@ -760,12 +764,12 @@ class DatabaseStorage implements IStorage {
   }
 
   async addUserRole(userId: string, role: string): Promise<UserRole> {
-    const [created] = await db.insert(userRoles).values({ userId, role }).returning();
+    const [created] = await db.insert(userRoles).values({ userId, role: role as any }).returning();
     return created;
   }
 
   async removeUserRole(userId: string, role: string): Promise<void> {
-    await db.delete(userRoles).where(and(eq(userRoles.userId, userId), eq(userRoles.role, role)));
+    await db.delete(userRoles).where(and(eq(userRoles.userId, userId), eq(userRoles.role, role as any)));
   }
 
   async getAllRestaurants(): Promise<Restaurant[]> {
@@ -802,6 +806,24 @@ class DatabaseStorage implements IStorage {
 
   async deleteReview(id: string): Promise<void> {
     await db.delete(reviews).where(eq(reviews.id, id));
+  }
+
+  async getAllServiceReviews(): Promise<ServiceReview[]> {
+    return db.select().from(serviceReviews).orderBy(desc(serviceReviews.createdAt));
+  }
+
+  async deleteServiceReview(id: string): Promise<void> {
+    await db.delete(serviceReviews).where(eq(serviceReviews.id, id));
+  }
+
+  async deleteRestaurant(id: string): Promise<void> {
+    await db.delete(menuItems).where(eq(menuItems.restaurantId, id));
+    await db.delete(restaurants).where(eq(restaurants.id, id));
+  }
+
+  async deleteServiceProvider(id: string): Promise<void> {
+    await db.delete(services).where(eq(services.providerId, id));
+    await db.delete(serviceProviders).where(eq(serviceProviders.id, id));
   }
 
   // Push Tokens (Mobile)

@@ -1,4 +1,5 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, Redirect } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -9,6 +10,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Navbar } from "@/components/navbar";
 import NotFound from "@/pages/not-found";
 import LandingPage from "@/pages/landing";
+import OnboardingPage from "@/pages/onboarding";
 import HomePage from "@/pages/home";
 import RestaurantsPage from "@/pages/restaurants";
 import RestaurantDetailPage from "@/pages/restaurant-detail";
@@ -29,10 +31,26 @@ import EventsPage from "@/pages/events";
 import BusinessesPage from "@/pages/businesses";
 import AdminPage from "@/pages/admin";
 
+function RoleBasedHome({ roles }: { roles: string[] }) {
+  if (roles.includes("vendor")) {
+    return <Redirect to="/vendor" />;
+  }
+  if (roles.includes("service_provider")) {
+    return <Redirect to="/provider-portal" />;
+  }
+  return <HomePage />;
+}
+
 function AppContent() {
   const { isAuthenticated, isLoading } = useAuth();
 
-  if (isLoading) {
+  const { data: roleData, isLoading: rolesLoading } = useQuery<{ roles: string[] }>({
+    queryKey: ["/api/user/role"],
+    enabled: isAuthenticated,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  if (isLoading || (isAuthenticated && rolesLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
@@ -49,11 +67,20 @@ function AppContent() {
     return <LandingPage />;
   }
 
+  const roles = roleData?.roles || [];
+  const hasNonAdminRole = roles.some(r => r !== "admin");
+
+  if (!hasNonAdminRole) {
+    return <OnboardingPage />;
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
       <Switch>
-        <Route path="/" component={HomePage} />
+        <Route path="/">
+          <RoleBasedHome roles={roles} />
+        </Route>
         <Route path="/restaurants" component={RestaurantsPage} />
         <Route path="/restaurant/:id" component={RestaurantDetailPage} />
         <Route path="/cart" component={CartPage} />

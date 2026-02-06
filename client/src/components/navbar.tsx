@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/use-auth";
 import { useCart } from "@/lib/cart-context";
 import { useTheme } from "@/components/theme-provider";
-import { ShoppingCart, Sun, Moon, User, LogOut, Store, Bell, Menu, Briefcase, Calendar, Users, Shield } from "lucide-react";
+import { ShoppingCart, Sun, Moon, LogOut, Store, Bell, Briefcase, Calendar, Shield } from "lucide-react";
 import { useState } from "react";
 
 export function Navbar() {
@@ -24,11 +24,17 @@ export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const itemCount = getItemCount();
 
-  const { data: adminStatus } = useQuery<{ isAdmin: boolean }>({
-    queryKey: ["/api/user/is-admin"],
+  const { data: roleData } = useQuery<{ roles: string[] }>({
+    queryKey: ["/api/user/role"],
     enabled: isAuthenticated,
-    staleTime: 60000,
+    staleTime: 1000 * 60 * 5,
   });
+
+  const roles = roleData?.roles || [];
+  const isAdmin = roles.includes("admin");
+  const isVendor = roles.includes("vendor");
+  const isProvider = roles.includes("service_provider");
+  const isCustomer = roles.includes("customer");
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -47,16 +53,45 @@ export function Navbar() {
 
         {isAuthenticated && (
           <nav className="hidden md:flex items-center gap-6">
-            <Link href="/">
-              <span
-                className={`text-sm font-medium transition-colors cursor-pointer ${
-                  location === "/" ? "text-primary" : "text-muted-foreground hover:text-foreground"
-                }`}
-                data-testid="link-home"
-              >
-                Home
-              </span>
-            </Link>
+            {isVendor && (
+              <Link href="/vendor">
+                <span
+                  className={`text-sm font-medium transition-colors cursor-pointer ${
+                    location === "/vendor" ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  data-testid="link-vendor-dashboard"
+                >
+                  My Restaurant
+                </span>
+              </Link>
+            )}
+
+            {isProvider && (
+              <Link href="/provider-portal">
+                <span
+                  className={`text-sm font-medium transition-colors cursor-pointer ${
+                    location === "/provider-portal" ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  data-testid="link-provider-dashboard"
+                >
+                  My Services
+                </span>
+              </Link>
+            )}
+
+            {isCustomer && (
+              <Link href="/">
+                <span
+                  className={`text-sm font-medium transition-colors cursor-pointer ${
+                    location === "/" ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  data-testid="link-home"
+                >
+                  Home
+                </span>
+              </Link>
+            )}
+
             <Link href="/restaurants">
               <span
                 className={`text-sm font-medium transition-colors cursor-pointer ${
@@ -89,16 +124,18 @@ export function Navbar() {
                 Community
               </span>
             </Link>
-            <Link href="/orders">
-              <span
-                className={`text-sm font-medium transition-colors cursor-pointer ${
-                  location === "/orders" ? "text-primary" : "text-muted-foreground hover:text-foreground"
-                }`}
-                data-testid="link-orders"
-              >
-                My Orders
-              </span>
-            </Link>
+            {isCustomer && (
+              <Link href="/orders">
+                <span
+                  className={`text-sm font-medium transition-colors cursor-pointer ${
+                    location === "/orders" ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  data-testid="link-orders"
+                >
+                  My Orders
+                </span>
+              </Link>
+            )}
           </nav>
         )}
 
@@ -114,16 +151,18 @@ export function Navbar() {
 
           {isAuthenticated && (
             <>
-              <Link href="/cart">
-                <Button variant="ghost" size="icon" className="relative" data-testid="button-cart">
-                  <ShoppingCart className="h-5 w-5" />
-                  {itemCount > 0 && (
-                    <Badge className="absolute -right-1 -top-1 h-5 w-5 flex items-center justify-center p-0 text-xs">
-                      {itemCount}
-                    </Badge>
-                  )}
-                </Button>
-              </Link>
+              {(isCustomer || isVendor) && (
+                <Link href="/cart">
+                  <Button variant="ghost" size="icon" className="relative" data-testid="button-cart">
+                    <ShoppingCart className="h-5 w-5" />
+                    {itemCount > 0 && (
+                      <Badge className="absolute -right-1 -top-1 h-5 w-5 flex items-center justify-center p-0 text-xs">
+                        {itemCount}
+                      </Badge>
+                    )}
+                  </Button>
+                </Link>
+              )}
 
               <Link href="/notifications">
                 <Button variant="ghost" size="icon" data-testid="button-notifications">
@@ -155,28 +194,45 @@ export function Navbar() {
                           {user.email}
                         </p>
                       )}
+                      <Badge variant="outline" className="w-fit text-xs mt-1" data-testid="badge-user-role">
+                        {isVendor ? "Restaurant Vendor" : isProvider ? "Service Provider" : "Customer"}
+                      </Badge>
                     </div>
                   </div>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link href="/vendor" className="cursor-pointer" data-testid="link-vendor-portal">
-                      <Store className="mr-2 h-4 w-4" />
-                      <span>Restaurant Portal</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/provider-portal" className="cursor-pointer" data-testid="link-provider-portal">
-                      <Briefcase className="mr-2 h-4 w-4" />
-                      <span>Service Provider</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/bookings" className="cursor-pointer" data-testid="link-bookings">
-                      <Calendar className="mr-2 h-4 w-4" />
-                      <span>My Bookings</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  {adminStatus?.isAdmin && (
+                  {isVendor && (
+                    <DropdownMenuItem asChild>
+                      <Link href="/vendor" className="cursor-pointer" data-testid="link-vendor-portal">
+                        <Store className="mr-2 h-4 w-4" />
+                        <span>Restaurant Portal</span>
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
+                  {isProvider && (
+                    <DropdownMenuItem asChild>
+                      <Link href="/provider-portal" className="cursor-pointer" data-testid="link-provider-portal">
+                        <Briefcase className="mr-2 h-4 w-4" />
+                        <span>Service Provider Portal</span>
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
+                  {isCustomer && (
+                    <>
+                      <DropdownMenuItem asChild>
+                        <Link href="/orders" className="cursor-pointer" data-testid="link-orders-menu">
+                          <ShoppingCart className="mr-2 h-4 w-4" />
+                          <span>My Orders</span>
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href="/bookings" className="cursor-pointer" data-testid="link-bookings">
+                          <Calendar className="mr-2 h-4 w-4" />
+                          <span>My Bookings</span>
+                        </Link>
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  {isAdmin && (
                     <DropdownMenuItem asChild>
                       <Link href="/admin" className="cursor-pointer" data-testid="link-admin">
                         <Shield className="mr-2 h-4 w-4" />

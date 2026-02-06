@@ -1351,10 +1351,66 @@ export async function registerRoutes(
   });
 
   // ============================================
+  // USER ROLE ROUTES
+  // ============================================
+
+  app.get("/api/user/role", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const roles = await storage.getUserRoles(userId);
+      const roleNames = roles.map(r => r.role);
+
+      const adminEmail = process.env.ADMIN_EMAIL;
+      const userEmail = req.user?.claims?.email;
+      if (adminEmail && userEmail && adminEmail.toLowerCase() === userEmail.toLowerCase()) {
+        if (!roleNames.includes("admin")) {
+          await storage.addUserRole(userId, "admin");
+          roleNames.push("admin");
+        }
+      }
+
+      res.json({ roles: roleNames });
+    } catch (error) {
+      console.error("Error fetching user role:", error);
+      res.status(500).json({ error: "Failed to fetch user role" });
+    }
+  });
+
+  app.post("/api/user/role", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const { role } = req.body;
+      const validRoles = ["customer", "vendor", "service_provider"];
+      if (!validRoles.includes(role)) {
+        return res.status(400).json({ error: "Invalid role. Must be: customer, vendor, or service_provider" });
+      }
+
+      const existingRoles = await storage.getUserRoles(userId);
+      const nonAdminRoles = existingRoles.filter(r => r.role !== "admin");
+      if (nonAdminRoles.length > 0) {
+        return res.status(400).json({ error: "Role already assigned. Contact admin to change." });
+      }
+
+      const created = await storage.addUserRole(userId, role);
+      const allRoles = await storage.getUserRoles(userId);
+      res.json({ roles: allRoles.map(r => r.role) });
+    } catch (error) {
+      console.error("Error setting user role:", error);
+      res.status(500).json({ error: "Failed to set user role" });
+    }
+  });
+
+  // ============================================
   // ADMIN PLATFORM ROUTES (EPIC 9)
   // ============================================
 
-  // Check if current user is admin (for frontend to determine if admin link should show)
   app.get("/api/user/is-admin", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
@@ -1587,6 +1643,60 @@ export async function registerRoutes(
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ error: "Failed to delete review" });
+    }
+  });
+
+  app.get("/api/admin/service-reviews", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const reviews = await storage.getAllServiceReviews();
+      res.json(reviews);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch service reviews" });
+    }
+  });
+
+  app.delete("/api/admin/service-reviews/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      await storage.deleteServiceReview(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete service review" });
+    }
+  });
+
+  app.delete("/api/admin/restaurants/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      await storage.deleteRestaurant(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete restaurant" });
+    }
+  });
+
+  app.delete("/api/admin/providers/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      await storage.deleteServiceProvider(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete provider" });
+    }
+  });
+
+  app.delete("/api/admin/events/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      await storage.deleteEvent(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete event" });
+    }
+  });
+
+  app.delete("/api/admin/businesses/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      await storage.deleteBusiness(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete business" });
     }
   });
 
