@@ -126,6 +126,7 @@ export const serviceProviders = pgTable("service_providers", {
   phone: varchar("phone", { length: 20 }),
   email: varchar("email", { length: 255 }),
   website: varchar("website", { length: 255 }),
+  einNumber: varchar("ein_number", { length: 20 }),
   imageUrl: text("image_url"),
   galleryImages: jsonb("gallery_images"), // Array of image URLs
   certifications: jsonb("certifications"), // Array of {name, issuer, year}
@@ -171,6 +172,10 @@ export const bookings = pgTable("bookings", {
   address: text("address"),
   notes: text("notes"),
   price: decimal("price", { precision: 10, scale: 2 }),
+  bookingFee: decimal("booking_fee", { precision: 10, scale: 2 }).default("0"),
+  totalPaid: decimal("total_paid", { precision: 10, scale: 2 }),
+  stripeSessionId: varchar("stripe_session_id"),
+  isPaid: boolean("is_paid").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

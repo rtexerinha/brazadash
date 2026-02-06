@@ -1237,6 +1237,173 @@ export async function registerRoutes(
   });
 
   // ============================================
+  // BOOKING CHECKOUT (Stripe payment for services)
+  // ============================================
+
+  const BOOKING_FEE_PERCENT = 0.05; // 5% platform booking fee
+
+  app.post("/api/bookings/checkout", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { providerId, serviceId, requestedDate, requestedTime, address, notes } = req.body;
+
+      if (!providerId) {
+        return res.status(400).json({ message: "Provider ID is required" });
+      }
+
+      const provider = await storage.getServiceProvider(providerId);
+      if (!provider) {
+        return res.status(404).json({ message: "Provider not found" });
+      }
+
+      let serviceName = provider.businessName;
+      let servicePrice = 0;
+
+      if (serviceId) {
+        const service = await storage.getService(serviceId);
+        if (!service) {
+          return res.status(404).json({ message: "Service not found" });
+        }
+        serviceName = service.name;
+        servicePrice = parseFloat(service.price || "0");
+      }
+
+      if (servicePrice <= 0) {
+        return res.status(400).json({ message: "Service has no price set. Cannot process payment." });
+      }
+
+      const bookingFee = Math.round(servicePrice * BOOKING_FEE_PERCENT * 100) / 100;
+      const totalAmount = servicePrice + bookingFee;
+
+      const stripe = await getUncachableStripeClient();
+
+      const lineItems: any[] = [
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: serviceName,
+              description: `Service by ${provider.businessName}`,
+            },
+            unit_amount: Math.round(servicePrice * 100),
+          },
+          quantity: 1,
+        },
+      ];
+
+      if (bookingFee > 0) {
+        lineItems.push({
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: 'Booking Fee',
+              description: 'Platform booking fee (5%)',
+            },
+            unit_amount: Math.round(bookingFee * 100),
+          },
+          quantity: 1,
+        });
+      }
+
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: lineItems,
+        mode: 'payment',
+        success_url: `${req.protocol}://${req.get('host')}/bookings?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${req.protocol}://${req.get('host')}/services/provider/${providerId}`,
+        metadata: {
+          type: 'booking',
+          userId,
+          providerId,
+          serviceId: serviceId || '',
+          serviceName,
+          servicePrice: servicePrice.toString(),
+          bookingFee: bookingFee.toString(),
+          totalAmount: totalAmount.toString(),
+          requestedDate: requestedDate || '',
+          requestedTime: requestedTime || '',
+          address: address || '',
+          notes: notes || '',
+        },
+      });
+
+      res.json({ sessionId: session.id, url: session.url });
+    } catch (error) {
+      console.error("Error creating booking checkout:", error);
+      res.status(500).json({ message: "Failed to create booking checkout session" });
+    }
+  });
+
+  app.post("/api/bookings/checkout/complete", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { sessionId } = req.body;
+
+      if (!sessionId) {
+        return res.status(400).json({ message: "Session ID required" });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+
+      if (session.payment_status !== 'paid') {
+        return res.status(400).json({ message: "Payment not completed" });
+      }
+
+      if (session.metadata?.userId !== userId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      if (session.metadata?.type !== 'booking') {
+        return res.status(400).json({ message: "Invalid session type" });
+      }
+
+      const existingBooking = await storage.getBookingByStripeSession(sessionId);
+      if (existingBooking) {
+        return res.json(existingBooking);
+      }
+
+      const booking = await storage.createBooking({
+        customerId: userId,
+        providerId: session.metadata.providerId,
+        serviceId: session.metadata.serviceId || null,
+        requestedDate: session.metadata.requestedDate ? new Date(session.metadata.requestedDate) : null,
+        requestedTime: session.metadata.requestedTime || null,
+        address: session.metadata.address || null,
+        notes: session.metadata.notes || null,
+        price: session.metadata.servicePrice || '0',
+        bookingFee: session.metadata.bookingFee || '0',
+        totalPaid: session.metadata.totalAmount || '0',
+        stripeSessionId: sessionId,
+        isPaid: true,
+        status: 'pending',
+      });
+
+      const provider = await storage.getServiceProvider(booking.providerId);
+      if (provider) {
+        await storage.createNotification({
+          userId: provider.userId,
+          title: "New Paid Booking",
+          message: `New booking request for ${session.metadata.serviceName} on ${new Date(session.metadata.requestedDate || '').toLocaleDateString()}. Payment received.`,
+          type: "booking",
+        });
+      }
+
+      await storage.createNotification({
+        userId,
+        title: "Booking Confirmed",
+        message: `Your booking for ${session.metadata.serviceName} has been placed. Payment of $${parseFloat(session.metadata.totalAmount || '0').toFixed(2)} received.`,
+        type: "booking",
+      });
+
+      res.json(booking);
+    } catch (error) {
+      console.error("Error completing booking checkout:", error);
+      res.status(500).json({ message: "Failed to complete booking checkout" });
+    }
+  });
+
+  // ============================================
   // COMMUNITY HUB ROUTES (EPIC 6)
   // ============================================
 
@@ -1501,6 +1668,8 @@ export async function registerRoutes(
             city: businessInfo.city || null,
             phone: businessInfo.phone || null,
             email: businessInfo.email || null,
+            einNumber: businessInfo.einNumber || null,
+            imageUrl: businessInfo.imageUrl || null,
             isActive: false,
           });
         }

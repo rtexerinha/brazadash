@@ -82,6 +82,7 @@ export interface IStorage {
   getBookings(customerId: string): Promise<(Booking & { provider?: { businessName: string } })[]>;
   getBooking(id: string): Promise<(Booking & { provider?: ServiceProvider; service?: Service }) | undefined>;
   getBookingsByProvider(providerId: string): Promise<Booking[]>;
+  getBookingByStripeSession(sessionId: string): Promise<Booking | undefined>;
   createBooking(booking: InsertBooking): Promise<Booking>;
   updateBookingStatus(id: string, status: string, data?: Partial<InsertBooking>): Promise<Booking | undefined>;
   
@@ -446,6 +447,11 @@ class DatabaseStorage implements IStorage {
     return db.select().from(bookings)
       .where(eq(bookings.providerId, providerId))
       .orderBy(desc(bookings.createdAt));
+  }
+
+  async getBookingByStripeSession(sessionId: string): Promise<Booking | undefined> {
+    const [booking] = await db.select().from(bookings).where(eq(bookings.stripeSessionId, sessionId));
+    return booking;
   }
 
   async createBooking(booking: InsertBooking): Promise<Booking> {

@@ -1,10 +1,14 @@
-import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { useState, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Link, useSearch } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Calendar, Clock, MapPin, ChevronRight } from "lucide-react";
+import { Calendar, Clock, MapPin, ChevronRight, CheckCircle, CreditCard } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useLanguage } from "@/lib/language-context";
 import type { Booking } from "@shared/schema";
 
 const statusColors: Record<string, string> = {
@@ -66,6 +70,36 @@ function BookingCard({ booking }: { booking: Booking & { provider?: { businessNa
 }
 
 export default function BookingsPage() {
+  const { toast } = useToast();
+  const { t } = useLanguage();
+  const searchString = useSearch();
+  const params = new URLSearchParams(searchString);
+  const paymentStatus = params.get("payment");
+  const sessionId = params.get("session_id");
+  const [paymentCompleted, setPaymentCompleted] = useState(false);
+
+  const completeBookingPayment = useMutation({
+    mutationFn: async (sid: string) => {
+      const res = await apiRequest("POST", "/api/bookings/checkout/complete", { sessionId: sid });
+      return res.json();
+    },
+    onSuccess: () => {
+      setPaymentCompleted(true);
+      queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+      toast({ title: t("booking.paymentSuccess"), description: t("booking.bookingCreated") });
+      window.history.replaceState({}, "", "/bookings");
+    },
+    onError: () => {
+      toast({ title: t("booking.error"), description: t("booking.paymentCompleteFailed"), variant: "destructive" });
+    },
+  });
+
+  useEffect(() => {
+    if (paymentStatus === "success" && sessionId && !paymentCompleted) {
+      completeBookingPayment.mutate(sessionId);
+    }
+  }, [paymentStatus, sessionId]);
+
   const { data: bookings, isLoading } = useQuery<(Booking & { provider?: { businessName: string } })[]>({
     queryKey: ["/api/bookings"],
   });

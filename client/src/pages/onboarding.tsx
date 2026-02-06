@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLanguage } from "@/lib/language-context";
 import { LanguageToggle } from "@/components/language-toggle";
-import { ShoppingBag, Store, Briefcase, ArrowRight, ArrowLeft, CheckCircle, Send } from "lucide-react";
+import { ShoppingBag, Store, Briefcase, ArrowRight, ArrowLeft, CheckCircle, Send, Upload, ImageIcon } from "lucide-react";
 
 interface VendorInfo {
   name: string;
@@ -29,6 +29,8 @@ interface ProviderInfo {
   address: string;
   phone: string;
   email: string;
+  einNumber: string;
+  imageUrl: string;
 }
 
 export default function OnboardingPage() {
@@ -54,7 +56,10 @@ export default function OnboardingPage() {
     address: "",
     phone: "",
     email: "",
+    einNumber: "",
+    imageUrl: "",
   });
+  const [uploading, setUploading] = useState(false);
 
   const roles = [
     {
@@ -484,6 +489,87 @@ export default function OnboardingPage() {
                         className="mt-1.5"
                         data-testid="input-business-email"
                       />
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="business-ein">{t("onboarding.einNumber")}</Label>
+                    <Input
+                      id="business-ein"
+                      value={providerInfo.einNumber}
+                      onChange={(e) => setProviderInfo({ ...providerInfo, einNumber: e.target.value })}
+                      placeholder="XX-XXXXXXX"
+                      className="mt-1.5"
+                      data-testid="input-business-ein"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">{t("onboarding.einNumberDesc")}</p>
+                  </div>
+                  <div>
+                    <Label>{t("onboarding.businessImage")}</Label>
+                    <div className="mt-1.5">
+                      {providerInfo.imageUrl ? (
+                        <div className="relative">
+                          <img
+                            src={providerInfo.imageUrl}
+                            alt="Business"
+                            className="w-full h-40 object-cover rounded-md"
+                            data-testid="img-business-preview"
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="absolute top-2 right-2"
+                            onClick={() => setProviderInfo({ ...providerInfo, imageUrl: "" })}
+                            data-testid="button-remove-business-image"
+                          >
+                            {t("onboarding.removeImage")}
+                          </Button>
+                        </div>
+                      ) : (
+                        <label
+                          className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-md cursor-pointer hover-elevate"
+                          data-testid="label-upload-business-image"
+                        >
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,image/gif"
+                            className="hidden"
+                            data-testid="input-business-image"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              if (file.size > 5 * 1024 * 1024) {
+                                toast({ title: t("onboarding.imageTooLarge"), variant: "destructive" });
+                                return;
+                              }
+                              setUploading(true);
+                              try {
+                                const formData = new FormData();
+                                formData.append("image", file);
+                                const res = await fetch("/api/upload", { method: "POST", body: formData, credentials: "include" });
+                                if (!res.ok) throw new Error("Upload failed");
+                                const data = await res.json();
+                                setProviderInfo({ ...providerInfo, imageUrl: data.url });
+                              } catch {
+                                toast({ title: t("onboarding.uploadFailed"), variant: "destructive" });
+                              } finally {
+                                setUploading(false);
+                              }
+                            }}
+                          />
+                          {uploading ? (
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <Upload className="h-5 w-5 animate-pulse" />
+                              <span className="text-sm">{t("onboarding.uploading")}</span>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                              <ImageIcon className="h-8 w-8" />
+                              <span className="text-sm">{t("onboarding.uploadBusinessImage")}</span>
+                              <span className="text-xs">{t("onboarding.imageFormats")}</span>
+                            </div>
+                          )}
+                        </label>
+                      )}
                     </div>
                   </div>
                 </div>
