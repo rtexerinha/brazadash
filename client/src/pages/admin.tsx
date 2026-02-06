@@ -26,10 +26,11 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import type { Restaurant, Order, ServiceProvider, Booking, Event, Business, Announcement, Review, ServiceReview } from "@shared/schema";
+import { Label } from "@/components/ui/label";
 import {
   Users, Store, ShoppingBag, Briefcase, Calendar, Building2, Megaphone,
   Star, DollarSign, CheckCircle, XCircle, Shield, Plus, AlertTriangle,
-  Trash2, UserPlus, UserMinus
+  Trash2, UserPlus, UserMinus, Filter, X
 } from "lucide-react";
 
 interface AdminStats {
@@ -60,6 +61,9 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState("overview");
   const [showAnnouncementDialog, setShowAnnouncementDialog] = useState(false);
   const [accessDenied, setAccessDenied] = useState(false);
+  const [orderFilterRestaurant, setOrderFilterRestaurant] = useState<string>("all");
+  const [orderFilterDateFrom, setOrderFilterDateFrom] = useState<string>("");
+  const [orderFilterDateTo, setOrderFilterDateTo] = useState<string>("");
   const [newAnnouncement, setNewAnnouncement] = useState({
     title: "",
     content: "",
@@ -566,56 +570,150 @@ export default function AdminPage() {
                 <CardDescription>View all food orders grouped by restaurant</CardDescription>
               </CardHeader>
               <CardContent>
+                <div className="flex flex-wrap items-end gap-4 mb-6 p-4 border rounded-md bg-muted/30">
+                  <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                    <Filter className="h-4 w-4" />
+                    Filters
+                  </div>
+                  <div className="flex-1 min-w-[180px]">
+                    <Label htmlFor="filter-restaurant" className="text-xs text-muted-foreground mb-1 block">Restaurant</Label>
+                    <Select value={orderFilterRestaurant} onValueChange={setOrderFilterRestaurant}>
+                      <SelectTrigger data-testid="select-filter-restaurant">
+                        <SelectValue placeholder="All restaurants" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All restaurants</SelectItem>
+                        {(() => {
+                          const seen = new Map<string, string>();
+                          orders?.forEach(o => {
+                            if (!seen.has(o.restaurantId)) {
+                              seen.set(o.restaurantId, o.restaurant?.name || "Unknown");
+                            }
+                          });
+                          return Array.from(seen.entries()).map(([id, name]) => (
+                            <SelectItem key={id} value={id} data-testid={`option-restaurant-${id}`}>{name}</SelectItem>
+                          ));
+                        })()}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="min-w-[150px]">
+                    <Label htmlFor="filter-date-from" className="text-xs text-muted-foreground mb-1 block">From date</Label>
+                    <Input
+                      id="filter-date-from"
+                      type="date"
+                      value={orderFilterDateFrom}
+                      onChange={(e) => setOrderFilterDateFrom(e.target.value)}
+                      data-testid="input-filter-date-from"
+                    />
+                  </div>
+                  <div className="min-w-[150px]">
+                    <Label htmlFor="filter-date-to" className="text-xs text-muted-foreground mb-1 block">To date</Label>
+                    <Input
+                      id="filter-date-to"
+                      type="date"
+                      value={orderFilterDateTo}
+                      onChange={(e) => setOrderFilterDateTo(e.target.value)}
+                      data-testid="input-filter-date-to"
+                    />
+                  </div>
+                  {(orderFilterRestaurant !== "all" || orderFilterDateFrom || orderFilterDateTo) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setOrderFilterRestaurant("all");
+                        setOrderFilterDateFrom("");
+                        setOrderFilterDateTo("");
+                      }}
+                      data-testid="button-clear-filters"
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      Clear
+                    </Button>
+                  )}
+                </div>
+
                 {(() => {
                   if (!orders || orders.length === 0) {
                     return <p className="text-center text-muted-foreground py-8">No orders found</p>;
                   }
-                  const grouped: Record<string, { name: string; orders: typeof orders }> = {};
-                  for (const order of orders) {
+
+                  let filtered = orders;
+                  if (orderFilterRestaurant !== "all") {
+                    filtered = filtered.filter(o => o.restaurantId === orderFilterRestaurant);
+                  }
+                  if (orderFilterDateFrom) {
+                    const from = new Date(orderFilterDateFrom);
+                    from.setHours(0, 0, 0, 0);
+                    filtered = filtered.filter(o => new Date(o.createdAt!) >= from);
+                  }
+                  if (orderFilterDateTo) {
+                    const to = new Date(orderFilterDateTo);
+                    to.setHours(23, 59, 59, 999);
+                    filtered = filtered.filter(o => new Date(o.createdAt!) <= to);
+                  }
+
+                  if (filtered.length === 0) {
+                    return <p className="text-center text-muted-foreground py-8">No orders match the selected filters</p>;
+                  }
+
+                  const grouped: Record<string, { name: string; orders: typeof filtered }> = {};
+                  for (const order of filtered) {
                     const key = order.restaurantId;
                     if (!grouped[key]) {
                       grouped[key] = { name: order.restaurant?.name || "Unknown Restaurant", orders: [] };
                     }
                     grouped[key].orders.push(order);
                   }
+
+                  const totalFiltered = filtered.length;
+                  const totalRevenue = filtered.reduce((sum, o) => sum + parseFloat(o.total), 0);
+
                   return (
-                    <div className="space-y-6">
-                      {Object.entries(grouped).map(([restaurantId, group]) => (
-                        <div key={restaurantId} data-testid={`admin-group-restaurant-${restaurantId}`}>
-                          <div className="flex items-center gap-3 mb-3">
-                            <div className="h-8 w-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
-                              <Store className="h-4 w-4 text-primary" />
-                            </div>
-                            <div>
-                              <h3 className="font-semibold" data-testid={`admin-group-name-${restaurantId}`}>{group.name}</h3>
-                              <p className="text-xs text-muted-foreground">{group.orders.length} order{group.orders.length !== 1 ? "s" : ""}</p>
-                            </div>
-                          </div>
-                          <div className="space-y-2 ml-11">
-                            {group.orders.map((order) => (
-                              <div
-                                key={order.id}
-                                className="flex items-center justify-between gap-4 p-3 border rounded-md"
-                                data-testid={`row-order-${order.id}`}
-                              >
-                                <div>
-                                  <p className="font-mono text-sm">{order.id.slice(0, 8)}...</p>
-                                  <p className="text-sm text-muted-foreground">
-                                    ${order.total} - {new Date(order.createdAt!).toLocaleDateString()}
-                                  </p>
-                                </div>
-                                <Badge variant={
-                                  order.status === "delivered" ? "default" :
-                                  order.status === "cancelled" ? "destructive" :
-                                  "secondary"
-                                }>
-                                  {order.status}
-                                </Badge>
+                    <div>
+                      <div className="flex items-center gap-4 mb-4 text-sm text-muted-foreground">
+                        <span data-testid="text-filtered-count">{totalFiltered} order{totalFiltered !== 1 ? "s" : ""}</span>
+                        <span data-testid="text-filtered-revenue">Total: ${totalRevenue.toFixed(2)}</span>
+                      </div>
+                      <div className="space-y-6">
+                        {Object.entries(grouped).map(([restaurantId, group]) => (
+                          <div key={restaurantId} data-testid={`admin-group-restaurant-${restaurantId}`}>
+                            <div className="flex items-center gap-3 mb-3">
+                              <div className="h-8 w-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
+                                <Store className="h-4 w-4 text-primary" />
                               </div>
-                            ))}
+                              <div>
+                                <h3 className="font-semibold" data-testid={`admin-group-name-${restaurantId}`}>{group.name}</h3>
+                                <p className="text-xs text-muted-foreground">{group.orders.length} order{group.orders.length !== 1 ? "s" : ""}</p>
+                              </div>
+                            </div>
+                            <div className="space-y-2 ml-11">
+                              {group.orders.map((order) => (
+                                <div
+                                  key={order.id}
+                                  className="flex items-center justify-between gap-4 p-3 border rounded-md"
+                                  data-testid={`row-order-${order.id}`}
+                                >
+                                  <div>
+                                    <p className="font-mono text-sm">{order.id.slice(0, 8)}...</p>
+                                    <p className="text-sm text-muted-foreground">
+                                      ${order.total} - {new Date(order.createdAt!).toLocaleDateString()}
+                                    </p>
+                                  </div>
+                                  <Badge variant={
+                                    order.status === "delivered" ? "default" :
+                                    order.status === "cancelled" ? "destructive" :
+                                    "secondary"
+                                  }>
+                                    {order.status}
+                                  </Badge>
+                                </div>
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   );
                 })()}
