@@ -536,9 +536,17 @@ function ProviderDashboard({ provider }: { provider: ServiceProvider }) {
                           {booking.address && <p>Location: {booking.address}</p>}
                           {booking.notes && <p>Notes: {booking.notes}</p>}
                         </div>
-                        {booking.price && (
-                          <p className="font-semibold mt-2">${parseFloat(booking.price).toFixed(2)}</p>
-                        )}
+                        <div className="mt-2 space-y-0.5">
+                          {booking.price && parseFloat(booking.price) > 0 && (
+                            <p className="text-sm text-muted-foreground">{t("booking.servicePrice")}: ${parseFloat(booking.price).toFixed(2)}</p>
+                          )}
+                          {booking.bookingFee && parseFloat(booking.bookingFee) > 0 && (
+                            <p className="text-sm text-muted-foreground">{t("booking.bookingFee")}: ${parseFloat(booking.bookingFee).toFixed(2)}</p>
+                          )}
+                          {booking.totalPaid && parseFloat(booking.totalPaid) > 0 && (
+                            <p className="font-semibold">{t("booking.totalPaid")}: ${parseFloat(booking.totalPaid).toFixed(2)}</p>
+                          )}
+                        </div>
                       </div>
                       <div className="flex gap-2">
                         {booking.status === "pending" && (
