@@ -1287,19 +1287,21 @@ export async function registerRoutes(
         servicePrice = parseFloat(service.price || "0");
       }
 
-      if (servicePrice <= 0) {
-        return res.status(400).json({ message: "Service has no price set. Cannot process payment." });
-      }
-
       const providerBookingFee = parseFloat(provider.bookingFee || "0");
       const platformFee = Math.round(servicePrice * PLATFORM_FEE_PERCENT * 100) / 100;
       const totalBookingFee = providerBookingFee + platformFee;
       const totalAmount = servicePrice + totalBookingFee;
 
+      if (totalAmount <= 0) {
+        return res.status(400).json({ message: "No amount to charge. Service price or booking fee must be set." });
+      }
+
       const stripe = await getUncachableStripeClient();
 
-      const lineItems: any[] = [
-        {
+      const lineItems: any[] = [];
+
+      if (servicePrice > 0) {
+        lineItems.push({
           price_data: {
             currency: 'usd',
             product_data: {
@@ -1309,8 +1311,8 @@ export async function registerRoutes(
             unit_amount: Math.round(servicePrice * 100),
           },
           quantity: 1,
-        },
-      ];
+        });
+      }
 
       if (platformFee > 0) {
         lineItems.push({

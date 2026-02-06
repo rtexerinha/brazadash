@@ -77,7 +77,7 @@ function BookingDialog({ provider, service }: { provider: ServiceProvider; servi
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button data-testid={`button-book-${service?.id || "provider"}`}>
-          {service && servicePrice > 0 ? `${t("booking.book")} - $${servicePrice.toFixed(2)}` : t("booking.requestBooking")}
+          {totalAmount > 0 ? `${t("booking.book")} - $${totalAmount.toFixed(2)}` : t("booking.requestBooking")}
         </Button>
       </DialogTrigger>
       <DialogContent>
@@ -136,21 +136,25 @@ function BookingDialog({ provider, service }: { provider: ServiceProvider; servi
             />
           </div>
 
-          {service && servicePrice > 0 && (
+          {totalAmount > 0 && (
             <Card>
               <CardContent className="p-4 space-y-2">
                 <div className="flex items-center gap-2 mb-2">
                   <CreditCard className="h-4 w-4 text-muted-foreground" />
                   <span className="font-medium text-sm">{t("booking.paymentSummary")}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span>{service.name}</span>
-                  <span data-testid="text-service-price">${servicePrice.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-sm text-muted-foreground">
-                  <span>{t("booking.platformFee")} (8%)</span>
-                  <span data-testid="text-platform-fee">${platformFee.toFixed(2)}</span>
-                </div>
+                {service && servicePrice > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span>{service.name}</span>
+                    <span data-testid="text-service-price">${servicePrice.toFixed(2)}</span>
+                  </div>
+                )}
+                {platformFee > 0 && (
+                  <div className="flex justify-between text-sm text-muted-foreground">
+                    <span>{t("booking.platformFee")} (8%)</span>
+                    <span data-testid="text-platform-fee">${platformFee.toFixed(2)}</span>
+                  </div>
+                )}
                 {providerBookingFee > 0 && (
                   <div className="flex justify-between text-sm text-muted-foreground">
                     <span>{t("booking.bookingFee")}</span>
@@ -168,7 +172,7 @@ function BookingDialog({ provider, service }: { provider: ServiceProvider; servi
         <DialogFooter>
           <Button 
             onClick={() => createBookingCheckout.mutate()} 
-            disabled={!date || createBookingCheckout.isPending || servicePrice <= 0}
+            disabled={!date || createBookingCheckout.isPending || totalAmount <= 0}
             data-testid="button-submit-booking"
           >
             {createBookingCheckout.isPending ? t("booking.processing") : (
