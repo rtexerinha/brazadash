@@ -27,6 +27,15 @@ const translations: Record<Language, Record<string, string>> = {
     "nav.serviceProvider": "Service Provider",
     "nav.customer": "Customer",
 
+    "landing.aboutTitle": "About BrazaDash",
+    "landing.aboutDesc": "BrazaDash.com is a platform created to connect, support, and empower the Brazilian community, bringing together businesses, restaurants, service providers, and customers in one centralized digital space.",
+    "landing.aboutMissionTitle": "Our mission is simple:",
+    "landing.aboutMission": "Strengthen our community by making Brazilian products, services, culture, and events more accessible and visible to everyone.",
+    "landing.aboutClosing": "BrazaDash is more than a marketplace — it's a community meeting point where people can discover, engage, and support Brazilian entrepreneurship and culture.",
+    "landing.exploreFood": "Explore Food",
+    "landing.exploreServices": "Explore Services",
+    "landing.exploreCommunity": "Explore Community",
+
     "landing.badge": "Now serving California",
     "landing.heroTitle1": "Brazilian flavor",
     "landing.heroTitle2": "at your door",
@@ -513,6 +522,15 @@ const translations: Record<Language, Record<string, string>> = {
     "nav.restaurantVendor": "Restaurante",
     "nav.serviceProvider": "Prestador de Servicos",
     "nav.customer": "Cliente",
+
+    "landing.aboutTitle": "Sobre o BrazaDash",
+    "landing.aboutDesc": "O BrazaDash.com e uma plataforma criada para conectar, apoiar e impulsionar a comunidade brasileira, reunindo empresas, restaurantes, prestadores de servicos e clientes em um unico espaco digital centralizado.",
+    "landing.aboutMissionTitle": "Nossa missao e simples:",
+    "landing.aboutMission": "Fortalecer nossa comunidade tornando produtos, servicos, cultura e eventos brasileiros mais acessiveis e visiveis para todos.",
+    "landing.aboutClosing": "O BrazaDash e mais do que um marketplace — e um ponto de encontro comunitario onde as pessoas podem descobrir, interagir e apoiar o empreendedorismo e a cultura brasileira.",
+    "landing.exploreFood": "Explorar Comida",
+    "landing.exploreServices": "Explorar Servicos",
+    "landing.exploreCommunity": "Explorar Comunidade",
 
     "landing.badge": "Atendendo a California",
     "landing.heroTitle1": "Sabor brasileiro",

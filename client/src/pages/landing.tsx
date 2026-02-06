@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { UtensilsCrossed, MapPin, Star, Clock, Shield, Heart } from "lucide-react";
+import { UtensilsCrossed, MapPin, Star, Clock, Shield, Heart, Users, Utensils, Briefcase } from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
 import { LanguageToggle } from "@/components/language-toggle";
 import { AuthDialog, useAuthDialog } from "@/components/auth-dialog";
@@ -30,6 +30,51 @@ export default function LandingPage() {
           </div>
         </div>
       </header>
+
+      <section className="relative overflow-hidden" data-testid="section-about">
+        <div className="relative w-full min-h-[520px] md:min-h-[480px]">
+          <div
+            className="absolute inset-0 bg-cover bg-center"
+            style={{ backgroundImage: "url('/images/community-hero.png')" }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/70 to-black/50" />
+          <div className="relative z-10 container mx-auto px-4 py-16 md:py-20">
+            <div className="max-w-2xl space-y-6">
+              <h2 className="text-3xl md:text-4xl font-bold text-white" data-testid="text-about-title">
+                {t("landing.aboutTitle")}
+              </h2>
+              <p className="text-lg text-white/90 leading-relaxed" data-testid="text-about-desc">
+                {t("landing.aboutDesc")}
+              </p>
+              <div className="space-y-2">
+                <p className="text-xl font-semibold text-yellow-400" data-testid="text-about-mission-title">
+                  {t("landing.aboutMissionTitle")}
+                </p>
+                <p className="text-lg text-white/90 leading-relaxed" data-testid="text-about-mission">
+                  {t("landing.aboutMission")}
+                </p>
+              </div>
+              <p className="text-white/80 italic leading-relaxed" data-testid="text-about-closing">
+                {t("landing.aboutClosing")}
+              </p>
+              <div className="flex flex-wrap gap-3 pt-4">
+                <Button size="lg" className="text-base" onClick={openAuthDialog} data-testid="button-about-food">
+                  <Utensils className="mr-2 h-5 w-5" />
+                  {t("landing.exploreFood")}
+                </Button>
+                <Button size="lg" variant="outline" className="text-base bg-white/10 backdrop-blur-sm border-white/30 text-white" onClick={openAuthDialog} data-testid="button-about-services">
+                  <Briefcase className="mr-2 h-5 w-5" />
+                  {t("landing.exploreServices")}
+                </Button>
+                <Button size="lg" variant="outline" className="text-base bg-white/10 backdrop-blur-sm border-white/30 text-white" onClick={openAuthDialog} data-testid="button-about-community">
+                  <Users className="mr-2 h-5 w-5" />
+                  {t("landing.exploreCommunity")}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <section className="relative overflow-hidden bg-gradient-to-b from-primary/5 via-background to-background py-20 lg:py-32">
         <div className="container mx-auto px-4">
