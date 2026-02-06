@@ -16,7 +16,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Store, Plus, Utensils, Package, Star, DollarSign, Loader2, Pencil, Trash2 } from "lucide-react";
+import { Store, Plus, Utensils, Package, Star, DollarSign, Loader2, Pencil, Trash2, Clock, CheckCircle, Truck, MapPin, XCircle, ChefHat } from "lucide-react";
+import { format } from "date-fns";
 import { z } from "zod";
 import type { Restaurant, MenuItem, Order } from "@shared/schema";
 
@@ -369,6 +370,17 @@ function VendorDashboard({ restaurant }: { restaurant: Restaurant }) {
 
   const pendingOrders = orders?.filter((o) => o.status === "pending") || [];
   const activeOrders = orders?.filter((o) => ["confirmed", "preparing", "ready", "out_for_delivery"].includes(o.status)) || [];
+  const completedOrders = orders?.filter((o) => ["delivered", "cancelled"].includes(o.status)) || [];
+
+  const statusConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {
+    pending: { label: "New Order", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400", icon: Clock },
+    confirmed: { label: "Confirmed", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400", icon: CheckCircle },
+    preparing: { label: "Preparing", color: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400", icon: ChefHat },
+    ready: { label: "Ready for Pickup", color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400", icon: Package },
+    out_for_delivery: { label: "Out for Delivery", color: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400", icon: Truck },
+    delivered: { label: "Delivered", color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400", icon: CheckCircle },
+    cancelled: { label: "Cancelled", color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400", icon: XCircle },
+  };
 
   return (
     <div className="space-y-8">
@@ -463,71 +475,201 @@ function VendorDashboard({ restaurant }: { restaurant: Restaurant }) {
               ))}
             </div>
           ) : orders && orders.length > 0 ? (
-            <div className="space-y-4">
-              {orders.map((order) => {
-                const items = order.items as Array<{ name: string; quantity: number }>;
-                return (
-                  <Card key={order.id} data-testid={`vendor-order-${order.id}`}>
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between gap-4 mb-3">
-                        <div>
-                          <p className="font-semibold">Order #{order.id.slice(0, 8)}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {items.map((i) => `${i.quantity}x ${i.name}`).join(", ")}
-                          </p>
-                        </div>
-                        <Badge>{order.status}</Badge>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <p className="font-medium">${parseFloat(order.total).toFixed(2)}</p>
-                        <div className="flex gap-2">
-                          {order.status === "pending" && (
-                            <Button
-                              size="sm"
-                              onClick={() => updateStatus.mutate({ orderId: order.id, status: "confirmed" })}
-                              data-testid={`button-confirm-${order.id}`}
-                            >
-                              Accept
-                            </Button>
-                          )}
-                          {order.status === "confirmed" && (
-                            <Button
-                              size="sm"
-                              onClick={() => updateStatus.mutate({ orderId: order.id, status: "preparing" })}
-                            >
-                              Start Preparing
-                            </Button>
-                          )}
-                          {order.status === "preparing" && (
-                            <Button
-                              size="sm"
-                              onClick={() => updateStatus.mutate({ orderId: order.id, status: "ready" })}
-                            >
-                              Mark Ready
-                            </Button>
-                          )}
-                          {order.status === "ready" && (
-                            <Button
-                              size="sm"
-                              onClick={() => updateStatus.mutate({ orderId: order.id, status: "out_for_delivery" })}
-                            >
-                              Out for Delivery
-                            </Button>
-                          )}
-                          {order.status === "out_for_delivery" && (
-                            <Button
-                              size="sm"
-                              onClick={() => updateStatus.mutate({ orderId: order.id, status: "delivered" })}
-                            >
-                              Mark Delivered
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+            <div className="space-y-8">
+              {pendingOrders.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-4">
+                    <Clock className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                    <h3 className="font-semibold text-lg" data-testid="text-section-pending">
+                      New Orders ({pendingOrders.length})
+                    </h3>
+                  </div>
+                  <div className="space-y-3">
+                    {pendingOrders.map((order) => {
+                      const items = order.items as Array<{ name: string; quantity: number; price: number }>;
+                      const config = statusConfig[order.status];
+                      const StatusIcon = config.icon;
+                      return (
+                        <Card key={order.id} className="border-yellow-200 dark:border-yellow-800" data-testid={`vendor-order-${order.id}`}>
+                          <CardContent className="p-4">
+                            <div className="flex items-start justify-between gap-4 mb-3">
+                              <div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <p className="font-semibold" data-testid={`text-order-id-${order.id}`}>Order #{order.id.slice(0, 8)}</p>
+                                  <Badge className={config.color}>
+                                    <StatusIcon className="h-3 w-3 mr-1" />
+                                    {config.label}
+                                  </Badge>
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {format(new Date(order.createdAt!), "MMM d, yyyy 'at' h:mm a")}
+                                </p>
+                              </div>
+                              <p className="font-semibold text-lg" data-testid={`text-order-total-${order.id}`}>
+                                ${parseFloat(order.total).toFixed(2)}
+                              </p>
+                            </div>
+                            <div className="mb-3 p-3 rounded-md bg-muted/50">
+                              <p className="text-sm font-medium mb-1">Items:</p>
+                              {items.map((item, idx) => (
+                                <p key={idx} className="text-sm text-muted-foreground">
+                                  {item.quantity}x {item.name} {item.price ? `- $${(item.price * item.quantity).toFixed(2)}` : ""}
+                                </p>
+                              ))}
+                            </div>
+                            {order.deliveryAddress && (
+                              <div className="flex items-start gap-2 mb-3 text-sm">
+                                <MapPin className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                                <span className="text-muted-foreground">{order.deliveryAddress}</span>
+                              </div>
+                            )}
+                            {order.notes && (
+                              <p className="text-sm text-muted-foreground mb-3 italic">Note: {order.notes}</p>
+                            )}
+                            <div className="flex items-center justify-end gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => updateStatus.mutate({ orderId: order.id, status: "cancelled" })}
+                                data-testid={`button-decline-${order.id}`}
+                              >
+                                <XCircle className="h-4 w-4 mr-1" />
+                                Decline
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => updateStatus.mutate({ orderId: order.id, status: "confirmed" })}
+                                data-testid={`button-accept-${order.id}`}
+                              >
+                                <CheckCircle className="h-4 w-4 mr-1" />
+                                Accept Order
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {activeOrders.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-4">
+                    <Utensils className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                    <h3 className="font-semibold text-lg" data-testid="text-section-active">
+                      Active Orders ({activeOrders.length})
+                    </h3>
+                  </div>
+                  <div className="space-y-3">
+                    {activeOrders.map((order) => {
+                      const items = order.items as Array<{ name: string; quantity: number; price: number }>;
+                      const config = statusConfig[order.status];
+                      const StatusIcon = config.icon;
+                      const nextStatus: Record<string, { status: string; label: string; icon: typeof Clock }> = {
+                        confirmed: { status: "preparing", label: "Start Preparing", icon: ChefHat },
+                        preparing: { status: "ready", label: "Ready for Pickup", icon: Package },
+                        ready: { status: "out_for_delivery", label: "Out for Delivery", icon: Truck },
+                        out_for_delivery: { status: "delivered", label: "Mark Delivered", icon: CheckCircle },
+                      };
+                      const next = nextStatus[order.status];
+                      return (
+                        <Card key={order.id} data-testid={`vendor-order-${order.id}`}>
+                          <CardContent className="p-4">
+                            <div className="flex items-start justify-between gap-4 mb-3">
+                              <div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <p className="font-semibold" data-testid={`text-order-id-${order.id}`}>Order #{order.id.slice(0, 8)}</p>
+                                  <Badge className={config.color}>
+                                    <StatusIcon className="h-3 w-3 mr-1" />
+                                    {config.label}
+                                  </Badge>
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {format(new Date(order.createdAt!), "MMM d, yyyy 'at' h:mm a")}
+                                </p>
+                              </div>
+                              <p className="font-semibold" data-testid={`text-order-total-${order.id}`}>
+                                ${parseFloat(order.total).toFixed(2)}
+                              </p>
+                            </div>
+                            <div className="mb-3 text-sm text-muted-foreground">
+                              {items.map((i) => `${i.quantity}x ${i.name}`).join(", ")}
+                            </div>
+                            {order.deliveryAddress && (
+                              <div className="flex items-start gap-2 mb-3 text-sm">
+                                <MapPin className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                                <span className="text-muted-foreground">{order.deliveryAddress}</span>
+                              </div>
+                            )}
+                            {next && (
+                              <div className="flex justify-end">
+                                <Button
+                                  size="sm"
+                                  onClick={() => updateStatus.mutate({ orderId: order.id, status: next.status })}
+                                  data-testid={`button-status-${order.id}`}
+                                >
+                                  <next.icon className="h-4 w-4 mr-1" />
+                                  {next.label}
+                                </Button>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {completedOrders.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-4">
+                    <CheckCircle className="h-5 w-5 text-muted-foreground" />
+                    <h3 className="font-semibold text-lg" data-testid="text-section-completed">
+                      Completed ({completedOrders.length})
+                    </h3>
+                  </div>
+                  <div className="space-y-3">
+                    {completedOrders.slice(0, 10).map((order) => {
+                      const items = order.items as Array<{ name: string; quantity: number }>;
+                      const config = statusConfig[order.status];
+                      const StatusIcon = config.icon;
+                      return (
+                        <Card key={order.id} className="opacity-80" data-testid={`vendor-order-${order.id}`}>
+                          <CardContent className="p-4">
+                            <div className="flex items-center justify-between gap-4">
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <p className="font-semibold text-sm">Order #{order.id.slice(0, 8)}</p>
+                                  <Badge className={config.color} variant="secondary">
+                                    <StatusIcon className="h-3 w-3 mr-1" />
+                                    {config.label}
+                                  </Badge>
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {items.map((i) => `${i.quantity}x ${i.name}`).join(", ")}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {format(new Date(order.createdAt!), "MMM d, yyyy 'at' h:mm a")}
+                                </p>
+                              </div>
+                              <p className="font-medium text-sm">${parseFloat(order.total).toFixed(2)}</p>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {pendingOrders.length === 0 && activeOrders.length === 0 && completedOrders.length === 0 && (
+                <Card className="p-8 text-center">
+                  <Package className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                  <p className="text-muted-foreground">No orders yet</p>
+                </Card>
+              )}
             </div>
           ) : (
             <Card className="p-8 text-center">

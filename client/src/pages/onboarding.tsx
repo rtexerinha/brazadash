@@ -32,7 +32,7 @@ const roles = [
   {
     id: "service_provider",
     title: "Service Provider",
-    subtitle: "Oferecer Servi\u00e7os / Offer Services",
+    subtitle: "Oferecer Serviços / Offer Services",
     description: "List your professional services, manage bookings, and grow your client base.",
     icon: Briefcase,
     color: "text-amber-600 dark:text-amber-400",
@@ -83,7 +83,7 @@ export default function OnboardingPage() {
             Welcome! How would you like to use the platform?
           </p>
           <p className="text-sm text-muted-foreground mt-1">
-            Como voc\u00ea gostaria de usar a plataforma?
+            Como você gostaria de usar a plataforma?
           </p>
         </div>
 
