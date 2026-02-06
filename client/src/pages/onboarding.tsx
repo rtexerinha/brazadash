@@ -4,47 +4,50 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useLanguage } from "@/lib/language-context";
+import { LanguageToggle } from "@/components/language-toggle";
 import { ShoppingBag, Store, Briefcase, ArrowRight, CheckCircle } from "lucide-react";
-
-const roles = [
-  {
-    id: "customer",
-    title: "Customer",
-    subtitle: "Comprar / Buy",
-    description: "Browse restaurants, order food, book services, and explore the community.",
-    icon: ShoppingBag,
-    color: "text-blue-600 dark:text-blue-400",
-    bgColor: "bg-blue-50 dark:bg-blue-950/30",
-    borderColor: "border-blue-200 dark:border-blue-800",
-    selectedBg: "bg-blue-50 dark:bg-blue-950/40",
-  },
-  {
-    id: "vendor",
-    title: "Restaurant / Food Vendor",
-    subtitle: "Vender Comida / Sell Food",
-    description: "Manage your restaurant, create menus, and process food orders from customers.",
-    icon: Store,
-    color: "text-primary",
-    bgColor: "bg-primary/5",
-    borderColor: "border-primary/30",
-    selectedBg: "bg-primary/10",
-  },
-  {
-    id: "service_provider",
-    title: "Service Provider",
-    subtitle: "Oferecer Serviços / Offer Services",
-    description: "List your professional services, manage bookings, and grow your client base.",
-    icon: Briefcase,
-    color: "text-amber-600 dark:text-amber-400",
-    bgColor: "bg-amber-50 dark:bg-amber-950/30",
-    borderColor: "border-amber-200 dark:border-amber-800",
-    selectedBg: "bg-amber-50 dark:bg-amber-950/40",
-  },
-];
 
 export default function OnboardingPage() {
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const { toast } = useToast();
+  const { t } = useLanguage();
+
+  const roles = [
+    {
+      id: "customer",
+      title: t("onboarding.customer"),
+      subtitle: t("onboarding.customerSub"),
+      description: t("onboarding.customerDesc"),
+      icon: ShoppingBag,
+      color: "text-blue-600 dark:text-blue-400",
+      bgColor: "bg-blue-50 dark:bg-blue-950/30",
+      borderColor: "border-blue-200 dark:border-blue-800",
+      selectedBg: "bg-blue-50 dark:bg-blue-950/40",
+    },
+    {
+      id: "vendor",
+      title: t("onboarding.vendor"),
+      subtitle: t("onboarding.vendorSub"),
+      description: t("onboarding.vendorDesc"),
+      icon: Store,
+      color: "text-primary",
+      bgColor: "bg-primary/5",
+      borderColor: "border-primary/30",
+      selectedBg: "bg-primary/10",
+    },
+    {
+      id: "service_provider",
+      title: t("onboarding.provider"),
+      subtitle: t("onboarding.providerSub"),
+      description: t("onboarding.providerDesc"),
+      icon: Briefcase,
+      color: "text-amber-600 dark:text-amber-400",
+      bgColor: "bg-amber-50 dark:bg-amber-950/30",
+      borderColor: "border-amber-200 dark:border-amber-800",
+      selectedBg: "bg-amber-50 dark:bg-amber-950/40",
+    },
+  ];
 
   const setRoleMutation = useMutation({
     mutationFn: async (role: string) => {
@@ -54,14 +57,19 @@ export default function OnboardingPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/user/role"] });
       toast({
-        title: "Welcome to BrazaDash!",
-        description: "Your account is ready. Let's get started!",
+        title: t("onboarding.welcomeToast"),
+        description: t("onboarding.welcomeToastDesc"),
       });
     },
-    onError: () => {
+    onError: (error: Error) => {
+      if (error.message.includes("401")) {
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+        window.location.href = "/api/login";
+        return;
+      }
       toast({
-        title: "Something went wrong",
-        description: "Please try again.",
+        title: t("onboarding.error"),
+        description: t("onboarding.errorDesc"),
         variant: "destructive",
       });
     },
@@ -69,6 +77,9 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <div className="absolute top-4 right-4">
+        <LanguageToggle />
+      </div>
       <div className="w-full max-w-2xl">
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-2 mb-4">
@@ -77,14 +88,16 @@ export default function OnboardingPage() {
             </div>
           </div>
           <h1 className="text-3xl font-bold mb-2" data-testid="text-onboarding-title">
-            Bem-vindo ao BrazaDash!
+            {t("onboarding.welcome")}
           </h1>
           <p className="text-lg text-muted-foreground" data-testid="text-onboarding-subtitle">
-            Welcome! How would you like to use the platform?
+            {t("onboarding.subtitle")}
           </p>
-          <p className="text-sm text-muted-foreground mt-1">
-            Como você gostaria de usar a plataforma?
-          </p>
+          {t("onboarding.subtitlePt") && (
+            <p className="text-sm text-muted-foreground mt-1">
+              {t("onboarding.subtitlePt")}
+            </p>
+          )}
         </div>
 
         <div className="space-y-3 mb-8">
@@ -136,17 +149,17 @@ export default function OnboardingPage() {
           data-testid="button-continue-onboarding"
         >
           {setRoleMutation.isPending ? (
-            "Setting up your account..."
+            t("onboarding.settingUp")
           ) : (
             <>
-              Continue
+              {t("onboarding.continue")}
               <ArrowRight className="ml-2 h-4 w-4" />
             </>
           )}
         </Button>
 
         <p className="text-center text-xs text-muted-foreground mt-4">
-          You can contact support later if you need to change your role.
+          {t("onboarding.changeRole")}
         </p>
       </div>
     </div>

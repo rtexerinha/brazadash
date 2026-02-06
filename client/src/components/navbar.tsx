@@ -13,6 +13,8 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/use-auth";
 import { useCart } from "@/lib/cart-context";
 import { useTheme } from "@/components/theme-provider";
+import { useLanguage } from "@/lib/language-context";
+import { LanguageToggle } from "@/components/language-toggle";
 import { ShoppingCart, Sun, Moon, LogOut, Store, Bell, Briefcase, Calendar, Shield } from "lucide-react";
 import { useState } from "react";
 
@@ -20,6 +22,7 @@ export function Navbar() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { getItemCount } = useCart();
   const { theme, toggleTheme } = useTheme();
+  const { t } = useLanguage();
   const [location] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const itemCount = getItemCount();
@@ -61,7 +64,7 @@ export function Navbar() {
                   }`}
                   data-testid="link-vendor-dashboard"
                 >
-                  My Restaurant
+                  {t("nav.myRestaurant")}
                 </span>
               </Link>
             )}
@@ -74,7 +77,7 @@ export function Navbar() {
                   }`}
                   data-testid="link-provider-dashboard"
                 >
-                  My Services
+                  {t("nav.myServices")}
                 </span>
               </Link>
             )}
@@ -87,7 +90,7 @@ export function Navbar() {
                   }`}
                   data-testid="link-home"
                 >
-                  Home
+                  {t("nav.home")}
                 </span>
               </Link>
             )}
@@ -99,7 +102,7 @@ export function Navbar() {
                 }`}
                 data-testid="link-restaurants"
               >
-                Food
+                {t("nav.food")}
               </span>
             </Link>
             <Link href="/services">
@@ -109,7 +112,7 @@ export function Navbar() {
                 }`}
                 data-testid="link-services"
               >
-                Services
+                {t("nav.services")}
               </span>
             </Link>
             <Link href="/community">
@@ -121,7 +124,7 @@ export function Navbar() {
                 }`}
                 data-testid="link-community"
               >
-                Community
+                {t("nav.community")}
               </span>
             </Link>
             {isCustomer && (
@@ -132,7 +135,7 @@ export function Navbar() {
                   }`}
                   data-testid="link-orders"
                 >
-                  My Orders
+                  {t("nav.myOrders")}
                 </span>
               </Link>
             )}
@@ -140,6 +143,8 @@ export function Navbar() {
         )}
 
         <div className="flex items-center gap-2">
+          <LanguageToggle />
+
           <Button
             variant="ghost"
             size="icon"
@@ -195,7 +200,7 @@ export function Navbar() {
                         </p>
                       )}
                       <Badge variant="outline" className="w-fit text-xs mt-1" data-testid="badge-user-role">
-                        {isVendor ? "Restaurant Vendor" : isProvider ? "Service Provider" : "Customer"}
+                        {isVendor ? t("nav.restaurantVendor") : isProvider ? t("nav.serviceProvider") : t("nav.customer")}
                       </Badge>
                     </div>
                   </div>
@@ -204,7 +209,7 @@ export function Navbar() {
                     <DropdownMenuItem asChild>
                       <Link href="/vendor" className="cursor-pointer" data-testid="link-vendor-portal">
                         <Store className="mr-2 h-4 w-4" />
-                        <span>Restaurant Portal</span>
+                        <span>{t("nav.restaurantPortal")}</span>
                       </Link>
                     </DropdownMenuItem>
                   )}
@@ -212,7 +217,7 @@ export function Navbar() {
                     <DropdownMenuItem asChild>
                       <Link href="/provider-portal" className="cursor-pointer" data-testid="link-provider-portal">
                         <Briefcase className="mr-2 h-4 w-4" />
-                        <span>Service Provider Portal</span>
+                        <span>{t("nav.serviceProviderPortal")}</span>
                       </Link>
                     </DropdownMenuItem>
                   )}
@@ -221,13 +226,13 @@ export function Navbar() {
                       <DropdownMenuItem asChild>
                         <Link href="/orders" className="cursor-pointer" data-testid="link-orders-menu">
                           <ShoppingCart className="mr-2 h-4 w-4" />
-                          <span>My Orders</span>
+                          <span>{t("nav.myOrders")}</span>
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
                         <Link href="/bookings" className="cursor-pointer" data-testid="link-bookings">
                           <Calendar className="mr-2 h-4 w-4" />
-                          <span>My Bookings</span>
+                          <span>{t("nav.myBookings")}</span>
                         </Link>
                       </DropdownMenuItem>
                     </>
@@ -236,7 +241,7 @@ export function Navbar() {
                     <DropdownMenuItem asChild>
                       <Link href="/admin" className="cursor-pointer" data-testid="link-admin">
                         <Shield className="mr-2 h-4 w-4" />
-                        <span>Admin Dashboard</span>
+                        <span>{t("nav.adminDashboard")}</span>
                       </Link>
                     </DropdownMenuItem>
                   )}
@@ -244,7 +249,7 @@ export function Navbar() {
                   <DropdownMenuItem asChild>
                     <a href="/api/logout" className="cursor-pointer text-destructive" data-testid="button-logout">
                       <LogOut className="mr-2 h-4 w-4" />
-                      <span>Log out</span>
+                      <span>{t("nav.logout")}</span>
                     </a>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -254,7 +259,7 @@ export function Navbar() {
 
           {!isLoading && !isAuthenticated && (
             <Button asChild data-testid="button-login">
-              <a href="/api/login">Get Started</a>
+              <a href="/api/login">{t("nav.getStarted")}</a>
             </Button>
           )}
         </div>

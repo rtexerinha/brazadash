@@ -22,9 +22,11 @@ The BrazaDash platform is built with a modern full-stack architecture:
 -   **UI/UX Design**: The application features a clean, modern design with a Brazilian flag-inspired color scheme (Primary: Green, Secondary: Yellow/Gold, Accent: Blue) and uses Plus Jakarta Sans for typography to ensure readability and a professional appearance.
 -   **Mobile Application**: A companion React Native mobile app built with Expo SDK 51 provides a native mobile experience, mirroring the web platform's features and design, including persistent cart state via AsyncStorage and push notifications.
 
+-   **Bilingual System**: Full English/Portuguese translation system using React Context (`client/src/lib/language-context.tsx`) with a flag toggle component (`client/src/components/language-toggle.tsx`). Language preference persisted to `localStorage` with key `brazadash-lang`. The `useLanguage()` hook provides `t()` function for translations and `language` for the current language code. All major pages use `t()` calls for user-facing text.
+
 **Core Features Implemented:**
 
--   **Home Page**: Bilingual hero section, popular services, featured providers and restaurants, customer testimonials, and food categories.
+-   **Home Page**: Language-aware hero section, popular services, featured providers and restaurants, customer testimonials, and food categories.
 -   **Food Marketplace**: User authentication, food ordering, order tracking, vendor portal for menu and order management, and a robust review system with photo uploads and detailed ratings.
 -   **Services Marketplace**: Service discovery across various categories, detailed provider profiles, a booking system, a provider portal for managing services and bookings, and service-specific reviews.
 -   **Community Hub**: Discovery of local events with RSVP functionality, a business directory for Brazilian-owned businesses, and platform-wide announcements.

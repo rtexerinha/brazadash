@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
+import { useLanguage } from "@/lib/language-context";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +30,7 @@ const categoryInfo: Record<ServiceCategory, { label: string; labelPt: string; ic
 };
 
 function ProviderCard({ provider }: { provider: ServiceProvider }) {
+  const { t } = useLanguage();
   const category = categoryInfo[provider.category as ServiceCategory] || categoryInfo.other;
   const Icon = category.icon;
   const initials = provider.businessName.substring(0, 2).toUpperCase();
@@ -51,7 +53,7 @@ function ProviderCard({ provider }: { provider: ServiceProvider }) {
                 {provider.isVerified && (
                   <Badge variant="secondary" className="shrink-0 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800">
                     <Shield className="h-3 w-3 mr-1" />
-                    Verified
+                    {t("services.verified")}
                   </Badge>
                 )}
               </div>
@@ -101,6 +103,7 @@ function ProviderSkeleton() {
 }
 
 export default function ServicesPage() {
+  const { t, language } = useLanguage();
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<ServiceCategory | "all">("all");
 
@@ -128,16 +131,16 @@ export default function ServicesPage() {
       <section className="bg-gradient-to-br from-primary/10 via-primary/5 to-yellow-500/10 py-10">
         <div className="container mx-auto px-4 max-w-5xl">
           <h1 className="text-3xl font-bold mb-2" data-testid="text-services-title">
-            Encontre Servicos Brasileiros
+            {t("services.title")}
           </h1>
           <p className="text-muted-foreground mb-6">
-            Find trusted Brazilian service providers in California
+            {t("services.subtitle")}
           </p>
 
           <div className="relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
             <Input
-              placeholder="Search services, providers, or locations..."
+              placeholder={t("services.search")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-12 h-12 text-base bg-background"
@@ -165,7 +168,7 @@ export default function ServicesPage() {
                 data-testid={`category-${cat}`}
               >
                 <Icon className="h-4 w-4" />
-                <span>{info.label}</span>
+                <span>{cat === "all" ? t("services.allCategories") : (language === "pt" ? info.labelPt : info.label)}</span>
               </Button>
             );
           })}
@@ -200,12 +203,10 @@ export default function ServicesPage() {
               <Search className="h-8 w-8 text-muted-foreground" />
             </div>
             <h3 className="text-lg font-semibold mb-2">
-              {search ? "Nenhum resultado encontrado" : "Nenhum provedor disponivel"}
+              {t("services.noResults")}
             </h3>
             <p className="text-muted-foreground mb-6">
-              {search 
-                ? "Try adjusting your search terms or clearing filters." 
-                : "No service providers available in this category yet."}
+              {t("services.noResultsDesc")}
             </p>
             {search && (
               <Button variant="outline" onClick={() => { setSearch(""); setSelectedCategory("all"); }}>

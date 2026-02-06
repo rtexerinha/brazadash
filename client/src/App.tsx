@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
 import { CartProvider } from "@/lib/cart-context";
+import { LanguageProvider } from "@/lib/language-context";
 import { useAuth } from "@/hooks/use-auth";
 import { Navbar } from "@/components/navbar";
 import NotFound from "@/pages/not-found";
@@ -47,11 +48,16 @@ function RoleBasedHome({ roles }: { roles: string[] }) {
 function AppContent() {
   const { isAuthenticated, isLoading } = useAuth();
 
-  const { data: roleData, isLoading: rolesLoading } = useQuery<{ roles: string[] }>({
+  const { data: roleData, isLoading: rolesLoading, isError: rolesError } = useQuery<{ roles: string[] }>({
     queryKey: ["/api/user/role"],
     enabled: isAuthenticated,
     staleTime: 1000 * 60 * 5,
+    retry: 1,
   });
+
+  if (rolesError && isAuthenticated) {
+    queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+  }
 
   if (isLoading || (isAuthenticated && rolesLoading)) {
     return (
@@ -113,12 +119,14 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <CartProvider>
-          <TooltipProvider>
-            <Toaster />
-            <AppContent />
-          </TooltipProvider>
-        </CartProvider>
+        <LanguageProvider>
+          <CartProvider>
+            <TooltipProvider>
+              <Toaster />
+              <AppContent />
+            </TooltipProvider>
+          </CartProvider>
+        </LanguageProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

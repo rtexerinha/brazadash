@@ -15,6 +15,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/lib/language-context";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Store, Plus, Utensils, Package, Star, DollarSign, Loader2, Pencil, Trash2, Clock, CheckCircle, Truck, MapPin, XCircle, ChefHat } from "lucide-react";
 import { format } from "date-fns";
@@ -44,6 +45,7 @@ const menuItemSchema = z.object({
 function CreateRestaurantDialog({ onSuccess, variant = "header" }: { onSuccess: () => void; variant?: "header" | "empty-state" }) {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
+  const { t } = useLanguage();
   
   const form = useForm<z.infer<typeof restaurantSchema>>({
     resolver: zodResolver(restaurantSchema),
@@ -81,12 +83,12 @@ function CreateRestaurantDialog({ onSuccess, variant = "header" }: { onSuccess: 
       <DialogTrigger asChild>
         <Button data-testid={variant === "header" ? "button-create-restaurant" : "button-create-restaurant-empty"}>
           <Plus className="mr-2 h-4 w-4" />
-          Create Restaurant
+          {t("vendor.createRestaurant")}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Create Restaurant</DialogTitle>
+          <DialogTitle>{t("vendor.createRestaurant")}</DialogTitle>
           <DialogDescription>Add your restaurant to BrazaDash</DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -96,7 +98,7 @@ function CreateRestaurantDialog({ onSuccess, variant = "header" }: { onSuccess: 
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Restaurant Name</FormLabel>
+                  <FormLabel>{t("vendor.restaurantName")}</FormLabel>
                   <FormControl>
                     <Input {...field} data-testid="input-restaurant-name" />
                   </FormControl>
@@ -109,7 +111,7 @@ function CreateRestaurantDialog({ onSuccess, variant = "header" }: { onSuccess: 
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Description</FormLabel>
+                  <FormLabel>{t("vendor.description")}</FormLabel>
                   <FormControl>
                     <Textarea {...field} className="resize-none" data-testid="input-restaurant-description" />
                   </FormControl>
@@ -123,7 +125,7 @@ function CreateRestaurantDialog({ onSuccess, variant = "header" }: { onSuccess: 
                 name="cuisine"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Cuisine Type</FormLabel>
+                    <FormLabel>{t("vendor.cuisine")}</FormLabel>
                     <FormControl>
                       <Input {...field} data-testid="input-restaurant-cuisine" />
                     </FormControl>
@@ -136,7 +138,7 @@ function CreateRestaurantDialog({ onSuccess, variant = "header" }: { onSuccess: 
                 name="phone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Phone</FormLabel>
+                    <FormLabel>{t("vendor.phone")}</FormLabel>
                     <FormControl>
                       <Input {...field} data-testid="input-restaurant-phone" />
                     </FormControl>
@@ -150,7 +152,7 @@ function CreateRestaurantDialog({ onSuccess, variant = "header" }: { onSuccess: 
               name="address"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Address</FormLabel>
+                  <FormLabel>{t("vendor.address")}</FormLabel>
                   <FormControl>
                     <Input {...field} data-testid="input-restaurant-address" />
                   </FormControl>
@@ -177,7 +179,7 @@ function CreateRestaurantDialog({ onSuccess, variant = "header" }: { onSuccess: 
                 name="deliveryFee"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Delivery Fee ($)</FormLabel>
+                    <FormLabel>{t("vendor.deliveryFee")}</FormLabel>
                     <FormControl>
                       <Input {...field} type="number" step="0.01" data-testid="input-restaurant-delivery-fee" />
                     </FormControl>
@@ -202,7 +204,7 @@ function CreateRestaurantDialog({ onSuccess, variant = "header" }: { onSuccess: 
             <DialogFooter>
               <Button type="submit" disabled={createRestaurant.isPending} data-testid="button-submit-restaurant">
                 {createRestaurant.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Create Restaurant
+                {createRestaurant.isPending ? t("vendor.creating") : t("vendor.create")}
               </Button>
             </DialogFooter>
           </form>
@@ -215,6 +217,7 @@ function CreateRestaurantDialog({ onSuccess, variant = "header" }: { onSuccess: 
 function AddMenuItemDialog({ restaurantId, onSuccess }: { restaurantId: string; onSuccess: () => void }) {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
+  const { t } = useLanguage();
   
   const form = useForm<z.infer<typeof menuItemSchema>>({
     resolver: zodResolver(menuItemSchema),
@@ -248,12 +251,12 @@ function AddMenuItemDialog({ restaurantId, onSuccess }: { restaurantId: string; 
       <DialogTrigger asChild>
         <Button size="sm" data-testid="button-add-menu-item">
           <Plus className="mr-2 h-4 w-4" />
-          Add Item
+          {t("vendor.addMenuItem")}
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add Menu Item</DialogTitle>
+          <DialogTitle>{t("vendor.addMenuItem")}</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit((data) => createMenuItem.mutate(data))} className="space-y-4">
@@ -262,7 +265,7 @@ function AddMenuItemDialog({ restaurantId, onSuccess }: { restaurantId: string; 
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Item Name</FormLabel>
+                  <FormLabel>{t("vendor.itemName")}</FormLabel>
                   <FormControl>
                     <Input {...field} data-testid="input-menu-item-name" />
                   </FormControl>
@@ -275,7 +278,7 @@ function AddMenuItemDialog({ restaurantId, onSuccess }: { restaurantId: string; 
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Description</FormLabel>
+                  <FormLabel>{t("vendor.description")}</FormLabel>
                   <FormControl>
                     <Textarea {...field} className="resize-none" data-testid="input-menu-item-description" />
                   </FormControl>
@@ -289,7 +292,7 @@ function AddMenuItemDialog({ restaurantId, onSuccess }: { restaurantId: string; 
                 name="price"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Price ($)</FormLabel>
+                    <FormLabel>{t("vendor.price")}</FormLabel>
                     <FormControl>
                       <Input {...field} type="number" step="0.01" data-testid="input-menu-item-price" />
                     </FormControl>
@@ -302,7 +305,7 @@ function AddMenuItemDialog({ restaurantId, onSuccess }: { restaurantId: string; 
                 name="category"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Category</FormLabel>
+                    <FormLabel>{t("vendor.category")}</FormLabel>
                     <FormControl>
                       <Input {...field} placeholder="e.g., Main Dishes" data-testid="input-menu-item-category" />
                     </FormControl>
@@ -327,7 +330,7 @@ function AddMenuItemDialog({ restaurantId, onSuccess }: { restaurantId: string; 
             <DialogFooter>
               <Button type="submit" disabled={createMenuItem.isPending} data-testid="button-submit-menu-item">
                 {createMenuItem.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Add Item
+                {t("vendor.save")}
               </Button>
             </DialogFooter>
           </form>
@@ -339,6 +342,7 @@ function AddMenuItemDialog({ restaurantId, onSuccess }: { restaurantId: string; 
 
 function VendorDashboard({ restaurant }: { restaurant: Restaurant }) {
   const { toast } = useToast();
+  const { t } = useLanguage();
   
   const { data: menuItems, isLoading: menuLoading } = useQuery<MenuItem[]>({
     queryKey: ["/api/vendor/restaurants", restaurant.id, "menu"],
@@ -373,13 +377,13 @@ function VendorDashboard({ restaurant }: { restaurant: Restaurant }) {
   const completedOrders = orders?.filter((o) => ["delivered", "cancelled"].includes(o.status)) || [];
 
   const statusConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {
-    pending: { label: "New Order", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400", icon: Clock },
-    confirmed: { label: "Confirmed", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400", icon: CheckCircle },
-    preparing: { label: "Preparing", color: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400", icon: ChefHat },
-    ready: { label: "Ready for Pickup", color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400", icon: Package },
-    out_for_delivery: { label: "Out for Delivery", color: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400", icon: Truck },
-    delivered: { label: "Delivered", color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400", icon: CheckCircle },
-    cancelled: { label: "Cancelled", color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400", icon: XCircle },
+    pending: { label: t("vendor.newOrder"), color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400", icon: Clock },
+    confirmed: { label: t("vendor.orderConfirmed"), color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400", icon: CheckCircle },
+    preparing: { label: t("vendor.orderPreparing"), color: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400", icon: ChefHat },
+    ready: { label: t("vendor.orderReady"), color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400", icon: Package },
+    out_for_delivery: { label: t("vendor.orderOutForDelivery"), color: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400", icon: Truck },
+    delivered: { label: t("vendor.orderDelivered"), color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400", icon: CheckCircle },
+    cancelled: { label: t("vendor.orderCancelled"), color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400", icon: XCircle },
   };
 
   return (
@@ -398,7 +402,7 @@ function VendorDashboard({ restaurant }: { restaurant: Restaurant }) {
               data-testid="switch-restaurant-open"
             />
             <span className="text-sm font-medium">
-              {restaurant.isOpen ? "Open" : "Closed"}
+              {restaurant.isOpen ? t("vendor.restaurantOpen") : t("vendor.restaurantClosed")}
             </span>
           </div>
         </div>
@@ -414,7 +418,7 @@ function VendorDashboard({ restaurant }: { restaurant: Restaurant }) {
               </div>
               <div>
                 <p className="text-2xl font-bold">{pendingOrders.length}</p>
-                <p className="text-sm text-muted-foreground">Pending</p>
+                <p className="text-sm text-muted-foreground">{t("vendor.pending")}</p>
               </div>
             </div>
           </CardContent>
@@ -427,7 +431,7 @@ function VendorDashboard({ restaurant }: { restaurant: Restaurant }) {
               </div>
               <div>
                 <p className="text-2xl font-bold">{activeOrders.length}</p>
-                <p className="text-sm text-muted-foreground">Active</p>
+                <p className="text-sm text-muted-foreground">{t("vendor.active")}</p>
               </div>
             </div>
           </CardContent>
@@ -440,7 +444,7 @@ function VendorDashboard({ restaurant }: { restaurant: Restaurant }) {
               </div>
               <div>
                 <p className="text-2xl font-bold">{parseFloat(restaurant.rating || "0").toFixed(1)}</p>
-                <p className="text-sm text-muted-foreground">Rating</p>
+                <p className="text-sm text-muted-foreground">{t("vendor.rating")}</p>
               </div>
             </div>
           </CardContent>
@@ -453,7 +457,7 @@ function VendorDashboard({ restaurant }: { restaurant: Restaurant }) {
               </div>
               <div>
                 <p className="text-2xl font-bold">{menuItems?.length || 0}</p>
-                <p className="text-sm text-muted-foreground">Menu Items</p>
+                <p className="text-sm text-muted-foreground">{t("vendor.menuItems")}</p>
               </div>
             </div>
           </CardContent>
@@ -463,8 +467,8 @@ function VendorDashboard({ restaurant }: { restaurant: Restaurant }) {
       {/* Tabs */}
       <Tabs defaultValue="orders">
         <TabsList>
-          <TabsTrigger value="orders" data-testid="tab-orders">Orders</TabsTrigger>
-          <TabsTrigger value="menu" data-testid="tab-menu">Menu</TabsTrigger>
+          <TabsTrigger value="orders" data-testid="tab-orders">{t("vendor.orders")}</TabsTrigger>
+          <TabsTrigger value="menu" data-testid="tab-menu">{t("vendor.menu")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="orders" className="mt-6">
@@ -481,7 +485,7 @@ function VendorDashboard({ restaurant }: { restaurant: Restaurant }) {
                   <div className="flex items-center gap-2 mb-4">
                     <Clock className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
                     <h3 className="font-semibold text-lg" data-testid="text-section-pending">
-                      New Orders ({pendingOrders.length})
+                      {t("vendor.newOrders")} ({pendingOrders.length})
                     </h3>
                   </div>
                   <div className="space-y-3">
@@ -510,7 +514,7 @@ function VendorDashboard({ restaurant }: { restaurant: Restaurant }) {
                               </p>
                             </div>
                             <div className="mb-3 p-3 rounded-md bg-muted/50">
-                              <p className="text-sm font-medium mb-1">Items:</p>
+                              <p className="text-sm font-medium mb-1">{t("cart.items")}:</p>
                               {items.map((item, idx) => (
                                 <p key={idx} className="text-sm text-muted-foreground">
                                   {item.quantity}x {item.name} {item.price ? `- $${(item.price * item.quantity).toFixed(2)}` : ""}
@@ -534,7 +538,7 @@ function VendorDashboard({ restaurant }: { restaurant: Restaurant }) {
                                 data-testid={`button-decline-${order.id}`}
                               >
                                 <XCircle className="h-4 w-4 mr-1" />
-                                Decline
+                                {t("vendor.decline")}
                               </Button>
                               <Button
                                 size="sm"
@@ -542,7 +546,7 @@ function VendorDashboard({ restaurant }: { restaurant: Restaurant }) {
                                 data-testid={`button-accept-${order.id}`}
                               >
                                 <CheckCircle className="h-4 w-4 mr-1" />
-                                Accept Order
+                                {t("vendor.accept")}
                               </Button>
                             </div>
                           </CardContent>
@@ -558,7 +562,7 @@ function VendorDashboard({ restaurant }: { restaurant: Restaurant }) {
                   <div className="flex items-center gap-2 mb-4">
                     <Utensils className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                     <h3 className="font-semibold text-lg" data-testid="text-section-active">
-                      Active Orders ({activeOrders.length})
+                      {t("vendor.activeOrders")} ({activeOrders.length})
                     </h3>
                   </div>
                   <div className="space-y-3">
@@ -567,10 +571,10 @@ function VendorDashboard({ restaurant }: { restaurant: Restaurant }) {
                       const config = statusConfig[order.status];
                       const StatusIcon = config.icon;
                       const nextStatus: Record<string, { status: string; label: string; icon: typeof Clock }> = {
-                        confirmed: { status: "preparing", label: "Start Preparing", icon: ChefHat },
-                        preparing: { status: "ready", label: "Ready for Pickup", icon: Package },
-                        ready: { status: "out_for_delivery", label: "Out for Delivery", icon: Truck },
-                        out_for_delivery: { status: "delivered", label: "Mark Delivered", icon: CheckCircle },
+                        confirmed: { status: "preparing", label: t("vendor.startPreparing"), icon: ChefHat },
+                        preparing: { status: "ready", label: t("vendor.readyForPickup"), icon: Package },
+                        ready: { status: "out_for_delivery", label: t("vendor.outForDelivery"), icon: Truck },
+                        out_for_delivery: { status: "delivered", label: t("vendor.markDelivered"), icon: CheckCircle },
                       };
                       const next = nextStatus[order.status];
                       return (
@@ -627,7 +631,7 @@ function VendorDashboard({ restaurant }: { restaurant: Restaurant }) {
                   <div className="flex items-center gap-2 mb-4">
                     <CheckCircle className="h-5 w-5 text-muted-foreground" />
                     <h3 className="font-semibold text-lg" data-testid="text-section-completed">
-                      Completed ({completedOrders.length})
+                      {t("vendor.completed")} ({completedOrders.length})
                     </h3>
                   </div>
                   <div className="space-y-3">
@@ -667,21 +671,21 @@ function VendorDashboard({ restaurant }: { restaurant: Restaurant }) {
               {pendingOrders.length === 0 && activeOrders.length === 0 && completedOrders.length === 0 && (
                 <Card className="p-8 text-center">
                   <Package className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                  <p className="text-muted-foreground">No orders yet</p>
+                  <p className="text-muted-foreground">{t("vendor.noOrders")}</p>
                 </Card>
               )}
             </div>
           ) : (
             <Card className="p-8 text-center">
               <Package className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-              <p className="text-muted-foreground">No orders yet</p>
+              <p className="text-muted-foreground">{t("vendor.noOrders")}</p>
             </Card>
           )}
         </TabsContent>
 
         <TabsContent value="menu" className="mt-6">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="font-semibold">Menu Items</h3>
+            <h3 className="font-semibold">{t("vendor.menuItems")}</h3>
             <AddMenuItemDialog restaurantId={restaurant.id} onSuccess={() => {}} />
           </div>
           
@@ -731,6 +735,7 @@ function VendorDashboard({ restaurant }: { restaurant: Restaurant }) {
 
 export default function VendorPage() {
   const { user, isLoading: authLoading } = useAuth();
+  const { t } = useLanguage();
   
   const { data: restaurants, isLoading } = useQuery<Restaurant[]>({
     queryKey: ["/api/vendor/restaurants"],
@@ -756,7 +761,7 @@ export default function VendorPage() {
       <div className="container mx-auto px-4 max-w-4xl">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold">Vendor Portal</h1>
+            <h1 className="text-3xl font-bold">{t("vendor.dashboard")}</h1>
             <p className="text-muted-foreground">Manage your restaurant and orders</p>
           </div>
           {!myRestaurant && <CreateRestaurantDialog onSuccess={() => {}} />}

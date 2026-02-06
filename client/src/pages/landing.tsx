@@ -1,11 +1,34 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { UtensilsCrossed, MapPin, Star, Clock, Shield, Heart } from "lucide-react";
+import { useLanguage } from "@/lib/language-context";
+import { LanguageToggle } from "@/components/language-toggle";
 
 export default function LandingPage() {
+  const { t } = useLanguage();
+
   return (
     <div className="flex flex-col min-h-screen">
-      {/* Hero Section */}
+      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
+          <div className="flex items-center gap-2">
+            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary">
+              <span className="text-xl font-bold text-primary-foreground">B</span>
+            </div>
+            <span className="text-xl font-bold tracking-tight">
+              <span className="text-primary">Braza</span>
+              <span>Dash</span>
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <LanguageToggle />
+            <Button asChild data-testid="button-login">
+              <a href="/api/login">{t("nav.getStarted")}</a>
+            </Button>
+          </div>
+        </div>
+      </header>
+
       <section className="relative overflow-hidden bg-gradient-to-b from-primary/5 via-background to-background py-20 lg:py-32">
         <div className="container mx-auto px-4">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
@@ -15,40 +38,39 @@ export default function LandingPage() {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
                 </span>
-                Now serving California
+                {t("landing.badge")}
               </div>
               
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight">
-                <span className="text-primary">Sabor brasileiro</span>
+                <span className="text-primary">{t("landing.heroTitle1")}</span>
                 <br />
-                na sua porta
+                {t("landing.heroTitle2")}
               </h1>
               
               <p className="text-lg text-muted-foreground max-w-lg">
-                Discover authentic Brazilian cuisine from your favorite restaurants. 
-                From feijoada to pao de queijo, experience the taste of Brazil right here in California.
+                {t("landing.heroDesc")}
               </p>
               
               <div className="flex flex-col sm:flex-row gap-4">
                 <Button size="lg" asChild className="text-base" data-testid="button-hero-cta">
                   <a href="/api/login">
                     <UtensilsCrossed className="mr-2 h-5 w-5" />
-                    Order Now
+                    {t("landing.orderNow")}
                   </a>
                 </Button>
                 <Button size="lg" variant="outline" asChild className="text-base" data-testid="button-learn-more">
-                  <a href="#features">Learn More</a>
+                  <a href="#features">{t("landing.learnMore")}</a>
                 </Button>
               </div>
               
               <div className="flex items-center gap-6 pt-4">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Shield className="h-4 w-4 text-primary" />
-                  <span>Secure payments</span>
+                  <span>{t("landing.securePayments")}</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Clock className="h-4 w-4 text-primary" />
-                  <span>Fast delivery</span>
+                  <span>{t("landing.fastDelivery")}</span>
                 </div>
               </div>
             </div>
@@ -68,8 +90,8 @@ export default function LandingPage() {
                     <Star className="h-6 w-6 text-primary fill-primary" />
                   </div>
                   <div>
-                    <p className="font-semibold">4.9 Rating</p>
-                    <p className="text-sm text-muted-foreground">10k+ happy customers</p>
+                    <p className="font-semibold">{t("landing.rating")}</p>
+                    <p className="text-sm text-muted-foreground">{t("landing.happyCustomers")}</p>
                   </div>
                 </div>
               </div>
@@ -78,15 +100,14 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Features Section */}
       <section id="features" className="py-20 bg-muted/30">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Por que escolher <span className="text-primary">BrazaDash</span>?
+              {t("landing.whyChoose")} <span className="text-primary">BrazaDash</span>?
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              We bring the authentic taste of Brazil to your doorstep with care and quality.
+              {t("landing.whyChooseDesc")}
             </p>
           </div>
 
@@ -96,9 +117,9 @@ export default function LandingPage() {
                 <div className="h-14 w-14 rounded-xl bg-primary/10 flex items-center justify-center mb-6">
                   <UtensilsCrossed className="h-7 w-7 text-primary" />
                 </div>
-                <h3 className="text-xl font-semibold mb-3">Authentic Brazilian Cuisine</h3>
+                <h3 className="text-xl font-semibold mb-3">{t("landing.authenticCuisine")}</h3>
                 <p className="text-muted-foreground">
-                  From traditional feijoada to street-style coxinhas, experience genuine Brazilian flavors prepared by passionate cooks.
+                  {t("landing.authenticCuisineDesc")}
                 </p>
               </CardContent>
             </Card>
@@ -108,9 +129,9 @@ export default function LandingPage() {
                 <div className="h-14 w-14 rounded-xl bg-primary/10 flex items-center justify-center mb-6">
                   <MapPin className="h-7 w-7 text-primary" />
                 </div>
-                <h3 className="text-xl font-semibold mb-3">Local Community</h3>
+                <h3 className="text-xl font-semibold mb-3">{t("landing.localCommunity")}</h3>
                 <p className="text-muted-foreground">
-                  Connect with Brazilian restaurants and home cooks right in your neighborhood. Support your local community.
+                  {t("landing.localCommunityDesc")}
                 </p>
               </CardContent>
             </Card>
@@ -120,9 +141,9 @@ export default function LandingPage() {
                 <div className="h-14 w-14 rounded-xl bg-primary/10 flex items-center justify-center mb-6">
                   <Clock className="h-7 w-7 text-primary" />
                 </div>
-                <h3 className="text-xl font-semibold mb-3">Fast Delivery</h3>
+                <h3 className="text-xl font-semibold mb-3">{t("landing.fastDeliveryTitle")}</h3>
                 <p className="text-muted-foreground">
-                  Get your favorite Brazilian dishes delivered hot and fresh. Track your order in real-time from kitchen to door.
+                  {t("landing.fastDeliveryDesc")}
                 </p>
               </CardContent>
             </Card>
@@ -132,9 +153,9 @@ export default function LandingPage() {
                 <div className="h-14 w-14 rounded-xl bg-primary/10 flex items-center justify-center mb-6">
                   <Star className="h-7 w-7 text-primary" />
                 </div>
-                <h3 className="text-xl font-semibold mb-3">Verified Reviews</h3>
+                <h3 className="text-xl font-semibold mb-3">{t("landing.verifiedReviews")}</h3>
                 <p className="text-muted-foreground">
-                  Make informed decisions with honest reviews from real customers. Every rating is from a verified order.
+                  {t("landing.verifiedReviewsDesc")}
                 </p>
               </CardContent>
             </Card>
@@ -144,9 +165,9 @@ export default function LandingPage() {
                 <div className="h-14 w-14 rounded-xl bg-primary/10 flex items-center justify-center mb-6">
                   <Shield className="h-7 w-7 text-primary" />
                 </div>
-                <h3 className="text-xl font-semibold mb-3">Secure Payments</h3>
+                <h3 className="text-xl font-semibold mb-3">{t("landing.securePaymentsTitle")}</h3>
                 <p className="text-muted-foreground">
-                  Your transactions are protected with industry-standard encryption. Pay with confidence using your preferred method.
+                  {t("landing.securePaymentsDesc")}
                 </p>
               </CardContent>
             </Card>
@@ -156,9 +177,9 @@ export default function LandingPage() {
                 <div className="h-14 w-14 rounded-xl bg-primary/10 flex items-center justify-center mb-6">
                   <Heart className="h-7 w-7 text-primary" />
                 </div>
-                <h3 className="text-xl font-semibold mb-3">Made with Love</h3>
+                <h3 className="text-xl font-semibold mb-3">{t("landing.madeWithLove")}</h3>
                 <p className="text-muted-foreground">
-                  Every dish is prepared with the same love and care as a Brazilian home-cooked meal. Saudade never tasted so good.
+                  {t("landing.madeWithLoveDesc")}
                 </p>
               </CardContent>
             </Card>
@@ -166,21 +187,20 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* CTA Section */}
       <section className="py-20">
         <div className="container mx-auto px-4">
           <div className="relative overflow-hidden rounded-3xl bg-primary p-8 md:p-16">
             <div className="absolute inset-0 bg-[url('/images/hero-food.png')] opacity-10 bg-cover bg-center" />
             <div className="relative z-10 text-center">
               <h2 className="text-3xl md:text-4xl font-bold text-primary-foreground mb-4">
-                Ready to taste Brazil?
+                {t("landing.readyToTaste")}
               </h2>
               <p className="text-primary-foreground/80 max-w-xl mx-auto mb-8">
-                Join thousands of Brazilians in California enjoying authentic food from the comfort of their homes.
+                {t("landing.readyToTasteDesc")}
               </p>
               <Button size="lg" variant="secondary" asChild data-testid="button-cta-bottom">
                 <a href="/api/login">
-                  Get Started - It's Free
+                  {t("landing.getStartedFree")}
                 </a>
               </Button>
             </div>
@@ -188,7 +208,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Footer */}
       <footer className="border-t py-8">
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
@@ -199,7 +218,7 @@ export default function LandingPage() {
               <span className="font-semibold">BrazaDash</span>
             </div>
             <p className="text-sm text-muted-foreground">
-              © 2024 BrazaDash. Feito com amor para a comunidade brasileira.
+              {t("landing.footer")}
             </p>
           </div>
         </div>

@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/use-auth";
+import { useLanguage } from "@/lib/language-context";
 import { 
   Star, Clock, MapPin, ChevronRight, Utensils, Quote,
   Sparkles, Home, Scissors, Scale, Dumbbell, Car, GraduationCap,
@@ -14,12 +15,12 @@ import {
 import type { Restaurant, ServiceProvider, Event, Business, Announcement, Review, ServiceReview } from "@shared/schema";
 
 const serviceCategories = [
-  { id: "cleaning", name: "Limpeza", nameEn: "Cleaning", icon: Sparkles, color: "bg-blue-500" },
-  { id: "beauty", name: "Beleza", nameEn: "Beauty", icon: Scissors, color: "bg-pink-500" },
-  { id: "legal", name: "Legal", nameEn: "Legal", icon: Scale, color: "bg-purple-500" },
-  { id: "fitness", name: "Fitness", nameEn: "Fitness", icon: Dumbbell, color: "bg-orange-500" },
-  { id: "auto", name: "Auto", nameEn: "Auto", icon: Car, color: "bg-red-500" },
-  { id: "construction", name: "Construcao", nameEn: "Construction", icon: Hammer, color: "bg-amber-600" },
+  { id: "cleaning", icon: Sparkles, color: "bg-blue-500" },
+  { id: "beauty", icon: Scissors, color: "bg-pink-500" },
+  { id: "legal", icon: Scale, color: "bg-purple-500" },
+  { id: "fitness", icon: Dumbbell, color: "bg-orange-500" },
+  { id: "auto", icon: Car, color: "bg-red-500" },
+  { id: "construction", icon: Hammer, color: "bg-amber-600" },
 ];
 
 const testimonials = [
@@ -66,6 +67,7 @@ const testimonials = [
 ];
 
 function RestaurantCard({ restaurant }: { restaurant: Restaurant }) {
+  const { t } = useLanguage();
   return (
     <Link href={`/restaurant/${restaurant.id}`}>
       <Card className="overflow-hidden hover-elevate cursor-pointer h-full" data-testid={`card-restaurant-${restaurant.id}`}>
@@ -89,10 +91,10 @@ function RestaurantCard({ restaurant }: { restaurant: Restaurant }) {
             </h3>
             {restaurant.isOpen ? (
               <Badge variant="secondary" className="shrink-0 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                Open
+                {t("home.open")}
               </Badge>
             ) : (
-              <Badge variant="secondary" className="shrink-0">Closed</Badge>
+              <Badge variant="secondary" className="shrink-0">{t("home.closed")}</Badge>
             )}
           </div>
           
@@ -115,7 +117,7 @@ function RestaurantCard({ restaurant }: { restaurant: Restaurant }) {
           <div className="flex items-center gap-1 mt-2 text-sm text-muted-foreground">
             <MapPin className="h-4 w-4" />
             <span className="line-clamp-1">{restaurant.city}</span>
-            <span className="ml-auto font-medium text-foreground">${parseFloat(restaurant.deliveryFee || "0").toFixed(2)} delivery</span>
+            <span className="ml-auto font-medium text-foreground">${parseFloat(restaurant.deliveryFee || "0").toFixed(2)} {t("home.delivery")}</span>
           </div>
         </CardContent>
       </Card>
@@ -137,6 +139,7 @@ function RestaurantSkeleton() {
 }
 
 function ServiceCategoryCard({ category }: { category: typeof serviceCategories[0] }) {
+  const { t } = useLanguage();
   const Icon = category.icon;
   return (
     <Link href={`/services?category=${category.id}`}>
@@ -145,8 +148,7 @@ function ServiceCategoryCard({ category }: { category: typeof serviceCategories[
           <div className={`w-14 h-14 rounded-full ${category.color} flex items-center justify-center mb-3`}>
             <Icon className="h-7 w-7 text-white" />
           </div>
-          <h3 className="font-semibold">{category.name}</h3>
-          <p className="text-sm text-muted-foreground">{category.nameEn}</p>
+          <h3 className="font-semibold">{t(`home.${category.id}`)}</h3>
         </CardContent>
       </Card>
     </Link>
@@ -154,14 +156,14 @@ function ServiceCategoryCard({ category }: { category: typeof serviceCategories[
 }
 
 function TestimonialCard({ testimonial }: { testimonial: typeof testimonials[0] }) {
+  const { t, language } = useLanguage();
   const initials = testimonial.name.split(" ").map(n => n[0]).join("");
   
   return (
     <Card className="h-full" data-testid={`card-testimonial-${testimonial.id}`}>
       <CardContent className="p-6">
         <Quote className="h-8 w-8 text-primary/20 mb-4" />
-        <p className="text-sm mb-2 italic">"{testimonial.comment}"</p>
-        <p className="text-xs text-muted-foreground mb-4">"{testimonial.commentEn}"</p>
+        <p className="text-sm mb-4 italic">"{language === "pt" ? testimonial.comment : testimonial.commentEn}"</p>
         
         <div className="flex items-center gap-3 pt-4 border-t">
           <Avatar className="h-10 w-10">
@@ -249,6 +251,7 @@ function EventCard({ event }: { event: Event }) {
 }
 
 function BusinessCard({ business }: { business: Business }) {
+  const { t } = useLanguage();
   return (
     <Link href={`/businesses?id=${business.id}`}>
       <Card className="overflow-hidden hover-elevate cursor-pointer h-full" data-testid={`card-business-${business.id}`}>
@@ -261,7 +264,7 @@ function BusinessCard({ business }: { business: Business }) {
               <div className="flex items-center gap-2">
                 <h3 className="font-semibold line-clamp-1">{business.name}</h3>
                 {business.isVerified && (
-                  <Badge variant="secondary" className="text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">Verified</Badge>
+                  <Badge variant="secondary" className="text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">{t("home.verified")}</Badge>
                 )}
               </div>
               <p className="text-sm text-muted-foreground line-clamp-1 mt-1">{business.description}</p>
@@ -309,6 +312,7 @@ function AnnouncementCard({ announcement }: { announcement: Announcement }) {
 }
 
 function ReviewCard({ review, type }: { review: Review | ServiceReview, type: 'food' | 'service' }) {
+  const { t } = useLanguage();
   const photos = review.photoUrls || [];
   
   return (
@@ -321,14 +325,14 @@ function ReviewCard({ review, type }: { review: Review | ServiceReview, type: 'f
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <p className="font-medium text-sm">{(review as any).userName || "Customer"}</p>
+            <p className="font-medium text-sm">{(review as any).userName || t("nav.customer")}</p>
             <div className="flex items-center gap-1">
               {[...Array(5)].map((_, i) => (
                 <Star key={i} className={`h-3 w-3 ${i < review.rating ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30'}`} />
               ))}
             </div>
           </div>
-          <Badge variant="outline" className="text-xs">{type === 'food' ? 'Food' : 'Service'}</Badge>
+          <Badge variant="outline" className="text-xs">{type === 'food' ? t("home.food") : t("home.service")}</Badge>
         </div>
         <p className="text-sm text-muted-foreground line-clamp-3">{review.comment}</p>
         {photos.length > 0 && (
@@ -352,6 +356,7 @@ function ReviewCard({ review, type }: { review: Review | ServiceReview, type: 'f
 
 export default function HomePage() {
   const { user } = useAuth();
+  const { t, language } = useLanguage();
   
   const { data: restaurants, isLoading: restaurantsLoading } = useQuery<Restaurant[]>({
     queryKey: ["/api/restaurants"],
@@ -402,38 +407,33 @@ export default function HomePage() {
             <div className="flex items-center gap-2 mb-4">
               <Badge className="bg-primary/20 text-primary border-primary/30">
                 <Users className="h-3 w-3 mr-1" />
-                Comunidade Brasileira na California
+                {t("home.badge")}
               </Badge>
             </div>
             <h1 className="text-4xl md:text-5xl font-bold mb-4" data-testid="text-welcome">
-              Ola{user?.firstName ? `, ${user.firstName}` : ""}! 
-              <span className="text-primary"> Bem-vindo ao BrazaDash</span>
+              {t("home.greeting")}{user?.firstName ? `, ${user.firstName}` : ""}! 
+              <span className="text-primary"> {t("home.welcomeTo")}</span>
             </h1>
-            <p className="text-lg text-muted-foreground mb-6">
-              Sua conexao com a comunidade brasileira na California. Descubra restaurantes autenticos, 
-              encontre servicos de confianca, e conecte-se com a nossa comunidade.
-            </p>
-            <p className="text-md text-muted-foreground/80 mb-8">
-              Your connection to the Brazilian community in California. Discover authentic restaurants, 
-              find trusted services, and connect with our community.
+            <p className="text-lg text-muted-foreground mb-8">
+              {t("home.heroDesc")}
             </p>
             <div className="flex flex-wrap gap-3">
               <Button size="lg" asChild data-testid="button-order-food">
                 <Link href="/restaurants">
                   <Utensils className="mr-2 h-5 w-5" />
-                  Order Food
+                  {t("home.orderFood")}
                 </Link>
               </Button>
               <Button size="lg" variant="outline" asChild data-testid="button-find-services">
                 <Link href="/services">
                   <Sparkles className="mr-2 h-5 w-5" />
-                  Find Services
+                  {t("home.findServices")}
                 </Link>
               </Button>
               <Button size="lg" variant="ghost" asChild data-testid="button-community">
                 <Link href="/community">
                   <Users className="mr-2 h-5 w-5" />
-                  Community
+                  {t("home.community")}
                 </Link>
               </Button>
             </div>
@@ -446,12 +446,12 @@ export default function HomePage() {
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between mb-8">
             <div>
-              <h2 className="text-2xl font-bold mb-1">Servicos Populares</h2>
-              <p className="text-muted-foreground">Popular services from our Brazilian community</p>
+              <h2 className="text-2xl font-bold mb-1">{t("home.popularServices")}</h2>
+              <p className="text-muted-foreground">{t("home.popularServicesDesc")}</p>
             </div>
             <Button variant="ghost" asChild data-testid="button-view-all-services">
               <Link href="/services">
-                Ver Todos
+                {t("home.viewAll")}
                 <ChevronRight className="ml-1 h-4 w-4" />
               </Link>
             </Button>
@@ -466,7 +466,7 @@ export default function HomePage() {
           {/* Featured Providers */}
           {featuredProviders.length > 0 && (
             <div className="mt-8">
-              <h3 className="text-lg font-semibold mb-4">Provedores em Destaque / Featured Providers</h3>
+              <h3 className="text-lg font-semibold mb-4">{t("home.featuredProviders")}</h3>
               <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {featuredProviders.map((provider) => (
                   <ProviderCard key={provider.id} provider={provider} />
@@ -482,12 +482,12 @@ export default function HomePage() {
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between mb-8">
             <div>
-              <h2 className="text-2xl font-bold mb-1">Restaurantes em Destaque</h2>
-              <p className="text-muted-foreground">Discover the best Brazilian food in your area</p>
+              <h2 className="text-2xl font-bold mb-1">{t("home.featuredRestaurants")}</h2>
+              <p className="text-muted-foreground">{t("home.featuredRestaurantsDesc")}</p>
             </div>
             <Button variant="ghost" asChild data-testid="button-view-all">
               <Link href="/restaurants">
-                Ver Todos
+                {t("home.viewAll")}
                 <ChevronRight className="ml-1 h-4 w-4" />
               </Link>
             </Button>
@@ -510,12 +510,12 @@ export default function HomePage() {
               <div className="mx-auto h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-4">
                 <Utensils className="h-8 w-8 text-muted-foreground" />
               </div>
-              <h3 className="text-lg font-semibold mb-2">No restaurants yet</h3>
+              <h3 className="text-lg font-semibold mb-2">{t("home.noRestaurants")}</h3>
               <p className="text-muted-foreground mb-6">
-                Be the first to add your restaurant to BrazaDash!
+                {t("home.noRestaurantsDesc")}
               </p>
               <Button asChild>
-                <Link href="/vendor">Become a Vendor</Link>
+                <Link href="/vendor">{t("home.becomeVendor")}</Link>
               </Button>
             </Card>
           )}
@@ -528,10 +528,10 @@ export default function HomePage() {
           <div className="text-center mb-10">
             <Badge className="mb-4 bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 border-yellow-500/30">
               <Star className="h-3 w-3 mr-1 fill-current" />
-              Depoimentos da Comunidade
+              {t("home.testimonialsBadge")}
             </Badge>
-            <h2 className="text-2xl md:text-3xl font-bold mb-2">O Que Nossa Comunidade Diz</h2>
-            <p className="text-muted-foreground">What our community says about BrazaDash</p>
+            <h2 className="text-2xl md:text-3xl font-bold mb-2">{t("home.testimonialsTitle")}</h2>
+            <p className="text-muted-foreground">{t("home.testimonialsDesc")}</p>
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -549,14 +549,14 @@ export default function HomePage() {
             <div>
               <Badge className="mb-2 bg-blue-500/20 text-blue-700 dark:text-blue-400 border-blue-500/30">
                 <Users className="h-3 w-3 mr-1" />
-                Comunidade Brasileira
+                {t("home.badge")}
               </Badge>
-              <h2 className="text-2xl font-bold mb-1">Community Hub</h2>
-              <p className="text-muted-foreground">Connect with the Brazilian community in California</p>
+              <h2 className="text-2xl font-bold mb-1">{t("home.communityHub")}</h2>
+              <p className="text-muted-foreground">{t("home.heroDesc")}</p>
             </div>
             <Button variant="ghost" asChild data-testid="button-view-community">
               <Link href="/community">
-                Explorar
+                {t("home.viewAll")}
                 <ChevronRight className="ml-1 h-4 w-4" />
               </Link>
             </Button>
@@ -567,7 +567,7 @@ export default function HomePage() {
             <div className="mb-8">
               <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                 <Megaphone className="h-5 w-5 text-yellow-600" />
-                Anuncios / Announcements
+                {t("home.announcements")}
               </h3>
               <div className="grid md:grid-cols-2 gap-4">
                 {activeAnnouncements.map((announcement) => (
@@ -583,11 +583,11 @@ export default function HomePage() {
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold flex items-center gap-2">
                   <Calendar className="h-5 w-5 text-primary" />
-                  Proximos Eventos / Upcoming Events
+                  {t("home.upcomingEvents")}
                 </h3>
                 <Button variant="ghost" size="sm" asChild>
                   <Link href="/events">
-                    Ver Todos
+                    {t("home.viewAllEvents")}
                     <ChevronRight className="ml-1 h-4 w-4" />
                   </Link>
                 </Button>
@@ -601,7 +601,7 @@ export default function HomePage() {
               ) : (
                 <Card className="p-8 text-center">
                   <Calendar className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
-                  <p className="text-muted-foreground">Nenhum evento proximo / No upcoming events</p>
+                  <p className="text-muted-foreground">{t("home.noEvents")}</p>
                 </Card>
               )}
             </div>
@@ -611,11 +611,11 @@ export default function HomePage() {
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold flex items-center gap-2">
                   <Building2 className="h-5 w-5 text-primary" />
-                  Negocios em Destaque / Featured Businesses
+                  {t("home.businessDirectory")}
                 </h3>
                 <Button variant="ghost" size="sm" asChild>
                   <Link href="/businesses">
-                    Ver Todos
+                    {t("home.viewAllBusinesses")}
                     <ChevronRight className="ml-1 h-4 w-4" />
                   </Link>
                 </Button>
@@ -629,7 +629,7 @@ export default function HomePage() {
               ) : (
                 <Card className="p-8 text-center">
                   <Building2 className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
-                  <p className="text-muted-foreground">Nenhum negocio ainda / No businesses yet</p>
+                  <p className="text-muted-foreground">{t("home.noBusinesses")}</p>
                 </Card>
               )}
             </div>
@@ -644,10 +644,10 @@ export default function HomePage() {
             <div className="text-center mb-10">
               <Badge className="mb-4 bg-green-500/20 text-green-700 dark:text-green-400 border-green-500/30">
                 <Star className="h-3 w-3 mr-1 fill-current" />
-                Avaliacoes Recentes
+                {t("home.recentReviews")}
               </Badge>
-              <h2 className="text-2xl md:text-3xl font-bold mb-2">Recent Reviews</h2>
-              <p className="text-muted-foreground">See what customers are saying about our vendors</p>
+              <h2 className="text-2xl md:text-3xl font-bold mb-2">{t("home.recentReviews")}</h2>
+              <p className="text-muted-foreground">{t("home.recentReviewsDesc")}</p>
             </div>
 
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">

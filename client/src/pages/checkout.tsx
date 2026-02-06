@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { useCart } from "@/lib/cart-context";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/lib/language-context";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Loader2, MapPin, CreditCard, Lock, CheckCircle } from "lucide-react";
 
@@ -31,6 +32,7 @@ function PaymentForm({ clientSecret, total, onSuccess }: {
   const stripe = useStripe();
   const elements = useElements();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentReady, setPaymentReady] = useState(false);
 
@@ -49,8 +51,8 @@ function PaymentForm({ clientSecret, total, onSuccess }: {
 
     if (error) {
       toast({
-        title: "Payment Failed",
-        description: error.message || "Your payment could not be processed. Please try again.",
+        title: t("checkout.paymentFailed"),
+        description: error.message || t("checkout.paymentFailedDesc"),
         variant: "destructive",
       });
       setIsProcessing(false);
@@ -72,7 +74,7 @@ function PaymentForm({ clientSecret, total, onSuccess }: {
       {!paymentReady && (
         <div className="flex items-center justify-center py-4">
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-          <span className="ml-2 text-sm text-muted-foreground">Loading payment form...</span>
+          <span className="ml-2 text-sm text-muted-foreground">{t("checkout.loadingPaymentForm")}</span>
         </div>
       )}
       <Button
@@ -85,7 +87,7 @@ function PaymentForm({ clientSecret, total, onSuccess }: {
         {isProcessing ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Processing Payment...
+            {t("checkout.processingPayment")}
           </>
         ) : (
           <>
@@ -102,6 +104,7 @@ export default function CheckoutPage() {
   const [, navigate] = useLocation();
   const { items, getSubtotal, getRestaurantId, clearCart } = useCart();
   const { toast } = useToast();
+  const { t } = useLanguage();
 
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
@@ -140,8 +143,8 @@ export default function CheckoutPage() {
     },
     onError: () => {
       toast({
-        title: "Error",
-        description: "Failed to initialize payment. Please try again.",
+        title: t("common.error"),
+        description: t("checkout.initError"),
         variant: "destructive",
       });
     },
@@ -162,8 +165,8 @@ export default function CheckoutPage() {
     },
     onError: () => {
       toast({
-        title: "Order Error",
-        description: "Payment was successful but order creation failed. Please contact support.",
+        title: t("common.error"),
+        description: t("checkout.orderCreateError"),
         variant: "destructive",
       });
     },
@@ -188,26 +191,26 @@ export default function CheckoutPage() {
             <div className="mx-auto bg-green-100 dark:bg-green-900/30 rounded-full p-3 w-fit">
               <CheckCircle className="h-12 w-12 text-green-600 dark:text-green-400" />
             </div>
-            <CardTitle className="text-center text-2xl" data-testid="text-order-confirmed">Order Confirmed!</CardTitle>
+            <CardTitle className="text-center text-2xl" data-testid="text-order-confirmed">{t("checkout.orderConfirmed")}</CardTitle>
           </CardHeader>
           <CardContent className="text-center space-y-4">
             <p className="text-muted-foreground">
-              Thank you for your order! Your food is being prepared and will be on its way soon.
+              {t("checkout.orderConfirmedDesc")}
             </p>
             {orderId && (
               <p className="text-sm">
-                Order ID: <span className="font-mono font-medium" data-testid="text-order-id">{orderId.slice(0, 8)}...</span>
+                {t("checkout.orderId")}: <span className="font-mono font-medium" data-testid="text-order-id">{orderId.slice(0, 8)}...</span>
               </p>
             )}
           </CardContent>
           <CardFooter className="flex justify-center gap-4 flex-wrap">
             {orderId && (
               <Button onClick={() => navigate(`/orders/${orderId}`)} data-testid="button-view-order">
-                View Order
+                {t("checkout.viewOrder")}
               </Button>
             )}
             <Button variant="outline" onClick={() => navigate("/restaurants")} data-testid="button-continue-shopping">
-              Continue Shopping
+              {t("checkout.continueShopping")}
             </Button>
           </CardFooter>
         </Card>
@@ -221,7 +224,7 @@ export default function CheckoutPage() {
   return (
     <div className="min-h-screen py-8">
       <div className="container mx-auto px-4">
-        <h1 className="text-3xl font-bold mb-8">Checkout</h1>
+        <h1 className="text-3xl font-bold mb-8">{t("checkout.title")}</h1>
 
         <div className="grid lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
@@ -229,15 +232,15 @@ export default function CheckoutPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <MapPin className="h-5 w-5" />
-                  Delivery Address
+                  {t("checkout.deliveryAddress")}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="address">Full Address</Label>
+                  <Label htmlFor="address">{t("checkout.fullAddress")}</Label>
                   <Textarea
                     id="address"
-                    placeholder="Enter your delivery address..."
+                    placeholder={t("checkout.addressPlaceholder")}
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
                     className="resize-none"
@@ -245,10 +248,10 @@ export default function CheckoutPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="notes">Delivery Instructions (Optional)</Label>
+                  <Label htmlFor="notes">{t("checkout.deliveryInstructions")}</Label>
                   <Textarea
                     id="notes"
-                    placeholder="Apartment number, gate code, etc..."
+                    placeholder={t("checkout.instructionsPlaceholder")}
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     className="resize-none"
@@ -260,7 +263,7 @@ export default function CheckoutPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Add a Tip</CardTitle>
+                <CardTitle>{t("checkout.addTip")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex gap-3 flex-wrap">
@@ -274,7 +277,7 @@ export default function CheckoutPage() {
                       }}
                       data-testid={`button-tip-${amount}`}
                     >
-                      {amount === "0" ? "No tip" : `$${amount}`}
+                      {amount === "0" ? t("checkout.noTip") : `$${amount}`}
                     </Button>
                   ))}
                   <div className="flex items-center gap-2">
@@ -300,25 +303,25 @@ export default function CheckoutPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <CreditCard className="h-5 w-5" />
-                  Payment Method
+                  {t("checkout.paymentMethod")}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {!publishableKey ? (
                   <div className="flex items-center justify-center py-6">
                     <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                    <span className="ml-2 text-sm text-muted-foreground">Loading payment...</span>
+                    <span className="ml-2 text-sm text-muted-foreground">{t("checkout.loadingPayment")}</span>
                   </div>
                 ) : address.trim().length < 5 ? (
                   <div className="p-4 border rounded-md bg-muted/50 text-center">
                     <p className="text-sm text-muted-foreground">
-                      Please enter your delivery address above to proceed with payment.
+                      {t("checkout.enterAddress")}
                     </p>
                   </div>
                 ) : !clientSecret ? (
                   <div className="flex items-center justify-center py-6">
                     <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                    <span className="ml-2 text-sm text-muted-foreground">Preparing payment form...</span>
+                    <span className="ml-2 text-sm text-muted-foreground">{t("checkout.preparingPayment")}</span>
                   </div>
                 ) : stripeInstance ? (
                   <Elements
@@ -343,7 +346,7 @@ export default function CheckoutPage() {
                 ) : null}
                 <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
                   <Lock className="h-3 w-3" />
-                  <span>Payments are securely processed by Stripe</span>
+                  <span>{t("checkout.securePayment")}</span>
                 </div>
               </CardContent>
             </Card>
@@ -352,7 +355,7 @@ export default function CheckoutPage() {
           <div>
             <Card className="sticky top-24">
               <CardHeader>
-                <CardTitle>Order Summary</CardTitle>
+                <CardTitle>{t("checkout.orderSummary")}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 {items.map((item) => (
@@ -365,22 +368,22 @@ export default function CheckoutPage() {
                 ))}
                 <Separator />
                 <div className="flex justify-between gap-1">
-                  <span className="text-muted-foreground">Subtotal</span>
+                  <span className="text-muted-foreground">{t("cart.subtotal")}</span>
                   <span>${subtotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between gap-1">
-                  <span className="text-muted-foreground">Delivery Fee</span>
+                  <span className="text-muted-foreground">{t("cart.deliveryFee")}</span>
                   <span>${deliveryFee.toFixed(2)}</span>
                 </div>
                 {tipAmount > 0 && (
                   <div className="flex justify-between gap-1">
-                    <span className="text-muted-foreground">Tip</span>
+                    <span className="text-muted-foreground">{t("checkout.tip")}</span>
                     <span>${tipAmount.toFixed(2)}</span>
                   </div>
                 )}
                 <Separator />
                 <div className="flex justify-between gap-1 text-lg font-semibold">
-                  <span>Total</span>
+                  <span>{t("cart.total")}</span>
                   <span data-testid="text-checkout-total">${total.toFixed(2)}</span>
                 </div>
               </CardContent>

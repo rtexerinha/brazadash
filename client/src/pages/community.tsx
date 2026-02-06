@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
+import { useLanguage } from "@/lib/language-context";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +42,7 @@ function formatEventDate(date: string | Date) {
 }
 
 export default function CommunityPage() {
+  const { t } = useLanguage();
   const { data: featuredEvents, isLoading: eventsLoading } = useQuery<Event[]>({
     queryKey: ["/api/community/events/featured"],
   });
@@ -57,10 +59,9 @@ export default function CommunityPage() {
     <div className="min-h-screen py-8">
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold mb-4">Brazilian Community Hub</h1>
+          <h1 className="text-4xl font-bold mb-4">{t("community.title")}</h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Connect with the Brazilian community in California. Discover events, 
-            find local businesses, and stay updated with community news.
+            {t("community.subtitle")}
           </p>
         </div>
 
@@ -73,7 +74,7 @@ export default function CommunityPage() {
                     <Calendar className="h-6 w-6 text-primary" />
                   </div>
                   <div>
-                    <CardTitle>Events</CardTitle>
+                    <CardTitle>{t("community.events")}</CardTitle>
                     <p className="text-sm text-muted-foreground">Festivals, concerts, meetups & more</p>
                   </div>
                 </div>
@@ -100,7 +101,7 @@ export default function CommunityPage() {
                     <Building2 className="h-6 w-6 text-primary" />
                   </div>
                   <div>
-                    <CardTitle>Business Directory</CardTitle>
+                    <CardTitle>{t("community.businessDirectory")}</CardTitle>
                     <p className="text-sm text-muted-foreground">Brazilian-owned businesses</p>
                   </div>
                 </div>
@@ -125,7 +126,7 @@ export default function CommunityPage() {
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-semibold flex items-center gap-2">
                 <Megaphone className="h-6 w-6" />
-                Announcements
+                {t("community.announcements")}
               </h2>
             </div>
             <div className="space-y-4">
@@ -187,9 +188,9 @@ export default function CommunityPage() {
         {((featuredEvents && featuredEvents.length > 0) || (upcomingEvents && upcomingEvents.length > 0)) && (
           <section>
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-semibold">Upcoming Events</h2>
+              <h2 className="text-2xl font-semibold">{t("community.upcomingEvents")}</h2>
               <Link href="/events">
-                <Button variant="outline" data-testid="link-view-all-events">View All</Button>
+                <Button variant="outline" data-testid="link-view-all-events">{t("community.viewAllEvents")}</Button>
               </Link>
             </div>
             {eventsLoading ? (
@@ -219,7 +220,7 @@ export default function CommunityPage() {
                             <Icon className="h-3 w-3 mr-1" />
                             {event.category}
                           </Badge>
-                          {event.isFree && <Badge variant="outline">Free</Badge>}
+                          {event.isFree && <Badge variant="outline">{t("community.free")}</Badge>}
                         </div>
                         <CardTitle className="text-base">{event.title}</CardTitle>
                       </CardHeader>
