@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -17,8 +18,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/lib/language-context";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Store, Plus, Utensils, Package, Star, DollarSign, Loader2, Pencil, Trash2, Clock, CheckCircle, Truck, MapPin, XCircle, ChefHat, Upload, ImageIcon, AlertTriangle } from "lucide-react";
-import { format } from "date-fns";
+import { Store, Plus, Utensils, Package, Star, DollarSign, Loader2, Pencil, Trash2, Clock, CheckCircle, Truck, MapPin, XCircle, ChefHat, Upload, ImageIcon, AlertTriangle, Calendar, TrendingUp, Filter, BarChart3 } from "lucide-react";
+import { format, startOfDay, startOfWeek, startOfMonth } from "date-fns";
 import { z } from "zod";
 import type { Restaurant, MenuItem, Order } from "@shared/schema";
 
@@ -426,9 +427,24 @@ function AddMenuItemDialog({ restaurantId, onSuccess }: { restaurantId: string; 
   );
 }
 
+type DateRange = "today" | "week" | "month" | "all";
+type StatusFilter = "all" | "pending" | "confirmed" | "preparing" | "ready" | "out_for_delivery" | "delivered" | "cancelled";
+
+function getDateRangeStart(range: DateRange): Date | null {
+  const now = new Date();
+  switch (range) {
+    case "today": return startOfDay(now);
+    case "week": return startOfWeek(now, { weekStartsOn: 1 });
+    case "month": return startOfMonth(now);
+    case "all": return null;
+  }
+}
+
 function VendorDashboard({ restaurant }: { restaurant: Restaurant }) {
   const { toast } = useToast();
   const { t } = useLanguage();
+  const [dateRange, setDateRange] = useState<DateRange>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   
   const { data: menuItems, isLoading: menuLoading } = useQuery<MenuItem[]>({
     queryKey: ["/api/vendor/restaurants", restaurant.id, "menu"],
@@ -458,9 +474,29 @@ function VendorDashboard({ restaurant }: { restaurant: Restaurant }) {
     },
   });
 
-  const pendingOrders = orders?.filter((o) => o.status === "pending") || [];
-  const activeOrders = orders?.filter((o) => ["confirmed", "preparing", "ready", "out_for_delivery"].includes(o.status)) || [];
-  const completedOrders = orders?.filter((o) => ["delivered", "cancelled"].includes(o.status)) || [];
+  const filteredOrders = useMemo(() => {
+    if (!orders) return [];
+    let filtered = [...orders];
+    const rangeStart = getDateRangeStart(dateRange);
+    if (rangeStart) {
+      filtered = filtered.filter((o) => o.createdAt && new Date(o.createdAt) >= rangeStart);
+    }
+    if (statusFilter !== "all") {
+      filtered = filtered.filter((o) => o.status === statusFilter);
+    }
+    return filtered;
+  }, [orders, dateRange, statusFilter]);
+
+  const revenueStats = useMemo(() => {
+    const deliveredOrders = filteredOrders.filter((o) => o.status === "delivered");
+    const totalRevenue = deliveredOrders.reduce((sum, o) => sum + parseFloat(o.total), 0);
+    const avgOrder = deliveredOrders.length > 0 ? totalRevenue / deliveredOrders.length : 0;
+    return { totalRevenue, orderCount: deliveredOrders.length, avgOrder };
+  }, [filteredOrders]);
+
+  const pendingOrders = filteredOrders.filter((o) => o.status === "pending");
+  const activeOrders = filteredOrders.filter((o) => ["confirmed", "preparing", "ready", "out_for_delivery"].includes(o.status));
+  const completedOrders = filteredOrders.filter((o) => ["delivered", "cancelled"].includes(o.status));
 
   const statusConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {
     pending: { label: t("vendor.newOrder"), color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400", icon: Clock },
@@ -565,7 +601,98 @@ function VendorDashboard({ restaurant }: { restaurant: Restaurant }) {
               ))}
             </div>
           ) : orders && orders.length > 0 ? (
-            <div className="space-y-8">
+            <div className="space-y-6">
+              {/* Revenue Summary */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-md bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                        <DollarSign className="h-5 w-5 text-green-600 dark:text-green-400" />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold" data-testid="text-revenue">${revenueStats.totalRevenue.toFixed(2)}</p>
+                        <p className="text-sm text-muted-foreground">{t("vendor.revenue")}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-md bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                        <BarChart3 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold" data-testid="text-total-orders">{revenueStats.orderCount}</p>
+                        <p className="text-sm text-muted-foreground">{t("vendor.totalOrders")}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-md bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                        <TrendingUp className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold" data-testid="text-avg-order">${revenueStats.avgOrder.toFixed(2)}</p>
+                        <p className="text-sm text-muted-foreground">{t("vendor.avgOrder")}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Filters */}
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">{t("vendor.dateRange")}:</span>
+                  <Select value={dateRange} onValueChange={(v) => setDateRange(v as DateRange)}>
+                    <SelectTrigger className="w-[140px]" data-testid="select-date-range">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="today">{t("vendor.today")}</SelectItem>
+                      <SelectItem value="week">{t("vendor.thisWeek")}</SelectItem>
+                      <SelectItem value="month">{t("vendor.thisMonth")}</SelectItem>
+                      <SelectItem value="all">{t("vendor.allTime")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Filter className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">{t("vendor.filterByStatus")}:</span>
+                  <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+                    <SelectTrigger className="w-[160px]" data-testid="select-status-filter">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t("vendor.allStatuses")}</SelectItem>
+                      <SelectItem value="pending">{t("vendor.newOrder")}</SelectItem>
+                      <SelectItem value="confirmed">{t("vendor.orderConfirmed")}</SelectItem>
+                      <SelectItem value="preparing">{t("vendor.orderPreparing")}</SelectItem>
+                      <SelectItem value="ready">{t("vendor.orderReady")}</SelectItem>
+                      <SelectItem value="out_for_delivery">{t("vendor.orderOutForDelivery")}</SelectItem>
+                      <SelectItem value="delivered">{t("vendor.orderDelivered")}</SelectItem>
+                      <SelectItem value="cancelled">{t("vendor.orderCancelled")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <span className="text-sm text-muted-foreground ml-auto" data-testid="text-filtered-count">
+                  {filteredOrders.length} {t("vendor.filteredOrders")}
+                </span>
+              </div>
+
+              {filteredOrders.length === 0 ? (
+                <Card className="p-8 text-center">
+                  <Filter className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                  <p className="text-muted-foreground">{t("vendor.noFilteredOrders")}</p>
+                </Card>
+              ) : (
+              <div className="space-y-8">
               {pendingOrders.length > 0 && (
                 <div>
                   <div className="flex items-center gap-2 mb-4">
@@ -759,6 +886,8 @@ function VendorDashboard({ restaurant }: { restaurant: Restaurant }) {
                   <Package className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
                   <p className="text-muted-foreground">{t("vendor.noOrders")}</p>
                 </Card>
+              )}
+            </div>
               )}
             </div>
           ) : (
