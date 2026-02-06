@@ -867,7 +867,133 @@ export async function registerRoutes(
     }
   });
 
-  // Create checkout session for food order
+  // Create PaymentIntent for embedded card form
+  app.post("/api/checkout/create-payment-intent", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { items, restaurantId, deliveryAddress, notes, tip } = req.body;
+
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: "Cart is empty" });
+      }
+
+      if (!deliveryAddress || deliveryAddress.trim().length < 5) {
+        return res.status(400).json({ message: "Delivery address is required" });
+      }
+
+      const restaurant = await storage.getRestaurant(restaurantId);
+      if (!restaurant) {
+        return res.status(404).json({ message: "Restaurant not found" });
+      }
+
+      let subtotal = 0;
+      const itemDetails: any[] = [];
+
+      for (const item of items) {
+        const menuItem = await storage.getMenuItem(item.menuItemId);
+        if (!menuItem) {
+          return res.status(400).json({ message: `Menu item not found: ${item.menuItemId}` });
+        }
+        const itemTotal = parseFloat(menuItem.price) * item.quantity;
+        subtotal += itemTotal;
+        itemDetails.push({
+          menuItemId: item.menuItemId,
+          name: menuItem.name,
+          price: menuItem.price,
+          quantity: item.quantity,
+        });
+      }
+
+      const deliveryFee = restaurant.deliveryFee ? parseFloat(restaurant.deliveryFee) : 3.99;
+      const tipAmount = tip ? parseFloat(tip) : 0;
+      const total = subtotal + deliveryFee + tipAmount;
+      const amountInCents = Math.round(total * 100);
+
+      const stripe = await getUncachableStripeClient();
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amountInCents,
+        currency: 'usd',
+        automatic_payment_methods: { enabled: true },
+        metadata: {
+          userId,
+          restaurantId,
+          deliveryAddress,
+          notes: notes || '',
+          items: JSON.stringify(itemDetails),
+          tip: tipAmount.toString(),
+          subtotal: subtotal.toFixed(2),
+          deliveryFee: deliveryFee.toFixed(2),
+        },
+      });
+
+      res.json({ clientSecret: paymentIntent.client_secret });
+    } catch (error) {
+      console.error("Error creating payment intent:", error);
+      res.status(500).json({ message: "Failed to create payment intent" });
+    }
+  });
+
+  // Confirm payment and create order
+  app.post("/api/checkout/confirm-payment", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { paymentIntentId } = req.body;
+
+      if (!paymentIntentId) {
+        return res.status(400).json({ message: "Payment intent ID required" });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+
+      if (paymentIntent.status !== 'succeeded') {
+        return res.status(400).json({ message: "Payment not completed" });
+      }
+
+      if (paymentIntent.metadata?.userId !== userId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      const existingOrder = await storage.getOrderByStripeSession(paymentIntentId);
+      if (existingOrder) {
+        return res.json(existingOrder);
+      }
+
+      const items = JSON.parse(paymentIntent.metadata?.items || '[]');
+      const total = paymentIntent.amount / 100;
+      const tipAmount = parseFloat(paymentIntent.metadata?.tip || '0');
+      const deliveryFee = parseFloat(paymentIntent.metadata?.deliveryFee || '3.99');
+      const subtotal = parseFloat(paymentIntent.metadata?.subtotal || '0');
+
+      const order = await storage.createOrder({
+        customerId: userId,
+        restaurantId: paymentIntent.metadata?.restaurantId || '',
+        items,
+        subtotal: subtotal.toFixed(2),
+        deliveryFee: deliveryFee.toFixed(2),
+        tip: tipAmount.toFixed(2),
+        total: total.toFixed(2),
+        deliveryAddress: paymentIntent.metadata?.deliveryAddress || '',
+        notes: paymentIntent.metadata?.notes || '',
+        stripeSessionId: paymentIntentId,
+      });
+
+      await storage.createNotification({
+        userId,
+        title: "Order Placed",
+        message: `Your order #${order.id.slice(0, 8)} has been placed successfully!`,
+        type: "order",
+      });
+
+      res.json(order);
+    } catch (error) {
+      console.error("Error confirming payment:", error);
+      res.status(500).json({ message: "Failed to confirm payment" });
+    }
+  });
+
+  // Create checkout session for food order (legacy redirect)
   app.post("/api/checkout/create-session", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
