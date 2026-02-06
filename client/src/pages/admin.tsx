@@ -30,7 +30,7 @@ import { Label } from "@/components/ui/label";
 import {
   Users, Store, ShoppingBag, Briefcase, Calendar, Building2, Megaphone,
   Star, DollarSign, CheckCircle, XCircle, Shield, Plus, AlertTriangle,
-  Trash2, UserPlus, UserMinus, Filter, X
+  Trash2, UserPlus, UserMinus, Filter, X, Clock
 } from "lucide-react";
 
 interface AdminStats {
@@ -50,6 +50,16 @@ interface AdminUser {
   firstName: string;
   lastName: string;
   roles: string[];
+}
+
+interface PendingApproval {
+  id: string;
+  userId: string;
+  role: string;
+  approvalStatus: string;
+  createdAt: string;
+  userName: string;
+  userEmail: string;
 }
 
 const ALL_ROLES = ["customer", "vendor", "service_provider", "admin"] as const;
@@ -126,6 +136,27 @@ export default function AdminPage() {
   const { data: serviceReviewsData } = useQuery<ServiceReview[]>({
     queryKey: ["/api/admin/service-reviews"],
     enabled: activeTab === "reviews" && !accessDenied,
+  });
+
+  const { data: pendingApprovals } = useQuery<PendingApproval[]>({
+    queryKey: ["/api/admin/pending-approvals"],
+    enabled: (activeTab === "approvals" || activeTab === "overview") && !accessDenied,
+  });
+
+  const approvalMutation = useMutation({
+    mutationFn: async ({ userId, role, status }: { userId: string; role: string; status: "approved" | "rejected" }) => {
+      const res = await apiRequest("PATCH", "/api/admin/approve-role", { userId, role, status });
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      toast({ title: variables.status === "approved" ? "Approved" : "Rejected", description: `Registration ${variables.status} successfully` });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-approvals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update approval status", variant: "destructive" });
+    },
   });
 
   const updateUserRoleMutation = useMutation({
@@ -324,8 +355,16 @@ export default function AdminPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid grid-cols-5 lg:grid-cols-10 gap-1 mb-6 h-auto">
+          <TabsList className="grid grid-cols-5 lg:grid-cols-11 gap-1 mb-6 h-auto">
             <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
+            <TabsTrigger value="approvals" data-testid="tab-approvals" className="relative">
+              Approvals
+              {pendingApprovals && pendingApprovals.length > 0 && (
+                <span className="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-destructive text-destructive-foreground text-xs font-medium px-1">
+                  {pendingApprovals.length}
+                </span>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="users" data-testid="tab-users">Users</TabsTrigger>
             <TabsTrigger value="restaurants" data-testid="tab-restaurants">Restaurants</TabsTrigger>
             <TabsTrigger value="orders" data-testid="tab-orders">Orders</TabsTrigger>
@@ -427,6 +466,117 @@ export default function AdminPage() {
                 </Card>
               </div>
             ) : null}
+
+            {pendingApprovals && pendingApprovals.length > 0 && (
+              <Card className="mt-6">
+                <CardHeader className="flex flex-row items-center justify-between gap-2">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Clock className="h-5 w-5 text-amber-500" />
+                      Pending Approvals
+                    </CardTitle>
+                    <CardDescription>{pendingApprovals.length} registration(s) awaiting review</CardDescription>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => setActiveTab("approvals")} data-testid="button-view-all-approvals">
+                    View All
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {pendingApprovals.slice(0, 3).map((approval) => (
+                      <div key={approval.id} className="flex items-center justify-between gap-4 p-3 rounded-md border">
+                        <div>
+                          <p className="font-medium" data-testid={`text-approval-name-${approval.id}`}>{approval.userName}</p>
+                          <p className="text-sm text-muted-foreground">{approval.userEmail}</p>
+                          <Badge variant="outline" className="mt-1">
+                            {approval.role === "vendor" ? "Restaurant / Food Vendor" : "Service Provider"}
+                          </Badge>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => approvalMutation.mutate({ userId: approval.userId, role: approval.role, status: "approved" })}
+                            disabled={approvalMutation.isPending}
+                            data-testid={`button-approve-${approval.id}`}
+                          >
+                            <CheckCircle className="h-4 w-4 mr-1" /> Approve
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => approvalMutation.mutate({ userId: approval.userId, role: approval.role, status: "rejected" })}
+                            disabled={approvalMutation.isPending}
+                            data-testid={`button-reject-${approval.id}`}
+                          >
+                            <XCircle className="h-4 w-4 mr-1" /> Reject
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="approvals">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-amber-500" />
+                  Pending Business Registrations
+                </CardTitle>
+                <CardDescription>
+                  Review and approve or reject vendor and service provider registrations.
+                  Customers are automatically approved.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {!pendingApprovals || pendingApprovals.length === 0 ? (
+                  <div className="text-center py-12">
+                    <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium mb-2">All Caught Up</h3>
+                    <p className="text-muted-foreground">No pending registrations to review.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {pendingApprovals.map((approval) => (
+                      <div key={approval.id} className="flex items-center justify-between gap-4 p-4 rounded-md border" data-testid={`card-approval-${approval.id}`}>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-medium" data-testid={`text-approval-name-full-${approval.id}`}>{approval.userName}</p>
+                            <Badge variant="outline">
+                              {approval.role === "vendor" ? "Restaurant / Food Vendor" : "Service Provider"}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-1">{approval.userEmail}</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Registered: {new Date(approval.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="flex gap-2 flex-shrink-0">
+                          <Button
+                            onClick={() => approvalMutation.mutate({ userId: approval.userId, role: approval.role, status: "approved" })}
+                            disabled={approvalMutation.isPending}
+                            data-testid={`button-approve-full-${approval.id}`}
+                          >
+                            <CheckCircle className="h-4 w-4 mr-1" /> Approve
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={() => approvalMutation.mutate({ userId: approval.userId, role: approval.role, status: "rejected" })}
+                            disabled={approvalMutation.isPending}
+                            data-testid={`button-reject-full-${approval.id}`}
+                          >
+                            <XCircle className="h-4 w-4 mr-1" /> Reject
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="users">

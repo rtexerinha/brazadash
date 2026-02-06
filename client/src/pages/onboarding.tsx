@@ -54,12 +54,19 @@ export default function OnboardingPage() {
       const res = await apiRequest("POST", "/api/user/role", { role });
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (_, role) => {
       queryClient.invalidateQueries({ queryKey: ["/api/user/role"] });
-      toast({
-        title: t("onboarding.welcomeToast"),
-        description: t("onboarding.welcomeToastDesc"),
-      });
+      if (role === "customer") {
+        toast({
+          title: t("onboarding.welcomeToast"),
+          description: t("onboarding.welcomeToastDesc"),
+        });
+      } else {
+        toast({
+          title: t("onboarding.pendingToast"),
+          description: t("onboarding.pendingToastDesc"),
+        });
+      }
     },
     onError: (error: Error) => {
       if (error.message.includes("401")) {

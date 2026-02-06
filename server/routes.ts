@@ -237,8 +237,30 @@ export async function registerRoutes(
   // VENDOR ROUTES
   // =================
 
+  const isApprovedVendor = async (req: any, res: any, next: any) => {
+    const userId = req.user?.claims?.sub;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+    const roles = await storage.getUserRoles(userId);
+    const vendorRole = roles.find(r => r.role === "vendor");
+    if (!vendorRole || vendorRole.approvalStatus !== "approved") {
+      return res.status(403).json({ error: "Your vendor account is pending approval" });
+    }
+    next();
+  };
+
+  const isApprovedProvider = async (req: any, res: any, next: any) => {
+    const userId = req.user?.claims?.sub;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+    const roles = await storage.getUserRoles(userId);
+    const providerRole = roles.find(r => r.role === "service_provider");
+    if (!providerRole || providerRole.approvalStatus !== "approved") {
+      return res.status(403).json({ error: "Your service provider account is pending approval" });
+    }
+    next();
+  };
+
   // Get vendor's restaurants
-  app.get("/api/vendor/restaurants", isAuthenticated, async (req: any, res) => {
+  app.get("/api/vendor/restaurants", isAuthenticated, isApprovedVendor, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const restaurants = await storage.getRestaurantsByOwner(userId);
@@ -250,7 +272,7 @@ export async function registerRoutes(
   });
 
   // Create restaurant
-  app.post("/api/vendor/restaurants", isAuthenticated, async (req: any, res) => {
+  app.post("/api/vendor/restaurants", isAuthenticated, isApprovedVendor, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       
@@ -276,7 +298,7 @@ export async function registerRoutes(
   });
 
   // Update restaurant
-  app.patch("/api/vendor/restaurants/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/vendor/restaurants/:id", isAuthenticated, isApprovedVendor, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const restaurant = await storage.getRestaurant(req.params.id);
@@ -302,7 +324,7 @@ export async function registerRoutes(
   });
 
   // Get vendor's restaurant menu
-  app.get("/api/vendor/restaurants/:id/menu", isAuthenticated, async (req: any, res) => {
+  app.get("/api/vendor/restaurants/:id/menu", isAuthenticated, isApprovedVendor, async (req: any, res) => {
     try {
       const menuItems = await storage.getMenuItems(req.params.id);
       res.json(menuItems);
@@ -313,7 +335,7 @@ export async function registerRoutes(
   });
 
   // Add menu item
-  app.post("/api/vendor/restaurants/:id/menu", isAuthenticated, async (req: any, res) => {
+  app.post("/api/vendor/restaurants/:id/menu", isAuthenticated, isApprovedVendor, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const restaurant = await storage.getRestaurant(req.params.id);
@@ -344,7 +366,7 @@ export async function registerRoutes(
   });
 
   // Get vendor's restaurant orders
-  app.get("/api/vendor/restaurants/:id/orders", isAuthenticated, async (req: any, res) => {
+  app.get("/api/vendor/restaurants/:id/orders", isAuthenticated, isApprovedVendor, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const restaurant = await storage.getRestaurant(req.params.id);
@@ -362,7 +384,7 @@ export async function registerRoutes(
   });
 
   // Update order status (vendor)
-  app.patch("/api/vendor/orders/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/vendor/orders/:id", isAuthenticated, isApprovedVendor, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { status } = req.body;
@@ -667,7 +689,7 @@ export async function registerRoutes(
   // =====================
 
   // Get current user's provider profile
-  app.get("/api/provider/profile", isAuthenticated, async (req: any, res) => {
+  app.get("/api/provider/profile", isAuthenticated, isApprovedProvider, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const provider = await storage.getServiceProviderByUser(userId);
@@ -679,7 +701,7 @@ export async function registerRoutes(
   });
 
   // Create provider profile
-  app.post("/api/provider/profile", isAuthenticated, async (req: any, res) => {
+  app.post("/api/provider/profile", isAuthenticated, isApprovedProvider, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       
@@ -709,7 +731,7 @@ export async function registerRoutes(
   });
 
   // Update provider profile
-  app.patch("/api/provider/profile", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/provider/profile", isAuthenticated, isApprovedProvider, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const provider = await storage.getServiceProviderByUser(userId);
@@ -734,7 +756,7 @@ export async function registerRoutes(
   });
 
   // Get provider's services
-  app.get("/api/provider/services", isAuthenticated, async (req: any, res) => {
+  app.get("/api/provider/services", isAuthenticated, isApprovedProvider, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const provider = await storage.getServiceProviderByUser(userId);
@@ -752,7 +774,7 @@ export async function registerRoutes(
   });
 
   // Add service
-  app.post("/api/provider/services", isAuthenticated, async (req: any, res) => {
+  app.post("/api/provider/services", isAuthenticated, isApprovedProvider, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const provider = await storage.getServiceProviderByUser(userId);
@@ -781,7 +803,7 @@ export async function registerRoutes(
   });
 
   // Get provider's bookings
-  app.get("/api/provider/bookings", isAuthenticated, async (req: any, res) => {
+  app.get("/api/provider/bookings", isAuthenticated, isApprovedProvider, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const provider = await storage.getServiceProviderByUser(userId);
@@ -799,7 +821,7 @@ export async function registerRoutes(
   });
 
   // Update booking status (provider)
-  app.patch("/api/provider/bookings/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/provider/bookings/:id", isAuthenticated, isApprovedProvider, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const provider = await storage.getServiceProviderByUser(userId);
@@ -1372,7 +1394,12 @@ export async function registerRoutes(
         }
       }
 
-      res.json({ roles: roleNames });
+      const approvalMap: Record<string, string> = {};
+      for (const r of roles) {
+        approvalMap[r.role] = r.approvalStatus || "approved";
+      }
+
+      res.json({ roles: roleNames, approvalStatus: approvalMap });
     } catch (error) {
       console.error("Error fetching user role:", error);
       res.status(500).json({ error: "Failed to fetch user role" });
@@ -1398,9 +1425,19 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Role already assigned. Contact admin to change." });
       }
 
+      const approvalStatus = role === "customer" ? "approved" : "pending";
       const created = await storage.addUserRole(userId, role);
+      if (approvalStatus === "pending") {
+        await storage.updateUserRoleApproval(userId, role, "pending");
+      }
+
       const allRoles = await storage.getUserRoles(userId);
-      res.json({ roles: allRoles.map(r => r.role) });
+      const approvalMap: Record<string, string> = {};
+      for (const r of allRoles) {
+        approvalMap[r.role] = r.approvalStatus || "approved";
+      }
+
+      res.json({ roles: allRoles.map(r => r.role), approvalStatus: approvalMap });
     } catch (error) {
       console.error("Error setting user role:", error);
       res.status(500).json({ error: "Failed to set user role" });
@@ -1484,6 +1521,40 @@ export async function registerRoutes(
       res.json(roles);
     } catch (error) {
       res.status(500).json({ error: "Failed to update user roles" });
+    }
+  });
+
+  // Pending approvals management
+  app.get("/api/admin/pending-approvals", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const pending = await storage.getPendingApprovals();
+      const enriched = await Promise.all(pending.map(async (p) => {
+        const user = await storage.getUserById(p.userId);
+        return {
+          ...p,
+          userName: user ? `${user.firstName} ${user.lastName}`.trim() : "Unknown",
+          userEmail: user?.email || "",
+        };
+      }));
+      res.json(enriched);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch pending approvals" });
+    }
+  });
+
+  app.patch("/api/admin/approve-role", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { userId, role, status } = req.body;
+      if (!["approved", "rejected"].includes(status)) {
+        return res.status(400).json({ error: "Status must be 'approved' or 'rejected'" });
+      }
+      const updated = await storage.updateUserRoleApproval(userId, role, status);
+      if (!updated) {
+        return res.status(404).json({ error: "Role not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update approval status" });
     }
   });
 

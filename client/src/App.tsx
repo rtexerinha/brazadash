@@ -31,12 +31,19 @@ import CommunityPage from "@/pages/community";
 import EventsPage from "@/pages/events";
 import BusinessesPage from "@/pages/businesses";
 import AdminPage from "@/pages/admin";
+import PendingApprovalPage from "@/pages/pending-approval";
 
-function RoleBasedHome({ roles }: { roles: string[] }) {
+function RoleBasedHome({ roles, approvalStatus }: { roles: string[]; approvalStatus: Record<string, string> }) {
   if (roles.includes("vendor")) {
+    if (approvalStatus?.vendor !== "approved") {
+      return <Redirect to="/pending-approval" />;
+    }
     return <Redirect to="/vendor" />;
   }
   if (roles.includes("service_provider")) {
+    if (approvalStatus?.service_provider !== "approved") {
+      return <Redirect to="/pending-approval" />;
+    }
     return <Redirect to="/provider-portal" />;
   }
   if (roles.includes("admin") && !roles.includes("customer")) {
@@ -48,7 +55,7 @@ function RoleBasedHome({ roles }: { roles: string[] }) {
 function AppContent() {
   const { isAuthenticated, isLoading } = useAuth();
 
-  const { data: roleData, isLoading: rolesLoading, isError: rolesError } = useQuery<{ roles: string[] }>({
+  const { data: roleData, isLoading: rolesLoading, isError: rolesError } = useQuery<{ roles: string[]; approvalStatus: Record<string, string> }>({
     queryKey: ["/api/user/role"],
     enabled: isAuthenticated,
     staleTime: 1000 * 60 * 5,
@@ -77,6 +84,7 @@ function AppContent() {
   }
 
   const roles = roleData?.roles || [];
+  const approvalStatus = roleData?.approvalStatus || {};
   const hasNonAdminRole = roles.some(r => r !== "admin");
   const isAdmin = roles.includes("admin");
 
@@ -89,7 +97,7 @@ function AppContent() {
       <Navbar />
       <Switch>
         <Route path="/">
-          <RoleBasedHome roles={roles} />
+          <RoleBasedHome roles={roles} approvalStatus={approvalStatus} />
         </Route>
         <Route path="/restaurants" component={RestaurantsPage} />
         <Route path="/restaurant/:id" component={RestaurantDetailPage} />
@@ -105,6 +113,7 @@ function AppContent() {
         <Route path="/bookings" component={BookingsPage} />
         <Route path="/bookings/:id" component={BookingDetailPage} />
         <Route path="/provider-portal" component={ProviderPortalPage} />
+        <Route path="/pending-approval" component={PendingApprovalPage} />
         <Route path="/community" component={CommunityPage} />
         <Route path="/events" component={EventsPage} />
         <Route path="/businesses" component={BusinessesPage} />

@@ -31,6 +31,7 @@ The BrazaDash platform is built with a modern full-stack architecture:
 -   **Services Marketplace**: Service discovery across various categories, detailed provider profiles, a booking system, a provider portal for managing services and bookings, and service-specific reviews.
 -   **Community Hub**: Discovery of local events with RSVP functionality, a business directory for Brazilian-owned businesses, and platform-wide announcements.
 -   **Admin Platform**: Comprehensive dashboard for managing users, restaurants, service providers, orders, bookings, events, businesses, and platform announcements, including content moderation.
+-   **Admin Approval Workflow**: Vendors and service providers require admin approval before operating. Customers are auto-approved. Admin dashboard has a dedicated "Approvals" tab with badge count for pending registrations. Users pending approval see a dedicated `/pending-approval` page. Server-side middleware (`isApprovedVendor`/`isApprovedProvider`) protects all vendor/provider API routes. The `user_roles` table has an `approvalStatus` column (approved/pending/rejected).
 
 ## External Dependencies
 

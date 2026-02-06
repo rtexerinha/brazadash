@@ -10,6 +10,7 @@ export const userRoles = pgTable("user_roles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),
   role: varchar("role", { enum: ["customer", "vendor", "service_provider", "admin"] }).notNull().default("customer"),
+  approvalStatus: varchar("approval_status", { enum: ["approved", "pending", "rejected"] }).notNull().default("approved"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

@@ -60,6 +60,8 @@ export interface IStorage {
   // User Roles
   getUserRole(userId: string): Promise<UserRole | undefined>;
   createUserRole(role: InsertUserRole): Promise<UserRole>;
+  updateUserRoleApproval(userId: string, role: string, approvalStatus: string): Promise<UserRole | undefined>;
+  getPendingApprovals(): Promise<UserRole[]>;
   
   // Service Providers
   getServiceProviders(category?: string): Promise<ServiceProvider[]>;
@@ -315,6 +317,18 @@ class DatabaseStorage implements IStorage {
   async createUserRole(role: InsertUserRole): Promise<UserRole> {
     const [created] = await db.insert(userRoles).values(role).returning();
     return created;
+  }
+
+  async updateUserRoleApproval(userId: string, role: string, approvalStatus: string): Promise<UserRole | undefined> {
+    const [updated] = await db.update(userRoles)
+      .set({ approvalStatus: approvalStatus as any })
+      .where(and(eq(userRoles.userId, userId), eq(userRoles.role, role as any)))
+      .returning();
+    return updated;
+  }
+
+  async getPendingApprovals(): Promise<UserRole[]> {
+    return db.select().from(userRoles).where(eq(userRoles.approvalStatus, "pending")).orderBy(desc(userRoles.createdAt));
   }
 
   // Service Providers
