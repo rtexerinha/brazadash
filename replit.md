@@ -1,297 +1,44 @@
 # BrazaDash
 
-A Brazilian community marketplace platform serving the Brazilian community in California. Enables users to discover and order authentic Brazilian food, find Brazilian services, and connect with the community.
+## Overview
 
-**Live URL**: https://brazadash.replit.app (also https://brazadash.com)
-**GitHub**: https://github.com/rtexerinha/brazadash
+BrazaDash is a mobile-first community marketplace platform designed to serve the Brazilian community in California. It aims to be a comprehensive hub for authentic Brazilian food delivery, various Brazilian services, and community connection. The project combines features similar to DoorDash, Thumbtack, and a local community directory, fostering cultural connection and economic activity within the Brazilian diaspora.
 
-## Project Overview
+## User Preferences
 
-**Purpose**: Mobile-first marketplace combining food delivery (DoorDash-style), services marketplace (Thumbtack-style), and community directory features.
+I prefer clear, actionable instructions and direct communication. When proposing changes, please outline the problem, potential solutions, and your recommended approach before implementation. For code, I appreciate well-structured, readable code with comments where complexity warrants. Focus on delivering iterative improvements and communicate progress regularly.
 
-**Target Users**:
-- Customers: Brazilian residents seeking authentic food and Portuguese-speaking services
-- Vendors: Brazilian restaurants, home-based cooks, food trucks
-- Service Providers: Cleaning, beauty, legal, construction, and more
+## System Architecture
 
-## Tech Stack
+The BrazaDash platform is built with a modern full-stack architecture:
 
-- **Frontend**: React + TypeScript with Vite, Wouter for routing, TanStack Query for data fetching
-- **Backend**: Express.js with TypeScript
-- **Database**: PostgreSQL with Drizzle ORM
-- **Authentication**: Replit Auth (OpenID Connect)
-- **Payments**: Stripe integration for secure checkout
-- **Styling**: Tailwind CSS with shadcn/ui components
-- **Version Control**: GitHub integration via Octokit
+-   **Frontend**: A React and TypeScript application, using Vite for fast development, Wouter for routing, and TanStack Query for efficient data fetching. Styling is managed with Tailwind CSS and pre-built shadcn/ui components, ensuring a consistent and responsive user experience.
+-   **Backend**: An Express.js server written in TypeScript, handling API requests and business logic.
+-   **Database**: PostgreSQL is used as the primary data store, with Drizzle ORM providing a type-safe interface for database interactions.
+-   **Authentication**: Replit Auth (OpenID Connect) manages user authentication and authorization, supporting various login methods.
+-   **Payments**: Stripe is integrated for secure and reliable payment processing.
+-   **Monorepo Structure**: The project is organized into `client/`, `server/`, and `shared/` directories to promote code reusability and maintainability.
+-   **User Role System**: A robust role-based access control system differentiates between Customers, Vendors (Restaurants), Service Providers, and Admins, dynamically adjusting UI and API access based on the user's assigned role.
+-   **UI/UX Design**: The application features a clean, modern design with a Brazilian flag-inspired color scheme (Primary: Green, Secondary: Yellow/Gold, Accent: Blue) and uses Plus Jakarta Sans for typography to ensure readability and a professional appearance.
+-   **Mobile Application**: A companion React Native mobile app built with Expo SDK 51 provides a native mobile experience, mirroring the web platform's features and design, including persistent cart state via AsyncStorage and push notifications.
 
-## Project Structure
+**Core Features Implemented:**
 
-```
-├── client/                 # Frontend React application
-│   ├── src/
-│   │   ├── components/     # Reusable UI components
-│   │   │   └── ui/         # shadcn/ui components
-│   │   ├── hooks/          # Custom React hooks
-│   │   ├── lib/            # Utilities (cart context, query client)
-│   │   └── pages/          # Page components
-│   └── public/images/      # Generated images for the app
-├── server/                 # Express backend
-│   ├── db.ts               # Database connection
-│   ├── routes.ts           # API routes
-│   ├── storage.ts          # Database operations
-│   ├── seed.ts             # Seed data for restaurants
-│   └── replit_integrations/auth/  # Replit Auth integration
-└── shared/                 # Shared types and schemas
-    └── schema.ts           # Drizzle schema definitions
-```
+-   **Home Page**: Bilingual hero section, popular services, featured providers and restaurants, customer testimonials, and food categories.
+-   **Food Marketplace**: User authentication, food ordering, order tracking, vendor portal for menu and order management, and a robust review system with photo uploads and detailed ratings.
+-   **Services Marketplace**: Service discovery across various categories, detailed provider profiles, a booking system, a provider portal for managing services and bookings, and service-specific reviews.
+-   **Community Hub**: Discovery of local events with RSVP functionality, a business directory for Brazilian-owned businesses, and platform-wide announcements.
+-   **Admin Platform**: Comprehensive dashboard for managing users, restaurants, service providers, orders, bookings, events, businesses, and platform announcements, including content moderation.
 
-## Key Features (MVP)
+## External Dependencies
 
-### Home Page
-- **Bilingual Hero Section**: Welcome in Portuguese and English with CTAs for Food, Services, Community
-- **Popular Services**: 6 service categories with icons (Cleaning, Beauty, Legal, Fitness, Auto, Construction)
-- **Featured Providers**: Top service providers from the database
-- **Featured Restaurants**: Top-rated Brazilian restaurants
-- **Customer Testimonials**: 4 community reviews in Portuguese with English translations
-- **Food Categories**: Visual category cards (Churrasco, Acai, Salgados, Pao de Queijo)
-- **Vendor CTA**: Calls-to-action for restaurants and service providers to join
-
-### Food Marketplace
-1. **User Authentication**: Replit Auth with Google, GitHub, email login
-2. **Food Ordering**: Browse restaurants, view menus, add to cart, checkout
-3. **Order Tracking**: Real-time order status updates
-4. **Vendor Portal**: Manage restaurant, menu items, process orders
-5. **Reviews**: Rate and review orders with photos and detailed ratings (food quality, delivery, value)
-6. **Notifications**: Order updates and system notifications
-
-### Services Marketplace (Epic 4)
-1. **Service Discovery**: Browse 11 service categories (cleaning, beauty, legal, fitness, auto, immigration, education, construction, photography, translation, other)
-2. **Provider Profiles**: View provider details, services offered, reviews, ratings
-3. **Booking System**: Request service bookings with date/time/location
-4. **Provider Portal**: Manage services, respond to bookings, track status
-5. **Service Reviews**: Rate completed services with photos and detailed ratings (professionalism, communication, value)
-6. **Messaging**: In-app messaging between customers and providers
-
-### Reviews System (Epic 5)
-1. **Star Rating Component**: Reusable interactive star display
-2. **Food Reviews**: Photo uploads (up to 5), ratings for food quality, delivery, value
-3. **Service Reviews**: Photo uploads (up to 5), ratings for professionalism, communication, value
-4. **Review Display**: Expandable photo galleries, detailed sub-ratings, timestamps
-
-### Community Hub (Epic 6)
-1. **Events Discovery**: Browse community events by category (festivals, concerts, meetups, sports, cultural, food, workshops)
-2. **Event RSVP**: Mark attendance as going, interested, or not going
-3. **Business Directory**: Discover Brazilian-owned businesses across 12 categories
-4. **Announcements**: Platform announcements with news, promos, updates, and alerts
-5. **Featured Events**: Highlighted community events on the main page
-
-### Admin Platform (Epic 9)
-1. **Dashboard Overview**: Stats for users, restaurants, orders, providers, bookings, events, businesses, revenue
-2. **Restaurant Management**: Activate/deactivate restaurants, view all listings
-3. **Service Provider Management**: Verify providers, manage active status
-4. **Event Moderation**: Approve and feature community events
-5. **Business Verification**: Verify business listings in directory
-6. **Announcements**: Create, edit, delete platform announcements
-7. **Review Moderation**: Remove inappropriate reviews
-
-## Database Schema
-
-### Core Tables
-- **users**: User accounts (managed by Replit Auth)
-- **sessions**: Auth sessions
-- **user_roles**: User role assignments (customer, vendor, service_provider, admin)
-- **notifications**: User notifications
-
-### Food Marketplace Tables
-- **restaurants**: Restaurant profiles
-- **menu_items**: Menu items for each restaurant
-- **orders**: Customer food orders with status tracking
-- **reviews**: Customer reviews for food orders
-
-### Services Marketplace Tables
-- **service_providers**: Service provider profiles with category, location, rating
-- **services**: Individual services offered by each provider with pricing
-- **bookings**: Service booking requests with status tracking (pending, accepted, declined, confirmed, in_progress, completed, cancelled)
-- **service_reviews**: Customer reviews for completed service bookings
-- **messages**: In-app messaging between users (supports booking-linked conversations)
-
-### Mobile Support Tables
-- **push_tokens**: Push notification tokens for mobile devices (userId, token, platform, deviceId, isActive)
-
-## API Endpoints
-
-### Public
-- `GET /api/restaurants` - List all restaurants
-- `GET /api/restaurants/:id` - Get restaurant details
-- `GET /api/restaurants/:id/menu` - Get restaurant menu
-- `GET /api/restaurants/:id/reviews` - Get restaurant reviews
-
-### Protected (requires auth)
-- `GET /api/orders` - Get user's orders
-- `GET /api/orders/:id` - Get order details
-- `POST /api/orders` - Create new order
-- `POST /api/reviews` - Submit review
-- `GET /api/notifications` - Get user notifications
-- `PATCH /api/notifications/:id` - Mark notification as read
-
-### Restaurant Vendor Portal
-- `GET /api/vendor/restaurants` - Get vendor's restaurants
-- `POST /api/vendor/restaurants` - Create restaurant
-- `PATCH /api/vendor/restaurants/:id` - Update restaurant
-- `GET /api/vendor/restaurants/:id/menu` - Get menu items
-- `POST /api/vendor/restaurants/:id/menu` - Add menu item
-- `GET /api/vendor/restaurants/:id/orders` - Get restaurant orders
-- `PATCH /api/vendor/orders/:id` - Update order status
-
-### Services Marketplace (Public)
-- `GET /api/services/categories` - List all service categories
-- `GET /api/services/providers` - List providers (query: category, search)
-- `GET /api/services/providers/:id` - Get provider details
-- `GET /api/services/providers/:id/services` - Get provider's services
-- `GET /api/services/providers/:id/reviews` - Get provider's reviews
-
-### Services Marketplace (Protected)
-- `GET /api/bookings` - Get user's service bookings
-- `GET /api/bookings/:id` - Get booking details
-- `POST /api/bookings` - Create booking request
-- `POST /api/services/reviews` - Submit service review
-
-### Service Provider Portal
-- `GET /api/provider/profile` - Get provider profile
-- `POST /api/provider/profile` - Create provider profile
-- `PATCH /api/provider/profile` - Update provider profile
-- `GET /api/provider/services` - Get provider's services
-- `POST /api/provider/services` - Add new service
-- `GET /api/provider/bookings` - Get provider's bookings
-- `PATCH /api/provider/bookings/:id` - Update booking status
-
-### Messaging
-- `GET /api/messages/conversations` - List conversations
-- `GET /api/messages/:partnerId` - Get conversation with user
-- `POST /api/messages` - Send message
-
-### Community Hub
-- `GET /api/community/events` - List all events (query: category)
-- `GET /api/community/events/featured` - Get featured events
-- `GET /api/community/events/upcoming` - Get upcoming events
-- `GET /api/community/events/:id` - Get event details
-- `POST /api/community/events/:id/rsvp` - RSVP to event (protected)
-- `GET /api/community/businesses` - List businesses (query: category, search)
-- `GET /api/community/businesses/:id` - Get business details
-- `GET /api/community/announcements` - Get active announcements
-- `GET /api/community/event-categories` - List event categories
-- `GET /api/community/business-categories` - List business categories
-
-### Mobile API (Protected)
-- `POST /api/mobile/push-token` - Register push notification token (body: {token, platform: "ios"|"android"|"web", deviceId?})
-- `DELETE /api/mobile/push-token` - Deactivate push token on logout/uninstall (body: {token})
-- `GET /api/mobile/profile` - Get mobile user profile with roles, stats, and active devices
-- `GET /api/mobile/home` - Combined home feed (restaurants, events, announcements, providers, unread count)
-
-### Admin Platform (Protected - Admin role required)
-- `GET /api/admin/stats` - Dashboard statistics
-- `GET /api/admin/users` - List all users
-- `PATCH /api/admin/users/:id/roles` - Update user roles
-- `GET /api/admin/restaurants` - List all restaurants
-- `PATCH /api/admin/restaurants/:id` - Update restaurant status
-- `GET /api/admin/providers` - List all service providers
-- `PATCH /api/admin/providers/:id` - Update provider status/verification
-- `GET /api/admin/orders` - List all orders
-- `GET /api/admin/bookings` - List all bookings
-- `GET /api/admin/events` - List all events
-- `PATCH /api/admin/events/:id` - Update event approval/featured
-- `GET /api/admin/businesses` - List all businesses
-- `PATCH /api/admin/businesses/:id` - Update business verification
-- `GET /api/admin/announcements` - List all announcements
-- `POST /api/admin/announcements` - Create announcement
-- `PATCH /api/admin/announcements/:id` - Update announcement
-- `DELETE /api/admin/announcements/:id` - Delete announcement
-- `GET /api/admin/reviews` - List all reviews
-- `DELETE /api/admin/reviews/:id` - Delete review
-
-## Design System
-
-**Colors**: Brazilian flag inspired theme
-- Primary: Green (#1B9B59)
-- Secondary: Yellow/Gold (#FFCC00)
-- Accent: Blue (#006B3F)
-
-**Fonts**: Plus Jakarta Sans for clean, modern typography
-
-## Running the App
-
-The app runs on port 5000 with:
-- Express API server
-- Vite dev server for React frontend
-
-Database is automatically seeded with sample Brazilian restaurants and service providers on first run.
-
-## Frontend Routes
-
-### Food Marketplace
-- `/` - Home/Dashboard
-- `/restaurants` - Browse restaurants
-- `/restaurant/:id` - Restaurant detail with menu
-- `/cart` - Shopping cart
-- `/checkout` - Order checkout
-- `/orders` - Order history
-- `/orders/:id` - Order details
-- `/vendor` - Restaurant vendor portal
-
-### Services Marketplace
-- `/services` - Browse service providers (filterable by category)
-- `/services/provider/:id` - Provider detail with services
-- `/bookings` - User's service bookings
-- `/bookings/:id` - Booking details
-- `/provider-portal` - Service provider portal
-
-### Community Hub
-- `/community` - Community hub landing page
-- `/events` - Browse community events
-- `/businesses` - Business directory
-
-### Admin Platform
-- `/admin` - Admin dashboard (requires admin role)
-
-### General
-- `/notifications` - User notifications
-
-## Mobile App (React Native / Expo)
-
-A complete React Native mobile app lives in the `mobile/` directory, built with Expo SDK 51 and React Navigation.
-
-### Mobile App Structure
-```
-mobile/
-├── App.tsx                    # Root component
-├── src/
-│   ├── api/client.ts          # API client (brazadash.replit.app)
-│   ├── components/            # StarRating, LoadingScreen, StatusBadge, EmptyState
-│   ├── constants/             # Theme colors, categories, status labels
-│   ├── contexts/              # AuthContext, CartContext
-│   ├── navigation/index.tsx   # Tab + stack navigation
-│   ├── screens/               # All app screens (13 total)
-│   └── types/index.ts         # TypeScript interfaces
-```
-
-### Running the Mobile App
-```bash
-cd mobile
-npm install
-npx expo start
-```
-Scan the QR code with Expo Go app on your phone.
-
-### Mobile App Features
-- 5-tab bottom navigation: Home, Food, Services, Community, Profile
-- WebView-based OIDC authentication (Replit Auth)
-- Cart persisted with AsyncStorage
-- Pull-to-refresh on all list screens
-- Brazilian flag color theme matching web app
-
-## Development Notes
-
-- Use `npm run db:push` to sync database schema
-- Cart state persists in localStorage (web) / AsyncStorage (mobile)
-- Theme (light/dark) persists in localStorage
-- All protected routes require Replit Auth login
+-   **Replit Auth**: For user authentication and authorization.
+-   **PostgreSQL**: The relational database management system.
+-   **Stripe**: For payment processing.
+-   **Octokit**: For GitHub integration (likely for version control or API interaction).
+-   **Expo**: For building and running the React Native mobile application.
+-   **Vite**: Frontend build tool.
+-   **Wouter**: Frontend routing library.
+-   **TanStack Query**: For data fetching and state management.
+-   **Tailwind CSS**: Utility-first CSS framework.
+-   **shadcn/ui**: Component library.

@@ -38,6 +38,9 @@ function RoleBasedHome({ roles }: { roles: string[] }) {
   if (roles.includes("service_provider")) {
     return <Redirect to="/provider-portal" />;
   }
+  if (roles.includes("admin") && !roles.includes("customer")) {
+    return <Redirect to="/admin" />;
+  }
   return <HomePage />;
 }
 
@@ -69,8 +72,9 @@ function AppContent() {
 
   const roles = roleData?.roles || [];
   const hasNonAdminRole = roles.some(r => r !== "admin");
+  const isAdmin = roles.includes("admin");
 
-  if (!hasNonAdminRole) {
+  if (!hasNonAdminRole && !isAdmin) {
     return <OnboardingPage />;
   }
 
