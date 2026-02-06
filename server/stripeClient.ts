@@ -35,6 +35,17 @@ async function getCredentials() {
     return cachedCredentials;
   }
 
+  const isProduction = process.env.REPLIT_DEPLOYMENT === '1';
+
+  if (isProduction && process.env.STRIPE_LIVE_PUBLISHABLE_KEY && process.env.STRIPE_LIVE_SECRET_KEY) {
+    cachedCredentials = {
+      publishableKey: process.env.STRIPE_LIVE_PUBLISHABLE_KEY,
+      secretKey: process.env.STRIPE_LIVE_SECRET_KEY,
+    };
+    credentialsCacheTime = Date.now();
+    return cachedCredentials;
+  }
+
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
   const xReplitToken = process.env.REPL_IDENTITY
     ? 'repl ' + process.env.REPL_IDENTITY
@@ -46,7 +57,6 @@ async function getCredentials() {
     throw new Error('X_REPLIT_TOKEN not found for repl/depl');
   }
 
-  const isProduction = process.env.REPLIT_DEPLOYMENT === '1';
   const primaryEnv = isProduction ? 'production' : 'development';
 
   let creds = await fetchCredentialsForEnvironment(hostname!, xReplitToken, primaryEnv);
