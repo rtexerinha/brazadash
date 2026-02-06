@@ -151,7 +151,7 @@ export interface IStorage {
   addUserRole(userId: string, role: string): Promise<UserRole>;
   removeUserRole(userId: string, role: string): Promise<void>;
   getAllRestaurants(): Promise<Restaurant[]>;
-  getAllOrders(): Promise<Order[]>;
+  getAllOrders(): Promise<(Order & { restaurant?: { name: string } })[]>;
   getAllBookings(): Promise<Booking[]>;
   getAllEvents(): Promise<Event[]>;
   getAllBusinesses(): Promise<Business[]>;
@@ -776,8 +776,15 @@ class DatabaseStorage implements IStorage {
     return db.select().from(restaurants).orderBy(desc(restaurants.createdAt));
   }
 
-  async getAllOrders(): Promise<Order[]> {
-    return db.select().from(orders).orderBy(desc(orders.createdAt));
+  async getAllOrders(): Promise<(Order & { restaurant?: { name: string } })[]> {
+    const orderList = await db.select().from(orders).orderBy(desc(orders.createdAt));
+    const result = await Promise.all(
+      orderList.map(async (order) => {
+        const restaurant = await this.getRestaurant(order.restaurantId);
+        return { ...order, restaurant: restaurant ? { name: restaurant.name } : undefined };
+      })
+    );
+    return result;
   }
 
   async getAllBookings(): Promise<Booking[]> {
