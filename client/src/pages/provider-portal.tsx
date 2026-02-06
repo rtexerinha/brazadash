@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +15,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Briefcase, Plus, Star, Calendar, DollarSign, Users, Loader2, Check, X } from "lucide-react";
+import { useLanguage } from "@/lib/language-context";
+import { Briefcase, Plus, Star, Calendar, DollarSign, Users, Loader2, Check, X, Upload, ImageIcon, XCircle } from "lucide-react";
 import { z } from "zod";
 import type { ServiceProvider, Service, Booking } from "@shared/schema";
 
@@ -577,11 +578,191 @@ function ProviderDashboard({ provider }: { provider: ServiceProvider }) {
           )}
         </TabsContent>
 
-        <TabsContent value="settings" className="mt-6">
+        <TabsContent value="settings" className="mt-6 space-y-6">
+          <ProviderImageSettings provider={provider} />
           <ProviderBankSettings provider={provider} />
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+function ProviderImageSettings({ provider }: { provider: ServiceProvider }) {
+  const { t } = useLanguage();
+  const { toast } = useToast();
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+  const [logo, setLogo] = useState<string | null>(provider.imageUrl || null);
+  const [gallery, setGallery] = useState<string[]>((provider.galleryImages as string[]) || []);
+  const [uploading, setUploading] = useState(false);
+
+  const uploadFile = async (file: File): Promise<string | null> => {
+    const formData = new FormData();
+    formData.append("image", file);
+    try {
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Upload failed");
+      const data = await res.json();
+      return data.url;
+    } catch {
+      toast({ title: t("common.error"), description: t("settings.uploadFailed"), variant: "destructive" });
+      return null;
+    }
+  };
+
+  const saveLogo = useMutation({
+    mutationFn: async (url: string) => {
+      return apiRequest("PATCH", "/api/provider/profile", { imageUrl: url });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/provider/profile"] });
+      toast({ title: t("settings.logoSaved") });
+    },
+  });
+
+  const saveGallery = useMutation({
+    mutationFn: async (images: string[]) => {
+      return apiRequest("PATCH", "/api/provider/profile", { galleryImages: images });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/provider/profile"] });
+      toast({ title: t("settings.gallerySaved") });
+    },
+  });
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    const url = await uploadFile(file);
+    if (url) {
+      setLogo(url);
+      saveLogo.mutate(url);
+    }
+    setUploading(false);
+    if (logoInputRef.current) logoInputRef.current.value = "";
+  };
+
+  const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    const newUrls: string[] = [];
+    for (const file of Array.from(files)) {
+      const url = await uploadFile(file);
+      if (url) newUrls.push(url);
+    }
+    if (newUrls.length > 0) {
+      const updated = [...gallery, ...newUrls];
+      setGallery(updated);
+      saveGallery.mutate(updated);
+    }
+    setUploading(false);
+    if (galleryInputRef.current) galleryInputRef.current.value = "";
+  };
+
+  const removeGalleryImage = (index: number) => {
+    const updated = gallery.filter((_, i) => i !== index);
+    setGallery(updated);
+    saveGallery.mutate(updated);
+  };
+
+  return (
+    <Card>
+      <CardContent className="p-6">
+        <h3 className="text-lg font-semibold mb-2">{t("settings.businessImages")}</h3>
+        <p className="text-sm text-muted-foreground mb-6">
+          {t("settings.businessImagesDesc")}
+        </p>
+
+        <div className="space-y-6">
+          <div>
+            <Label className="mb-2 block">{t("settings.businessLogo")}</Label>
+            <div className="flex items-center gap-4">
+              {logo ? (
+                <div className="relative w-24 h-24 rounded-md overflow-hidden border">
+                  <img src={logo} alt="Logo" className="w-full h-full object-cover" />
+                  <button
+                    onClick={() => {
+                      setLogo(null);
+                      saveLogo.mutate("");
+                    }}
+                    className="absolute top-1 right-1 bg-background/80 rounded-full p-0.5"
+                    data-testid="button-provider-remove-logo"
+                  >
+                    <XCircle className="h-4 w-4 text-destructive" />
+                  </button>
+                </div>
+              ) : (
+                <div className="w-24 h-24 rounded-md border border-dashed flex items-center justify-center bg-muted/30">
+                  <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                </div>
+              )}
+              <div>
+                <input
+                  ref={logoInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  onChange={handleLogoUpload}
+                  data-testid="input-provider-logo-upload"
+                />
+                <Button
+                  variant="outline"
+                  onClick={() => logoInputRef.current?.click()}
+                  disabled={uploading || saveLogo.isPending}
+                  data-testid="button-provider-upload-logo"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  {uploading ? t("common.saving") : t("settings.uploadLogo")}
+                </Button>
+                <p className="text-xs text-muted-foreground mt-1">{t("settings.imageRequirements")}</p>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <Label className="mb-2 block">{t("settings.businessPhotos")}</Label>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-3">
+              {gallery.map((url, i) => (
+                <div key={i} className="relative aspect-video rounded-md overflow-hidden border group">
+                  <img src={url} alt={`Photo ${i + 1}`} className="w-full h-full object-cover" />
+                  <button
+                    onClick={() => removeGalleryImage(i)}
+                    className="absolute top-1 right-1 bg-background/80 rounded-full p-0.5 invisible group-hover:visible"
+                    data-testid={`button-provider-remove-gallery-${i}`}
+                  >
+                    <XCircle className="h-4 w-4 text-destructive" />
+                  </button>
+                </div>
+              ))}
+              <div
+                className="aspect-video rounded-md border border-dashed flex flex-col items-center justify-center cursor-pointer bg-muted/30 hover-elevate"
+                onClick={() => galleryInputRef.current?.click()}
+                data-testid="button-provider-add-gallery-photo"
+              >
+                <Plus className="h-6 w-6 text-muted-foreground mb-1" />
+                <span className="text-xs text-muted-foreground">{t("settings.addPhoto")}</span>
+              </div>
+            </div>
+            <input
+              ref={galleryInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              multiple
+              className="hidden"
+              onChange={handleGalleryUpload}
+              data-testid="input-provider-gallery-upload"
+            />
+            <p className="text-xs text-muted-foreground">{t("settings.galleryDesc")}</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

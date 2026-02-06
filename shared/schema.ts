@@ -25,6 +25,7 @@ export const restaurants = pgTable("restaurants", {
   city: varchar("city", { length: 100 }),
   phone: varchar("phone", { length: 20 }),
   imageUrl: text("image_url"),
+  galleryImages: jsonb("gallery_images"),
   rating: decimal("rating", { precision: 2, scale: 1 }).default("0"),
   reviewCount: integer("review_count").default(0),
   deliveryFee: decimal("delivery_fee", { precision: 10, scale: 2 }).default("3.99"),

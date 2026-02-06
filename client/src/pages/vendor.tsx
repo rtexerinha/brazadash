@@ -970,7 +970,13 @@ function VendorDashboard({ restaurant }: { restaurant: Restaurant }) {
           )}
         </TabsContent>
 
-        <TabsContent value="settings" className="mt-6">
+        <TabsContent value="settings" className="mt-6 space-y-6">
+          <BusinessImageSettings
+            type="restaurant"
+            entityId={restaurant.id}
+            currentLogo={restaurant.imageUrl || null}
+            currentGallery={(restaurant.galleryImages as string[]) || []}
+          />
           <BankInfoSettings
             type="restaurant"
             entityId={restaurant.id}
@@ -985,6 +991,193 @@ function VendorDashboard({ restaurant }: { restaurant: Restaurant }) {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+function BusinessImageSettings({ type, entityId, currentLogo, currentGallery }: {
+  type: "restaurant" | "provider";
+  entityId: string;
+  currentLogo: string | null;
+  currentGallery: string[];
+}) {
+  const { t } = useLanguage();
+  const { toast } = useToast();
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+  const [logo, setLogo] = useState<string | null>(currentLogo);
+  const [gallery, setGallery] = useState<string[]>(currentGallery);
+  const [uploading, setUploading] = useState(false);
+
+  const patchEndpoint = type === "restaurant"
+    ? `/api/vendor/restaurants/${entityId}`
+    : "/api/provider/profile";
+  const cacheKey = type === "restaurant" ? "/api/vendor/restaurants" : "/api/provider/profile";
+
+  const uploadFile = async (file: File): Promise<string | null> => {
+    const formData = new FormData();
+    formData.append("image", file);
+    try {
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Upload failed");
+      const data = await res.json();
+      return data.url;
+    } catch {
+      toast({ title: t("common.error"), description: t("settings.uploadFailed"), variant: "destructive" });
+      return null;
+    }
+  };
+
+  const saveLogo = useMutation({
+    mutationFn: async (url: string) => {
+      return apiRequest("PATCH", patchEndpoint, { imageUrl: url });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [cacheKey] });
+      toast({ title: t("settings.logoSaved") });
+    },
+  });
+
+  const saveGallery = useMutation({
+    mutationFn: async (images: string[]) => {
+      return apiRequest("PATCH", patchEndpoint, { galleryImages: images });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [cacheKey] });
+      toast({ title: t("settings.gallerySaved") });
+    },
+  });
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    const url = await uploadFile(file);
+    if (url) {
+      setLogo(url);
+      saveLogo.mutate(url);
+    }
+    setUploading(false);
+    if (logoInputRef.current) logoInputRef.current.value = "";
+  };
+
+  const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    const newUrls: string[] = [];
+    for (const file of Array.from(files)) {
+      const url = await uploadFile(file);
+      if (url) newUrls.push(url);
+    }
+    if (newUrls.length > 0) {
+      const updated = [...gallery, ...newUrls];
+      setGallery(updated);
+      saveGallery.mutate(updated);
+    }
+    setUploading(false);
+    if (galleryInputRef.current) galleryInputRef.current.value = "";
+  };
+
+  const removeGalleryImage = (index: number) => {
+    const updated = gallery.filter((_, i) => i !== index);
+    setGallery(updated);
+    saveGallery.mutate(updated);
+  };
+
+  return (
+    <Card>
+      <CardContent className="p-6">
+        <h3 className="text-lg font-semibold mb-2">{t("settings.businessImages")}</h3>
+        <p className="text-sm text-muted-foreground mb-6">{t("settings.businessImagesDesc")}</p>
+
+        <div className="space-y-6">
+          <div>
+            <Label className="mb-2 block">{t("settings.businessLogo")}</Label>
+            <div className="flex items-center gap-4">
+              {logo ? (
+                <div className="relative w-24 h-24 rounded-md overflow-hidden border">
+                  <img src={logo} alt="Logo" className="w-full h-full object-cover" />
+                  <button
+                    onClick={() => {
+                      setLogo(null);
+                      saveLogo.mutate("");
+                    }}
+                    className="absolute top-1 right-1 bg-background/80 rounded-full p-0.5"
+                    data-testid="button-remove-logo"
+                  >
+                    <XCircle className="h-4 w-4 text-destructive" />
+                  </button>
+                </div>
+              ) : (
+                <div className="w-24 h-24 rounded-md border border-dashed flex items-center justify-center bg-muted/30">
+                  <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                </div>
+              )}
+              <div>
+                <input
+                  ref={logoInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  onChange={handleLogoUpload}
+                  data-testid="input-logo-upload"
+                />
+                <Button
+                  variant="outline"
+                  onClick={() => logoInputRef.current?.click()}
+                  disabled={uploading || saveLogo.isPending}
+                  data-testid="button-upload-logo"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  {uploading ? t("common.saving") : t("settings.uploadLogo")}
+                </Button>
+                <p className="text-xs text-muted-foreground mt-1">{t("settings.imageRequirements")}</p>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <Label className="mb-2 block">{t("settings.businessPhotos")}</Label>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-3">
+              {gallery.map((url, i) => (
+                <div key={i} className="relative aspect-video rounded-md overflow-hidden border group">
+                  <img src={url} alt={`Photo ${i + 1}`} className="w-full h-full object-cover" />
+                  <button
+                    onClick={() => removeGalleryImage(i)}
+                    className="absolute top-1 right-1 bg-background/80 rounded-full p-0.5 invisible group-hover:visible"
+                    data-testid={`button-remove-gallery-${i}`}
+                  >
+                    <XCircle className="h-4 w-4 text-destructive" />
+                  </button>
+                </div>
+              ))}
+              <div
+                className="aspect-video rounded-md border border-dashed flex flex-col items-center justify-center cursor-pointer bg-muted/30 hover-elevate"
+                onClick={() => galleryInputRef.current?.click()}
+                data-testid="button-add-gallery-photo"
+              >
+                <Plus className="h-6 w-6 text-muted-foreground mb-1" />
+                <span className="text-xs text-muted-foreground">{t("settings.addPhoto")}</span>
+              </div>
+            </div>
+            <input
+              ref={galleryInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              multiple
+              className="hidden"
+              onChange={handleGalleryUpload}
+              data-testid="input-gallery-upload"
+            />
+            <p className="text-xs text-muted-foreground">{t("settings.galleryDesc")}</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
