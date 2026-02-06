@@ -2111,6 +2111,169 @@ export async function registerRoutes(
   });
 
   // =================
+  // ADMIN FINANCIAL REPORT
+  // =================
+
+  app.get("/api/admin/financial-report", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const weekOffset = parseInt(req.query.weekOffset as string || "0");
+      
+      const now = new Date();
+      const currentDay = now.getDay();
+      const startOfCurrentWeek = new Date(now);
+      startOfCurrentWeek.setDate(now.getDate() - currentDay + (weekOffset * 7));
+      startOfCurrentWeek.setHours(0, 0, 0, 0);
+      
+      const endOfWeek = new Date(startOfCurrentWeek);
+      endOfWeek.setDate(startOfCurrentWeek.getDate() + 7);
+
+      const allOrders = await storage.getAllOrders();
+      const allBookings = await storage.getAllBookings();
+      const allRestaurants = await storage.getAllRestaurants();
+      const allProviders = await storage.getAllServiceProviders();
+
+      const weekOrders = allOrders.filter(o => {
+        const d = o.createdAt ? new Date(o.createdAt) : null;
+        return d && d >= startOfCurrentWeek && d < endOfWeek && o.status !== "cancelled";
+      });
+
+      const weekBookings = allBookings.filter(b => {
+        const d = b.createdAt ? new Date(b.createdAt) : null;
+        return d && d >= startOfCurrentWeek && d < endOfWeek && b.isPaid && b.status !== "cancelled";
+      });
+
+      const PLATFORM_FEE_RATE = 0.08;
+      const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+      const restaurantReports = allRestaurants.map(r => {
+        const rOrders = weekOrders.filter(o => o.restaurantId === r.id);
+        const dailyBreakdown = Array.from({ length: 7 }, (_, i) => {
+          const dayDate = new Date(startOfCurrentWeek);
+          dayDate.setDate(startOfCurrentWeek.getDate() + i);
+          const dayEnd = new Date(dayDate);
+          dayEnd.setDate(dayDate.getDate() + 1);
+
+          const dayOrders = rOrders.filter(o => {
+            const d = new Date(o.createdAt!);
+            return d >= dayDate && d < dayEnd;
+          });
+
+          const grossRevenue = dayOrders.reduce((sum, o) => sum + parseFloat(o.subtotal || "0"), 0);
+          const platformFee = Math.round(grossRevenue * PLATFORM_FEE_RATE * 100) / 100;
+          const netPayout = Math.round((grossRevenue - platformFee) * 100) / 100;
+
+          return {
+            day: dayNames[i],
+            date: dayDate.toISOString().split("T")[0],
+            orders: dayOrders.length,
+            grossRevenue: Math.round(grossRevenue * 100) / 100,
+            platformFee,
+            netPayout,
+          };
+        });
+
+        const totalGross = dailyBreakdown.reduce((s, d) => s + d.grossRevenue, 0);
+        const totalPlatformFee = dailyBreakdown.reduce((s, d) => s + d.platformFee, 0);
+        const totalNet = dailyBreakdown.reduce((s, d) => s + d.netPayout, 0);
+        const totalOrders = dailyBreakdown.reduce((s, d) => s + d.orders, 0);
+
+        return {
+          type: "restaurant" as const,
+          id: r.id,
+          name: r.name,
+          totalOrders,
+          grossRevenue: Math.round(totalGross * 100) / 100,
+          platformFee: Math.round(totalPlatformFee * 100) / 100,
+          netPayout: Math.round(totalNet * 100) / 100,
+          dailyBreakdown,
+        };
+      }).filter(r => r.totalOrders > 0 || true);
+
+      const providerReports = allProviders.map(p => {
+        const pBookings = weekBookings.filter(b => b.providerId === p.id);
+        const dailyBreakdown = Array.from({ length: 7 }, (_, i) => {
+          const dayDate = new Date(startOfCurrentWeek);
+          dayDate.setDate(startOfCurrentWeek.getDate() + i);
+          const dayEnd = new Date(dayDate);
+          dayEnd.setDate(dayDate.getDate() + 1);
+
+          const dayBookings = pBookings.filter(b => {
+            const d = new Date(b.createdAt!);
+            return d >= dayDate && d < dayEnd;
+          });
+
+          const serviceRevenue = dayBookings.reduce((sum, b) => sum + parseFloat(b.price || "0"), 0);
+          const bookingFeeRevenue = dayBookings.reduce((sum, b) => sum + parseFloat(b.bookingFee || "0"), 0);
+          const totalPaid = dayBookings.reduce((sum, b) => sum + parseFloat(b.totalPaid || "0"), 0);
+          const platformFee = Math.round(serviceRevenue * PLATFORM_FEE_RATE * 100) / 100;
+          const netPayout = Math.round((serviceRevenue + bookingFeeRevenue - platformFee) * 100) / 100;
+
+          return {
+            day: dayNames[i],
+            date: dayDate.toISOString().split("T")[0],
+            bookings: dayBookings.length,
+            serviceRevenue: Math.round(serviceRevenue * 100) / 100,
+            bookingFeeRevenue: Math.round(bookingFeeRevenue * 100) / 100,
+            totalPaid: Math.round(totalPaid * 100) / 100,
+            platformFee,
+            netPayout,
+          };
+        });
+
+        const totalServiceRev = dailyBreakdown.reduce((s, d) => s + d.serviceRevenue, 0);
+        const totalBookingFeeRev = dailyBreakdown.reduce((s, d) => s + d.bookingFeeRevenue, 0);
+        const totalPlatformFee = dailyBreakdown.reduce((s, d) => s + d.platformFee, 0);
+        const totalNet = dailyBreakdown.reduce((s, d) => s + d.netPayout, 0);
+        const totalBookings = dailyBreakdown.reduce((s, d) => s + d.bookings, 0);
+        const totalPaidAmount = dailyBreakdown.reduce((s, d) => s + d.totalPaid, 0);
+
+        return {
+          type: "provider" as const,
+          id: p.id,
+          name: p.businessName,
+          totalBookings,
+          serviceRevenue: Math.round(totalServiceRev * 100) / 100,
+          bookingFeeRevenue: Math.round(totalBookingFeeRev * 100) / 100,
+          totalPaid: Math.round(totalPaidAmount * 100) / 100,
+          platformFee: Math.round(totalPlatformFee * 100) / 100,
+          netPayout: Math.round(totalNet * 100) / 100,
+          dailyBreakdown,
+        };
+      }).filter(p => p.totalBookings > 0 || true);
+
+      const weekStart = startOfCurrentWeek.toISOString().split("T")[0];
+      const weekEndDate = new Date(endOfWeek);
+      weekEndDate.setDate(weekEndDate.getDate() - 1);
+      const weekEndStr = weekEndDate.toISOString().split("T")[0];
+
+      const totalPlatformRevenue = 
+        restaurantReports.reduce((s, r) => s + r.platformFee, 0) +
+        providerReports.reduce((s, p) => s + p.platformFee, 0);
+
+      const totalPayouts =
+        restaurantReports.reduce((s, r) => s + r.netPayout, 0) +
+        providerReports.reduce((s, p) => s + p.netPayout, 0);
+
+      res.json({
+        weekStart,
+        weekEnd: weekEndStr,
+        weekOffset,
+        restaurants: restaurantReports,
+        providers: providerReports,
+        summary: {
+          totalPlatformRevenue: Math.round(totalPlatformRevenue * 100) / 100,
+          totalPayouts: Math.round(totalPayouts * 100) / 100,
+          totalOrders: weekOrders.length,
+          totalBookings: weekBookings.length,
+        },
+      });
+    } catch (error) {
+      console.error("Error generating financial report:", error);
+      res.status(500).json({ error: "Failed to generate financial report" });
+    }
+  });
+
+  // =================
   // MOBILE API ROUTES
   // =================
 

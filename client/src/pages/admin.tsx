@@ -30,8 +30,10 @@ import { Label } from "@/components/ui/label";
 import {
   Users, Store, ShoppingBag, Briefcase, Calendar, Building2, Megaphone,
   Star, DollarSign, CheckCircle, XCircle, Shield, Plus, AlertTriangle,
-  Trash2, UserPlus, UserMinus, Filter, X, Clock
+  Trash2, UserPlus, UserMinus, Filter, X, Clock, ChevronLeft, ChevronRight,
+  FileText, TrendingUp
 } from "lucide-react";
+import { useLanguage } from "@/lib/language-context";
 
 interface AdminStats {
   totalUsers: number;
@@ -73,6 +75,64 @@ interface PendingApproval {
   } | null;
 }
 
+interface RestaurantDayBreakdown {
+  day: string;
+  date: string;
+  orders: number;
+  grossRevenue: number;
+  platformFee: number;
+  netPayout: number;
+}
+
+interface ProviderDayBreakdown {
+  day: string;
+  date: string;
+  bookings: number;
+  serviceRevenue: number;
+  bookingFeeRevenue: number;
+  totalPaid: number;
+  platformFee: number;
+  netPayout: number;
+}
+
+interface RestaurantReport {
+  type: "restaurant";
+  id: string;
+  name: string;
+  totalOrders: number;
+  grossRevenue: number;
+  platformFee: number;
+  netPayout: number;
+  dailyBreakdown: RestaurantDayBreakdown[];
+}
+
+interface ProviderReport {
+  type: "provider";
+  id: string;
+  name: string;
+  totalBookings: number;
+  serviceRevenue: number;
+  bookingFeeRevenue: number;
+  totalPaid: number;
+  platformFee: number;
+  netPayout: number;
+  dailyBreakdown: ProviderDayBreakdown[];
+}
+
+interface FinancialReport {
+  weekStart: string;
+  weekEnd: string;
+  weekOffset: number;
+  restaurants: RestaurantReport[];
+  providers: ProviderReport[];
+  summary: {
+    totalPlatformRevenue: number;
+    totalPayouts: number;
+    totalOrders: number;
+    totalBookings: number;
+  };
+}
+
 const ALL_ROLES = ["customer", "vendor", "service_provider", "admin"] as const;
 
 export default function AdminPage() {
@@ -85,6 +145,9 @@ export default function AdminPage() {
   const [orderFilterRestaurant, setOrderFilterRestaurant] = useState<string>("all");
   const [orderFilterDateFrom, setOrderFilterDateFrom] = useState<string>("");
   const [orderFilterDateTo, setOrderFilterDateTo] = useState<string>("");
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [expandedBusiness, setExpandedBusiness] = useState<string | null>(null);
+  const { t } = useLanguage();
   const [newAnnouncement, setNewAnnouncement] = useState({
     title: "",
     content: "",
@@ -97,6 +160,16 @@ export default function AdminPage() {
   const { data: stats, isLoading: statsLoading, error: statsError } = useQuery<AdminStats>({
     queryKey: ["/api/admin/stats"],
     retry: false,
+  });
+
+  const { data: financialReport, isLoading: reportLoading } = useQuery<FinancialReport>({
+    queryKey: ["/api/admin/financial-report", weekOffset],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/financial-report?weekOffset=${weekOffset}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+    enabled: activeTab === "overview" && !accessDenied,
   });
 
   const { data: usersData } = useQuery<AdminUser[]>({
@@ -533,6 +606,266 @@ export default function AdminPage() {
                 </CardContent>
               </Card>
             )}
+
+            {/* Weekly Financial Report */}
+            <Card className="mt-6">
+              <CardHeader>
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <FileText className="h-5 w-5" />
+                      {t("admin.weeklyFinancialReport")}
+                    </CardTitle>
+                    <CardDescription>
+                      {t("admin.financialReportDesc")}
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setWeekOffset(prev => prev - 1)}
+                      data-testid="button-prev-week"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="text-sm font-medium min-w-[180px] text-center" data-testid="text-week-range">
+                      {financialReport ? `${financialReport.weekStart} — ${financialReport.weekEnd}` : "..."}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setWeekOffset(prev => prev + 1)}
+                      disabled={weekOffset >= 0}
+                      data-testid="button-next-week"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                    {weekOffset !== 0 && (
+                      <Button variant="outline" size="sm" onClick={() => setWeekOffset(0)} data-testid="button-current-week">
+                        {t("admin.currentWeek")}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {reportLoading ? (
+                  <div className="space-y-4">
+                    <Skeleton className="h-20" />
+                    <Skeleton className="h-20" />
+                    <Skeleton className="h-20" />
+                  </div>
+                ) : financialReport ? (
+                  <div className="space-y-6">
+                    {/* Summary Cards */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <Card>
+                        <CardContent className="p-4">
+                          <p className="text-sm text-muted-foreground">{t("admin.weeklyOrders")}</p>
+                          <p className="text-2xl font-bold" data-testid="text-weekly-orders">{financialReport.summary.totalOrders}</p>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="p-4">
+                          <p className="text-sm text-muted-foreground">{t("admin.weeklyBookings")}</p>
+                          <p className="text-2xl font-bold" data-testid="text-weekly-bookings">{financialReport.summary.totalBookings}</p>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="p-4">
+                          <p className="text-sm text-muted-foreground">{t("admin.platformRevenue")}</p>
+                          <p className="text-2xl font-bold text-green-600" data-testid="text-platform-revenue">
+                            ${financialReport.summary.totalPlatformRevenue.toFixed(2)}
+                          </p>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="p-4">
+                          <p className="text-sm text-muted-foreground">{t("admin.totalPayouts")}</p>
+                          <p className="text-2xl font-bold" data-testid="text-total-payouts">
+                            ${financialReport.summary.totalPayouts.toFixed(2)}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Restaurants Section */}
+                    {financialReport.restaurants.length > 0 && (
+                      <div>
+                        <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
+                          <Store className="h-5 w-5" />
+                          {t("admin.restaurantPayouts")}
+                        </h3>
+                        <div className="space-y-3">
+                          {financialReport.restaurants.map(r => (
+                            <Card key={r.id} data-testid={`report-restaurant-${r.id}`}>
+                              <CardContent className="p-4">
+                                <div
+                                  className="flex items-center justify-between gap-4 cursor-pointer flex-wrap"
+                                  onClick={() => setExpandedBusiness(expandedBusiness === r.id ? null : r.id)}
+                                  data-testid={`button-expand-${r.id}`}
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <Store className="h-4 w-4 text-muted-foreground" />
+                                    <div>
+                                      <p className="font-medium">{r.name}</p>
+                                      <p className="text-sm text-muted-foreground">{r.totalOrders} {t("admin.ordersThisWeek")}</p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-6 flex-wrap">
+                                    <div className="text-right">
+                                      <p className="text-xs text-muted-foreground">{t("admin.grossRevenue")}</p>
+                                      <p className="font-medium">${r.grossRevenue.toFixed(2)}</p>
+                                    </div>
+                                    <div className="text-right">
+                                      <p className="text-xs text-muted-foreground">{t("admin.platformFee8")}</p>
+                                      <p className="font-medium text-green-600">${r.platformFee.toFixed(2)}</p>
+                                    </div>
+                                    <div className="text-right">
+                                      <p className="text-xs text-muted-foreground">{t("admin.netPayout")}</p>
+                                      <p className="font-bold">${r.netPayout.toFixed(2)}</p>
+                                    </div>
+                                    <ChevronRight className={`h-4 w-4 transition-transform ${expandedBusiness === r.id ? "rotate-90" : ""}`} />
+                                  </div>
+                                </div>
+                                {expandedBusiness === r.id && (
+                                  <div className="mt-4 overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                      <thead>
+                                        <tr className="border-b">
+                                          <th className="text-left py-2 pr-4 font-medium">{t("admin.day")}</th>
+                                          <th className="text-left py-2 pr-4 font-medium">{t("admin.date")}</th>
+                                          <th className="text-right py-2 pr-4 font-medium">{t("admin.colOrders")}</th>
+                                          <th className="text-right py-2 pr-4 font-medium">{t("admin.gross")}</th>
+                                          <th className="text-right py-2 pr-4 font-medium">{t("admin.fee")}</th>
+                                          <th className="text-right py-2 font-medium">{t("admin.colPayout")}</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {r.dailyBreakdown.map(day => (
+                                          <tr key={day.date} className="border-b last:border-0">
+                                            <td className="py-2 pr-4">{day.day}</td>
+                                            <td className="py-2 pr-4 text-muted-foreground">{day.date}</td>
+                                            <td className="py-2 pr-4 text-right">{day.orders}</td>
+                                            <td className="py-2 pr-4 text-right">${day.grossRevenue.toFixed(2)}</td>
+                                            <td className="py-2 pr-4 text-right text-green-600">${day.platformFee.toFixed(2)}</td>
+                                            <td className="py-2 text-right font-medium">${day.netPayout.toFixed(2)}</td>
+                                          </tr>
+                                        ))}
+                                        <tr className="font-bold border-t-2">
+                                          <td className="py-2 pr-4" colSpan={2}>{t("admin.weekTotal")}</td>
+                                          <td className="py-2 pr-4 text-right">{r.totalOrders}</td>
+                                          <td className="py-2 pr-4 text-right">${r.grossRevenue.toFixed(2)}</td>
+                                          <td className="py-2 pr-4 text-right text-green-600">${r.platformFee.toFixed(2)}</td>
+                                          <td className="py-2 text-right">${r.netPayout.toFixed(2)}</td>
+                                        </tr>
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                )}
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Service Providers Section */}
+                    {financialReport.providers.length > 0 && (
+                      <div>
+                        <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
+                          <Briefcase className="h-5 w-5" />
+                          {t("admin.providerPayouts")}
+                        </h3>
+                        <div className="space-y-3">
+                          {financialReport.providers.map(p => (
+                            <Card key={p.id} data-testid={`report-provider-${p.id}`}>
+                              <CardContent className="p-4">
+                                <div
+                                  className="flex items-center justify-between gap-4 cursor-pointer flex-wrap"
+                                  onClick={() => setExpandedBusiness(expandedBusiness === p.id ? null : p.id)}
+                                  data-testid={`button-expand-${p.id}`}
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <Briefcase className="h-4 w-4 text-muted-foreground" />
+                                    <div>
+                                      <p className="font-medium">{p.name}</p>
+                                      <p className="text-sm text-muted-foreground">{p.totalBookings} {t("admin.bookingsThisWeek")}</p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-6 flex-wrap">
+                                    <div className="text-right">
+                                      <p className="text-xs text-muted-foreground">{t("admin.totalCollected")}</p>
+                                      <p className="font-medium">${p.totalPaid.toFixed(2)}</p>
+                                    </div>
+                                    <div className="text-right">
+                                      <p className="text-xs text-muted-foreground">{t("admin.platformFee8")}</p>
+                                      <p className="font-medium text-green-600">${p.platformFee.toFixed(2)}</p>
+                                    </div>
+                                    <div className="text-right">
+                                      <p className="text-xs text-muted-foreground">{t("admin.netPayout")}</p>
+                                      <p className="font-bold">${p.netPayout.toFixed(2)}</p>
+                                    </div>
+                                    <ChevronRight className={`h-4 w-4 transition-transform ${expandedBusiness === p.id ? "rotate-90" : ""}`} />
+                                  </div>
+                                </div>
+                                {expandedBusiness === p.id && (
+                                  <div className="mt-4 overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                      <thead>
+                                        <tr className="border-b">
+                                          <th className="text-left py-2 pr-4 font-medium">{t("admin.day")}</th>
+                                          <th className="text-left py-2 pr-4 font-medium">{t("admin.date")}</th>
+                                          <th className="text-right py-2 pr-4 font-medium">{t("admin.colBookings")}</th>
+                                          <th className="text-right py-2 pr-4 font-medium">{t("admin.colServices")}</th>
+                                          <th className="text-right py-2 pr-4 font-medium">{t("admin.bookingFees")}</th>
+                                          <th className="text-right py-2 pr-4 font-medium">{t("admin.fee")}</th>
+                                          <th className="text-right py-2 font-medium">{t("admin.colPayout")}</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {p.dailyBreakdown.map(day => (
+                                          <tr key={day.date} className="border-b last:border-0">
+                                            <td className="py-2 pr-4">{day.day}</td>
+                                            <td className="py-2 pr-4 text-muted-foreground">{day.date}</td>
+                                            <td className="py-2 pr-4 text-right">{day.bookings}</td>
+                                            <td className="py-2 pr-4 text-right">${day.serviceRevenue.toFixed(2)}</td>
+                                            <td className="py-2 pr-4 text-right">${day.bookingFeeRevenue.toFixed(2)}</td>
+                                            <td className="py-2 pr-4 text-right text-green-600">${day.platformFee.toFixed(2)}</td>
+                                            <td className="py-2 text-right font-medium">${day.netPayout.toFixed(2)}</td>
+                                          </tr>
+                                        ))}
+                                        <tr className="font-bold border-t-2">
+                                          <td className="py-2 pr-4" colSpan={2}>{t("admin.weekTotal")}</td>
+                                          <td className="py-2 pr-4 text-right">{p.totalBookings}</td>
+                                          <td className="py-2 pr-4 text-right">${p.serviceRevenue.toFixed(2)}</td>
+                                          <td className="py-2 pr-4 text-right">${p.bookingFeeRevenue.toFixed(2)}</td>
+                                          <td className="py-2 pr-4 text-right text-green-600">${p.platformFee.toFixed(2)}</td>
+                                          <td className="py-2 text-right">${p.netPayout.toFixed(2)}</td>
+                                        </tr>
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                )}
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {financialReport.restaurants.every(r => r.totalOrders === 0) && 
+                     financialReport.providers.every(p => p.totalBookings === 0) && (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-30" />
+                        <p>{t("admin.noTransactionsWeek")}</p>
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="approvals">
