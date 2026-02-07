@@ -351,7 +351,17 @@ export default function EventsPage() {
               {featuredEvents.map((event) => {
                 const Icon = categoryIcons[event.category] || CalendarDays;
                 return (
-                  <Card key={event.id} className="border-2 border-primary/20 bg-primary/5">
+                  <Card key={event.id} className="border-2 border-primary/20 bg-primary/5 overflow-hidden">
+                    {event.imageUrl && (
+                      <div className="w-full h-48">
+                        <img
+                          src={event.imageUrl}
+                          alt={event.title}
+                          className="w-full h-full object-cover"
+                          data-testid={`img-event-featured-${event.id}`}
+                        />
+                      </div>
+                    )}
                     <CardHeader className="flex flex-row items-start justify-between gap-2">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2 flex-wrap">
@@ -456,7 +466,17 @@ export default function EventsPage() {
             {events.map((event) => {
               const Icon = categoryIcons[event.category] || CalendarDays;
               return (
-                <Card key={event.id} className="hover-elevate" data-testid={`card-event-${event.id}`}>
+                <Card key={event.id} className="hover-elevate overflow-hidden" data-testid={`card-event-${event.id}`}>
+                  {event.imageUrl && (
+                    <div className="w-full h-40">
+                      <img
+                        src={event.imageUrl}
+                        alt={event.title}
+                        className="w-full h-full object-cover"
+                        data-testid={`img-event-${event.id}`}
+                      />
+                    </div>
+                  )}
                   <CardHeader className="flex flex-row items-start justify-between gap-2">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2 flex-wrap">
