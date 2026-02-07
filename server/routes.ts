@@ -1628,8 +1628,15 @@ export async function registerRoutes(
   app.post("/api/community/events", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      const eventData = { ...req.body };
+      if (eventData.eventDate && typeof eventData.eventDate === "string") {
+        eventData.eventDate = new Date(eventData.eventDate);
+      }
+      if (eventData.endDate && typeof eventData.endDate === "string") {
+        eventData.endDate = new Date(eventData.endDate);
+      }
       const event = await storage.createEvent({
-        ...req.body,
+        ...eventData,
         createdBy: userId,
         isApproved: false,
         isFeatured: false,
