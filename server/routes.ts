@@ -1559,6 +1559,88 @@ export async function registerRoutes(
     }
   });
 
+  // Yellow Pages - Public
+  app.get("/api/community/yellow-pages", async (req, res) => {
+    try {
+      const category = req.query.category as string | undefined;
+      const city = req.query.city as string | undefined;
+      const search = req.query.search as string | undefined;
+      const listings = await storage.getYellowPages(category, city, search);
+      res.json(listings);
+    } catch (error) {
+      console.error("Error fetching yellow pages:", error);
+      res.status(500).json({ message: "Failed to fetch listings" });
+    }
+  });
+
+  app.get("/api/community/yellow-pages/cities", async (req, res) => {
+    try {
+      const cities = await storage.getYellowPageCities();
+      res.json(cities);
+    } catch (error) {
+      console.error("Error fetching cities:", error);
+      res.status(500).json({ message: "Failed to fetch cities" });
+    }
+  });
+
+  app.get("/api/community/yellow-pages/categories", async (req, res) => {
+    res.json([
+      { id: "room", name: "Room" },
+      { id: "shared-room", name: "Shared Room" },
+      { id: "house", name: "House" },
+      { id: "apartment", name: "Apartment" },
+      { id: "car", name: "Car" },
+      { id: "other", name: "Other" },
+    ]);
+  });
+
+  app.get("/api/community/yellow-pages/:id", async (req, res) => {
+    try {
+      const listing = await storage.getYellowPage(req.params.id);
+      if (!listing) {
+        return res.status(404).json({ message: "Listing not found" });
+      }
+      res.json(listing);
+    } catch (error) {
+      console.error("Error fetching listing:", error);
+      res.status(500).json({ message: "Failed to fetch listing" });
+    }
+  });
+
+  // Yellow Pages - User submission (requires auth)
+  app.post("/api/community/yellow-pages", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const listing = await storage.createYellowPage({
+        ...req.body,
+        createdBy: userId,
+        isApproved: false,
+        isActive: true,
+      });
+      res.status(201).json(listing);
+    } catch (error) {
+      console.error("Error creating yellow page listing:", error);
+      res.status(500).json({ message: "Failed to create listing" });
+    }
+  });
+
+  // Events - User submission (requires auth)
+  app.post("/api/community/events", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const event = await storage.createEvent({
+        ...req.body,
+        createdBy: userId,
+        isApproved: false,
+        isFeatured: false,
+      });
+      res.status(201).json(event);
+    } catch (error) {
+      console.error("Error creating event:", error);
+      res.status(500).json({ message: "Failed to create event" });
+    }
+  });
+
   // Announcements - Public
   app.get("/api/community/announcements", async (req, res) => {
     try {
@@ -2034,6 +2116,35 @@ export async function registerRoutes(
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ error: "Failed to delete announcement" });
+    }
+  });
+
+  // Yellow Pages management
+  app.get("/api/admin/yellow-pages", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const allListings = await storage.getAllYellowPages();
+      res.json(allListings);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch yellow pages" });
+    }
+  });
+
+  app.patch("/api/admin/yellow-pages/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { isApproved, isActive } = req.body;
+      const updated = await storage.updateYellowPage(req.params.id, { isApproved, isActive });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update listing" });
+    }
+  });
+
+  app.delete("/api/admin/yellow-pages/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      await storage.deleteYellowPage(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete listing" });
     }
   });
 

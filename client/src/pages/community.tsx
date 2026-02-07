@@ -9,7 +9,7 @@ import type { Event, Announcement } from "@shared/schema";
 import { 
   Calendar, MapPin, Clock, ArrowRight, Megaphone, 
   PartyPopper, Music, Users2, Dumbbell, ExternalLink,
-  Building2, Bell, Tag, AlertCircle, Newspaper
+  BookOpen, Bell, Tag, AlertCircle, Newspaper
 } from "lucide-react";
 
 const categoryIcons: Record<string, any> = {
@@ -98,23 +98,22 @@ export default function CommunityPage() {
               <CardHeader>
                 <div className="flex items-center gap-3">
                   <div className="p-3 rounded-lg bg-primary/10">
-                    <Building2 className="h-6 w-6 text-primary" />
+                    <BookOpen className="h-6 w-6 text-primary" />
                   </div>
                   <div>
-                    <CardTitle>{t("community.businessDirectory")}</CardTitle>
-                    <p className="text-sm text-muted-foreground">Brazilian-owned businesses</p>
+                    <CardTitle>{t("community.yellowPages")}</CardTitle>
+                    <p className="text-sm text-muted-foreground">{t("community.yellowPagesDesc")}</p>
                   </div>
                 </div>
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground">
-                  Find and support Brazilian-owned restaurants, stores, salons, 
-                  and professional services near you.
+                  {t("yp.subtitle")}
                 </p>
               </CardContent>
               <CardFooter>
-                <Button variant="ghost" className="gap-2" data-testid="link-browse-businesses">
-                  Browse Directory <ArrowRight className="h-4 w-4" />
+                <Button variant="ghost" className="gap-2" data-testid="link-browse-yellow-pages">
+                  {t("community.viewYellowPages")} <ArrowRight className="h-4 w-4" />
                 </Button>
               </CardFooter>
             </Card>

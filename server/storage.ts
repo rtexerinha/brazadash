@@ -1,7 +1,7 @@
 import { 
   restaurants, menuItems, orders, reviews, notifications, userRoles,
   serviceProviders, services, bookings, serviceReviews, messages,
-  events, businesses, announcements, eventRsvps, pushTokens,
+  events, businesses, announcements, eventRsvps, yellowPages, pushTokens,
   type Restaurant, type InsertRestaurant,
   type MenuItem, type InsertMenuItem,
   type Order, type InsertOrder,
@@ -17,6 +17,7 @@ import {
   type Business, type InsertBusiness,
   type Announcement, type InsertAnnouncement,
   type EventRsvp, type InsertEventRsvp,
+  type YellowPage, type InsertYellowPage,
   type PushToken, type InsertPushToken
 } from "@shared/schema";
 import { db } from "./db";
@@ -121,6 +122,15 @@ export interface IStorage {
   updateBusiness(id: string, data: Partial<InsertBusiness>): Promise<Business | undefined>;
   deleteBusiness(id: string): Promise<void>;
   
+  // Yellow Pages (Community Hub)
+  getYellowPages(category?: string, city?: string, search?: string): Promise<YellowPage[]>;
+  getYellowPage(id: string): Promise<YellowPage | undefined>;
+  createYellowPage(listing: InsertYellowPage): Promise<YellowPage>;
+  updateYellowPage(id: string, data: Partial<InsertYellowPage>): Promise<YellowPage | undefined>;
+  deleteYellowPage(id: string): Promise<void>;
+  getAllYellowPages(): Promise<YellowPage[]>;
+  getYellowPageCities(): Promise<string[]>;
+
   // Announcements (Community Hub)
   getAnnouncements(): Promise<Announcement[]>;
   getActiveAnnouncements(): Promise<Announcement[]>;
@@ -669,6 +679,54 @@ class DatabaseStorage implements IStorage {
 
   async deleteBusiness(id: string): Promise<void> {
     await db.delete(businesses).where(eq(businesses.id, id));
+  }
+
+  // Yellow Pages (Community Hub)
+  async getYellowPages(category?: string, city?: string, search?: string): Promise<YellowPage[]> {
+    const conditions = [eq(yellowPages.isApproved, true), eq(yellowPages.isActive, true)];
+    if (category) conditions.push(eq(yellowPages.category, category));
+    if (city) conditions.push(eq(yellowPages.city, city));
+    if (search) {
+      const searchPattern = `%${search}%`;
+      conditions.push(or(
+        ilike(yellowPages.title, searchPattern),
+        ilike(yellowPages.description, searchPattern)
+      )!);
+    }
+    return db.select().from(yellowPages)
+      .where(and(...conditions))
+      .orderBy(desc(yellowPages.createdAt));
+  }
+
+  async getYellowPage(id: string): Promise<YellowPage | undefined> {
+    const [listing] = await db.select().from(yellowPages).where(eq(yellowPages.id, id));
+    return listing;
+  }
+
+  async createYellowPage(listing: InsertYellowPage): Promise<YellowPage> {
+    const [created] = await db.insert(yellowPages).values(listing).returning();
+    return created;
+  }
+
+  async updateYellowPage(id: string, data: Partial<InsertYellowPage>): Promise<YellowPage | undefined> {
+    const [updated] = await db.update(yellowPages).set(data).where(eq(yellowPages.id, id)).returning();
+    return updated;
+  }
+
+  async deleteYellowPage(id: string): Promise<void> {
+    await db.delete(yellowPages).where(eq(yellowPages.id, id));
+  }
+
+  async getAllYellowPages(): Promise<YellowPage[]> {
+    return db.select().from(yellowPages).orderBy(desc(yellowPages.createdAt));
+  }
+
+  async getYellowPageCities(): Promise<string[]> {
+    const results = await db.selectDistinct({ city: yellowPages.city })
+      .from(yellowPages)
+      .where(and(eq(yellowPages.isApproved, true), eq(yellowPages.isActive, true)))
+      .orderBy(yellowPages.city);
+    return results.map(r => r.city);
   }
 
   // Announcements (Community Hub)

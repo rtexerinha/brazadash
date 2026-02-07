@@ -25,7 +25,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
-import type { Restaurant, Order, ServiceProvider, Booking, Event, Business, Announcement, Review, ServiceReview } from "@shared/schema";
+import type { Restaurant, Order, ServiceProvider, Booking, Event, Business, Announcement, Review, ServiceReview, YellowPage } from "@shared/schema";
 import { Label } from "@/components/ui/label";
 import {
   Users, Store, ShoppingBag, Briefcase, Calendar, Building2, Megaphone,
@@ -207,6 +207,11 @@ export default function AdminPage() {
     enabled: activeTab === "businesses" && !accessDenied,
   });
 
+  const { data: yellowPagesData } = useQuery<YellowPage[]>({
+    queryKey: ["/api/admin/yellow-pages"],
+    enabled: activeTab === "yellowpages" && !accessDenied,
+  });
+
   const { data: announcementsData } = useQuery<Announcement[]>({
     queryKey: ["/api/admin/announcements"],
     enabled: activeTab === "announcements" && !accessDenied,
@@ -345,6 +350,27 @@ export default function AdminPage() {
     },
   });
 
+  const updateYellowPageMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<YellowPage> }) => {
+      const res = await apiRequest("PATCH", `/api/admin/yellow-pages/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Updated", description: "Listing updated successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/yellow-pages"] });
+    },
+  });
+
+  const deleteYellowPageMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/admin/yellow-pages/${id}`);
+    },
+    onSuccess: () => {
+      toast({ title: "Deleted", description: "Listing deleted" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/yellow-pages"] });
+    },
+  });
+
   const createAnnouncementMutation = useMutation({
     mutationFn: async (data: typeof newAnnouncement) => {
       const res = await apiRequest("POST", "/api/admin/announcements", data);
@@ -455,6 +481,7 @@ export default function AdminPage() {
             <TabsTrigger value="providers" data-testid="tab-providers">Providers</TabsTrigger>
             <TabsTrigger value="bookings" data-testid="tab-bookings">Bookings</TabsTrigger>
             <TabsTrigger value="events" data-testid="tab-events">Events</TabsTrigger>
+            <TabsTrigger value="yellowpages" data-testid="tab-yellowpages">Yellow Pages</TabsTrigger>
             <TabsTrigger value="businesses" data-testid="tab-businesses">Businesses</TabsTrigger>
             <TabsTrigger value="announcements" data-testid="tab-announcements">Announcements</TabsTrigger>
             <TabsTrigger value="reviews" data-testid="tab-reviews">Reviews</TabsTrigger>
@@ -1451,6 +1478,83 @@ export default function AdminPage() {
                   ))}
                   {events?.length === 0 && (
                     <p className="text-center text-muted-foreground py-8">No events found</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="yellowpages">
+            <Card>
+              <CardHeader>
+                <CardTitle>Yellow Pages Management</CardTitle>
+                <CardDescription>Manage rental listings and classifieds submissions</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {yellowPagesData?.map((listing) => (
+                    <div
+                      key={listing.id}
+                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border rounded-lg"
+                      data-testid={`row-yp-${listing.id}`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold truncate">{listing.title}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {listing.category} - {listing.city} {listing.price ? `- $${listing.price}` : ""}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">{listing.contactInfo}</p>
+                      </div>
+                      <div className="flex items-center gap-4 flex-wrap">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-muted-foreground">Approved</span>
+                          <Switch
+                            checked={listing.isApproved || false}
+                            onCheckedChange={(checked) =>
+                              updateYellowPageMutation.mutate({ id: listing.id, data: { isApproved: checked } })
+                            }
+                            data-testid={`switch-yp-approved-${listing.id}`}
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-muted-foreground">Active</span>
+                          <Switch
+                            checked={listing.isActive || false}
+                            onCheckedChange={(checked) =>
+                              updateYellowPageMutation.mutate({ id: listing.id, data: { isActive: checked } })
+                            }
+                            data-testid={`switch-yp-active-${listing.id}`}
+                          />
+                        </div>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" data-testid={`button-delete-yp-${listing.id}`}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Listing</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete "{listing.title}"? This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => deleteYellowPageMutation.mutate(listing.id)}
+                                data-testid={`button-confirm-delete-yp-${listing.id}`}
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </div>
+                  ))}
+                  {(!yellowPagesData || yellowPagesData.length === 0) && (
+                    <p className="text-center text-muted-foreground py-8">No Yellow Pages listings found</p>
                   )}
                 </div>
               </CardContent>
