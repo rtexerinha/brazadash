@@ -16,7 +16,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useLanguage } from "@/lib/language-context";
 import type { Event } from "@shared/schema";
 import { 
-  Calendar, MapPin, Clock, Users, Ticket, ExternalLink, Plus,
+  Calendar, MapPin, Clock, Users, Ticket, ExternalLink, Plus, ImagePlus, X,
   PartyPopper, Music, Users2, Dumbbell, Landmark, Utensils, GraduationCap, CalendarDays
 } from "lucide-react";
 
@@ -70,7 +70,28 @@ export default function EventsPage() {
     isFree: true,
     ticketPrice: "",
     ticketUrl: "",
+    imageUrl: "",
   });
+  const [uploading, setUploading] = useState(false);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      if (!res.ok) throw new Error("Upload failed");
+      const data = await res.json();
+      setNewEvent((prev) => ({ ...prev, imageUrl: data.url }));
+      toast({ title: t("events.imageUploaded"), description: t("events.imageUploadedDesc") });
+    } catch {
+      toast({ title: t("events.submitEventError"), description: t("events.imageUploadError"), variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const { data: categories } = useQuery<{ id: string; name: string; icon: string }[]>({
     queryKey: ["/api/community/event-categories"],
@@ -120,7 +141,7 @@ export default function EventsPage() {
       setNewEvent({
         title: "", description: "", category: "meetup", eventDate: "",
         startTime: "", endTime: "", venue: "", city: "",
-        isFree: true, ticketPrice: "", ticketUrl: "",
+        isFree: true, ticketPrice: "", ticketUrl: "", imageUrl: "",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/community/events"] });
     },
@@ -266,6 +287,46 @@ export default function EventsPage() {
                       </div>
                     </div>
                   )}
+                  <div>
+                    <Label>{t("events.eventImage")}</Label>
+                    {newEvent.imageUrl ? (
+                      <div className="relative mt-1">
+                        <img
+                          src={newEvent.imageUrl}
+                          alt="Event"
+                          className="w-full h-40 object-cover rounded-md"
+                          data-testid="img-event-preview"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute top-1 right-1 bg-background/80"
+                          onClick={() => setNewEvent({ ...newEvent, imageUrl: "" })}
+                          data-testid="button-remove-event-image"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <label
+                        className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-md cursor-pointer hover-elevate mt-1"
+                        data-testid="label-upload-event-image"
+                      >
+                        <ImagePlus className="h-8 w-8 text-muted-foreground mb-2" />
+                        <span className="text-sm text-muted-foreground">
+                          {uploading ? t("events.uploadingImage") : t("events.uploadImage")}
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,image/gif"
+                          className="hidden"
+                          onChange={handleImageUpload}
+                          disabled={uploading}
+                          data-testid="input-event-image"
+                        />
+                      </label>
+                    )}
+                  </div>
                   <Button
                     className="w-full"
                     onClick={() => submitEventMutation.mutate(newEvent)}
