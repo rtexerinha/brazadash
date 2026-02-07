@@ -3,6 +3,7 @@ import type {
   Restaurant, MenuItem, Order, Review, Notification,
   ServiceProvider, Service, Booking, ServiceReview,
   CommunityEvent, Business, Announcement,
+  YellowPageListing,
   MobileProfile, MobileHomeFeed,
 } from "../types";
 
@@ -146,6 +147,19 @@ export const api = {
     const qs = query.toString();
     return request<Business[]>(`/api/community/businesses${qs ? `?${qs}` : ""}`);
   },
+
+  getYellowPages: (params?: { category?: string; city?: string; search?: string }) => {
+    const query = new URLSearchParams();
+    if (params?.category) query.set("category", params.category);
+    if (params?.city) query.set("city", params.city);
+    if (params?.search) query.set("search", params.search);
+    const qs = query.toString();
+    return request<YellowPageListing[]>(`/api/community/yellow-pages${qs ? `?${qs}` : ""}`);
+  },
+  getYellowPage: (id: string) => request<YellowPageListing>(`/api/community/yellow-pages/${id}`),
+  getYellowPageCities: () => request<string[]>("/api/community/yellow-pages/cities"),
+  getYellowPageCategories: () =>
+    request<{ id: string; name: string }[]>("/api/community/yellow-pages/categories"),
 
   getAnnouncements: () => request<Announcement[]>("/api/community/announcements"),
 
