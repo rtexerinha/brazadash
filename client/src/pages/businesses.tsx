@@ -243,6 +243,7 @@ export default function YellowPagesPage() {
                   </div>
                   <div>
                     <Label>{t("yp.listingImage")}</Label>
+                    <p className="text-xs text-muted-foreground mt-1 mb-2">{t("yp.imageRecommendation")}</p>
                     {newListing.imageUrl ? (
                       <div className="relative mt-1">
                         <img
@@ -370,7 +371,17 @@ export default function YellowPagesPage() {
             {listings.map((listing) => {
               const Icon = categoryIcons[listing.category] || Tag;
               return (
-                <Card key={listing.id} className="hover-elevate" data-testid={`card-yp-${listing.id}`}>
+                <Card key={listing.id} className="hover-elevate overflow-hidden" data-testid={`card-yp-${listing.id}`}>
+                  {listing.imageUrl && (
+                    <div className="w-full h-40">
+                      <img
+                        src={listing.imageUrl}
+                        alt={listing.title}
+                        className="w-full h-full object-cover"
+                        data-testid={`img-yp-${listing.id}`}
+                      />
+                    </div>
+                  )}
                   <CardHeader className="flex flex-row items-start justify-between gap-2">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2 flex-wrap">
