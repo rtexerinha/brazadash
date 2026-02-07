@@ -15,7 +15,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useLanguage } from "@/lib/language-context";
 import type { YellowPage } from "@shared/schema";
 import {
-  Search, MapPin, Phone, Mail, DollarSign, Plus,
+  Search, MapPin, Phone, Mail, DollarSign, Plus, ImagePlus, X,
   Home, Users2, Building2, Car, BedDouble, MessageCircle, Tag
 } from "lucide-react";
 
@@ -57,7 +57,28 @@ export default function YellowPagesPage() {
     contactPhone: "",
     contactEmail: "",
     contactWhatsapp: "",
+    imageUrl: "",
   });
+  const [uploading, setUploading] = useState(false);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      if (!res.ok) throw new Error("Upload failed");
+      const data = await res.json();
+      setNewListing((prev) => ({ ...prev, imageUrl: data.url }));
+      toast({ title: t("yp.imageUploaded"), description: t("yp.imageUploadedDesc") });
+    } catch {
+      toast({ title: t("yp.submitError"), description: t("yp.imageUploadError"), variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const { data: categories } = useQuery<{ id: string; name: string }[]>({
     queryKey: ["/api/community/yellow-pages/categories"],
@@ -91,7 +112,7 @@ export default function YellowPagesPage() {
       setNewListing({
         title: "", description: "", category: "room", price: "",
         city: "", address: "", contactName: "", contactPhone: "",
-        contactEmail: "", contactWhatsapp: "",
+        contactEmail: "", contactWhatsapp: "", imageUrl: "",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/community/yellow-pages"] });
     },
@@ -219,6 +240,46 @@ export default function YellowPagesPage() {
                         data-testid="input-listing-whatsapp"
                       />
                     </div>
+                  </div>
+                  <div>
+                    <Label>{t("yp.listingImage")}</Label>
+                    {newListing.imageUrl ? (
+                      <div className="relative mt-1">
+                        <img
+                          src={newListing.imageUrl}
+                          alt="Listing"
+                          className="w-full h-40 object-cover rounded-md"
+                          data-testid="img-listing-preview"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute top-1 right-1 bg-background/80"
+                          onClick={() => setNewListing({ ...newListing, imageUrl: "" })}
+                          data-testid="button-remove-listing-image"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <label
+                        className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-md cursor-pointer hover-elevate mt-1"
+                        data-testid="label-upload-listing-image"
+                      >
+                        <ImagePlus className="h-8 w-8 text-muted-foreground mb-2" />
+                        <span className="text-sm text-muted-foreground">
+                          {uploading ? t("yp.uploadingImage") : t("yp.uploadImage")}
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,image/gif"
+                          className="hidden"
+                          onChange={handleImageUpload}
+                          disabled={uploading}
+                          data-testid="input-listing-image"
+                        />
+                      </label>
+                    )}
                   </div>
                   <Button
                     className="w-full"
