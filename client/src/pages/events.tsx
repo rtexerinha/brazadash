@@ -289,6 +289,7 @@ export default function EventsPage() {
                   )}
                   <div>
                     <Label>{t("events.eventImage")}</Label>
+                    <p className="text-xs text-muted-foreground mt-1 mb-2">{t("events.imageRecommendation")}</p>
                     {newEvent.imageUrl ? (
                       <div className="relative mt-1">
                         <img
