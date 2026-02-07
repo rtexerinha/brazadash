@@ -975,10 +975,17 @@ export async function registerRoutes(
 
       const stripe = await getUncachableStripeClient();
 
+      const descriptorSuffix = (restaurant.businessName || 'Order')
+        .replace(/[^a-zA-Z0-9 ]/g, '')
+        .substring(0, 22)
+        .trim();
+
       const paymentIntent = await stripe.paymentIntents.create({
         amount: amountInCents,
         currency: 'usd',
         automatic_payment_methods: { enabled: true },
+        statement_descriptor: 'BRAZADASH',
+        statement_descriptor_suffix: descriptorSuffix,
         metadata: {
           userId,
           restaurantId,
@@ -1342,10 +1349,19 @@ export async function registerRoutes(
         });
       }
 
+      const bookingDescriptorSuffix = (provider.businessName || 'Booking')
+        .replace(/[^a-zA-Z0-9 ]/g, '')
+        .substring(0, 22)
+        .trim();
+
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ['card'],
         line_items: lineItems,
         mode: 'payment',
+        payment_intent_data: {
+          statement_descriptor: 'BRAZADASH',
+          statement_descriptor_suffix: bookingDescriptorSuffix,
+        },
         success_url: `${req.protocol}://${req.get('host')}/bookings?payment=success&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${req.protocol}://${req.get('host')}/services/provider/${providerId}`,
         metadata: {
