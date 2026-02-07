@@ -2227,40 +2227,54 @@ export async function registerRoutes(
 
   app.get("/api/admin/financial-report", isAuthenticated, isAdmin, async (req, res) => {
     try {
-      const weekOffset = parseInt(req.query.weekOffset as string || "0");
-      
-      const now = new Date();
-      const currentDay = now.getDay();
-      const startOfCurrentWeek = new Date(now);
-      startOfCurrentWeek.setDate(now.getDate() - currentDay + (weekOffset * 7));
-      startOfCurrentWeek.setHours(0, 0, 0, 0);
-      
-      const endOfWeek = new Date(startOfCurrentWeek);
-      endOfWeek.setDate(startOfCurrentWeek.getDate() + 7);
+      const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      const PLATFORM_FEE_RATE = 0.08;
+
+      let rangeStart: Date;
+      let rangeEnd: Date;
+
+      if (req.query.startDate && req.query.endDate) {
+        rangeStart = new Date(req.query.startDate as string);
+        rangeStart.setHours(0, 0, 0, 0);
+        rangeEnd = new Date(req.query.endDate as string);
+        rangeEnd.setHours(23, 59, 59, 999);
+      } else {
+        const weekOffset = parseInt(req.query.weekOffset as string || "0");
+        const now = new Date();
+        const currentDay = now.getDay();
+        rangeStart = new Date(now);
+        rangeStart.setDate(now.getDate() - currentDay + (weekOffset * 7));
+        rangeStart.setHours(0, 0, 0, 0);
+        rangeEnd = new Date(rangeStart);
+        rangeEnd.setDate(rangeStart.getDate() + 6);
+        rangeEnd.setHours(23, 59, 59, 999);
+      }
+
+      const rangeEndExclusive = new Date(rangeEnd);
+      rangeEndExclusive.setMilliseconds(rangeEndExclusive.getMilliseconds() + 1);
+
+      const numDays = Math.round((rangeEnd.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 
       const allOrders = await storage.getAllOrders();
       const allBookings = await storage.getAllBookings();
       const allRestaurants = await storage.getAllRestaurants();
       const allProviders = await storage.getAllServiceProviders();
 
-      const weekOrders = allOrders.filter(o => {
+      const periodOrders = allOrders.filter(o => {
         const d = o.createdAt ? new Date(o.createdAt) : null;
-        return d && d >= startOfCurrentWeek && d < endOfWeek && o.status !== "cancelled";
+        return d && d >= rangeStart && d < rangeEndExclusive && o.status !== "cancelled";
       });
 
-      const weekBookings = allBookings.filter(b => {
+      const periodBookings = allBookings.filter(b => {
         const d = b.createdAt ? new Date(b.createdAt) : null;
-        return d && d >= startOfCurrentWeek && d < endOfWeek && b.isPaid && b.status !== "cancelled";
+        return d && d >= rangeStart && d < rangeEndExclusive && b.isPaid && b.status !== "cancelled";
       });
-
-      const PLATFORM_FEE_RATE = 0.08;
-      const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
       const restaurantReports = allRestaurants.map(r => {
-        const rOrders = weekOrders.filter(o => o.restaurantId === r.id);
-        const dailyBreakdown = Array.from({ length: 7 }, (_, i) => {
-          const dayDate = new Date(startOfCurrentWeek);
-          dayDate.setDate(startOfCurrentWeek.getDate() + i);
+        const rOrders = periodOrders.filter(o => o.restaurantId === r.id);
+        const dailyBreakdown = Array.from({ length: numDays }, (_, i) => {
+          const dayDate = new Date(rangeStart);
+          dayDate.setDate(rangeStart.getDate() + i);
           const dayEnd = new Date(dayDate);
           dayEnd.setDate(dayDate.getDate() + 1);
 
@@ -2274,7 +2288,7 @@ export async function registerRoutes(
           const netPayout = Math.round((grossRevenue - platformFee) * 100) / 100;
 
           return {
-            day: dayNames[i],
+            day: dayNames[dayDate.getDay()],
             date: dayDate.toISOString().split("T")[0],
             orders: dayOrders.length,
             grossRevenue: Math.round(grossRevenue * 100) / 100,
@@ -2301,10 +2315,10 @@ export async function registerRoutes(
       }).filter(r => r.totalOrders > 0 || true);
 
       const providerReports = allProviders.map(p => {
-        const pBookings = weekBookings.filter(b => b.providerId === p.id);
-        const dailyBreakdown = Array.from({ length: 7 }, (_, i) => {
-          const dayDate = new Date(startOfCurrentWeek);
-          dayDate.setDate(startOfCurrentWeek.getDate() + i);
+        const pBookings = periodBookings.filter(b => b.providerId === p.id);
+        const dailyBreakdown = Array.from({ length: numDays }, (_, i) => {
+          const dayDate = new Date(rangeStart);
+          dayDate.setDate(rangeStart.getDate() + i);
           const dayEnd = new Date(dayDate);
           dayEnd.setDate(dayDate.getDate() + 1);
 
@@ -2320,7 +2334,7 @@ export async function registerRoutes(
           const netPayout = Math.round((serviceRevenue + bookingFeeRevenue - platformFee) * 100) / 100;
 
           return {
-            day: dayNames[i],
+            day: dayNames[dayDate.getDay()],
             date: dayDate.toISOString().split("T")[0],
             bookings: dayBookings.length,
             serviceRevenue: Math.round(serviceRevenue * 100) / 100,
@@ -2352,10 +2366,8 @@ export async function registerRoutes(
         };
       }).filter(p => p.totalBookings > 0 || true);
 
-      const weekStart = startOfCurrentWeek.toISOString().split("T")[0];
-      const weekEndDate = new Date(endOfWeek);
-      weekEndDate.setDate(weekEndDate.getDate() - 1);
-      const weekEndStr = weekEndDate.toISOString().split("T")[0];
+      const startStr = rangeStart.toISOString().split("T")[0];
+      const endStr = rangeEnd.toISOString().split("T")[0];
 
       const totalPlatformRevenue = 
         restaurantReports.reduce((s, r) => s + r.platformFee, 0) +
@@ -2366,16 +2378,16 @@ export async function registerRoutes(
         providerReports.reduce((s, p) => s + p.netPayout, 0);
 
       res.json({
-        weekStart,
-        weekEnd: weekEndStr,
-        weekOffset,
+        weekStart: startStr,
+        weekEnd: endStr,
+        weekOffset: 0,
         restaurants: restaurantReports,
         providers: providerReports,
         summary: {
           totalPlatformRevenue: Math.round(totalPlatformRevenue * 100) / 100,
           totalPayouts: Math.round(totalPayouts * 100) / 100,
-          totalOrders: weekOrders.length,
-          totalBookings: weekBookings.length,
+          totalOrders: periodOrders.length,
+          totalBookings: periodBookings.length,
         },
       });
     } catch (error) {

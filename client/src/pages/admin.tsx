@@ -145,8 +145,42 @@ export default function AdminPage() {
   const [orderFilterRestaurant, setOrderFilterRestaurant] = useState<string>("all");
   const [orderFilterDateFrom, setOrderFilterDateFrom] = useState<string>("");
   const [orderFilterDateTo, setOrderFilterDateTo] = useState<string>("");
-  const [weekOffset, setWeekOffset] = useState(0);
   const [expandedBusiness, setExpandedBusiness] = useState<string | null>(null);
+  const [reportFilter, setReportFilter] = useState<string>("all");
+
+  const getDateRange = (preset: string) => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    switch (preset) {
+      case "today": {
+        const d = today.toISOString().split("T")[0];
+        return { startDate: d, endDate: d };
+      }
+      case "week": {
+        const start = new Date(today);
+        start.setDate(today.getDate() - today.getDay());
+        const end = new Date(start);
+        end.setDate(start.getDate() + 6);
+        return { startDate: start.toISOString().split("T")[0], endDate: end.toISOString().split("T")[0] };
+      }
+      case "month": {
+        const start = new Date(today.getFullYear(), today.getMonth(), 1);
+        const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        return { startDate: start.toISOString().split("T")[0], endDate: end.toISOString().split("T")[0] };
+      }
+      default:
+        return null;
+    }
+  };
+
+  const [datePreset, setDatePreset] = useState<string>("week");
+  const defaultRange = getDateRange("week")!;
+  const [customStartDate, setCustomStartDate] = useState(defaultRange.startDate);
+  const [customEndDate, setCustomEndDate] = useState(defaultRange.endDate);
+
+  const activeRange = datePreset === "custom"
+    ? { startDate: customStartDate, endDate: customEndDate }
+    : getDateRange(datePreset) || { startDate: customStartDate, endDate: customEndDate };
   const { t } = useLanguage();
   const [newAnnouncement, setNewAnnouncement] = useState({
     title: "",
@@ -163,9 +197,9 @@ export default function AdminPage() {
   });
 
   const { data: financialReport, isLoading: reportLoading } = useQuery<FinancialReport>({
-    queryKey: ["/api/admin/financial-report", weekOffset],
+    queryKey: ["/api/admin/financial-report", activeRange.startDate, activeRange.endDate],
     queryFn: async () => {
-      const res = await fetch(`/api/admin/financial-report?weekOffset=${weekOffset}`, { credentials: "include" });
+      const res = await fetch(`/api/admin/financial-report?startDate=${activeRange.startDate}&endDate=${activeRange.endDate}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
     },
@@ -634,45 +668,86 @@ export default function AdminPage() {
               </Card>
             )}
 
-            {/* Weekly Financial Report */}
+            {/* Financial Report */}
             <Card className="mt-6">
               <CardHeader>
-                <div className="flex items-center justify-between gap-4 flex-wrap">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <FileText className="h-5 w-5" />
-                      {t("admin.weeklyFinancialReport")}
-                    </CardTitle>
-                    <CardDescription>
-                      {t("admin.financialReportDesc")}
-                    </CardDescription>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => setWeekOffset(prev => prev - 1)}
-                      data-testid="button-prev-week"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <span className="text-sm font-medium min-w-[180px] text-center" data-testid="text-week-range">
-                      {financialReport ? `${financialReport.weekStart} — ${financialReport.weekEnd}` : "..."}
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <FileText className="h-5 w-5" />
+                        {t("admin.financialReport")}
+                      </CardTitle>
+                      <CardDescription>
+                        {t("admin.financialReportDesc")}
+                      </CardDescription>
+                    </div>
+                    <span className="text-sm font-medium" data-testid="text-date-range">
+                      {activeRange.startDate === activeRange.endDate
+                        ? activeRange.startDate
+                        : `${activeRange.startDate} — ${activeRange.endDate}`}
                     </span>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => setWeekOffset(prev => prev + 1)}
-                      disabled={weekOffset >= 0}
-                      data-testid="button-next-week"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                    {weekOffset !== 0 && (
-                      <Button variant="outline" size="sm" onClick={() => setWeekOffset(0)} data-testid="button-current-week">
-                        {t("admin.currentWeek")}
-                      </Button>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
+                    <div className="flex gap-1 flex-wrap">
+                      {(["today", "week", "month", "custom"] as const).map((preset) => (
+                        <Button
+                          key={preset}
+                          variant={datePreset === preset ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => {
+                            setDatePreset(preset);
+                            if (preset !== "custom") {
+                              const range = getDateRange(preset);
+                              if (range) {
+                                setCustomStartDate(range.startDate);
+                                setCustomEndDate(range.endDate);
+                              }
+                            }
+                          }}
+                          data-testid={`button-preset-${preset}`}
+                        >
+                          {t(`admin.preset${preset.charAt(0).toUpperCase() + preset.slice(1)}`)}
+                        </Button>
+                      ))}
+                    </div>
+
+                    {datePreset === "custom" && (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Input
+                          type="date"
+                          value={customStartDate}
+                          onChange={(e) => setCustomStartDate(e.target.value)}
+                          className="w-auto"
+                          data-testid="input-start-date"
+                        />
+                        <span className="text-sm text-muted-foreground">{t("admin.to")}</span>
+                        <Input
+                          type="date"
+                          value={customEndDate}
+                          onChange={(e) => setCustomEndDate(e.target.value)}
+                          className="w-auto"
+                          data-testid="input-end-date"
+                        />
+                      </div>
                     )}
+
+                    <Select value={reportFilter} onValueChange={setReportFilter}>
+                      <SelectTrigger className="w-auto min-w-[180px]" data-testid="select-report-filter">
+                        <Filter className="h-4 w-4 mr-2" />
+                        <SelectValue placeholder={t("admin.filterBusiness")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">{t("admin.allBusinesses")}</SelectItem>
+                        {financialReport?.restaurants.map(r => (
+                          <SelectItem key={`r-${r.id}`} value={`restaurant-${r.id}`}>{r.name}</SelectItem>
+                        ))}
+                        {financialReport?.providers.map(p => (
+                          <SelectItem key={`p-${p.id}`} value={`provider-${p.id}`}>{p.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </CardHeader>
@@ -685,210 +760,231 @@ export default function AdminPage() {
                   </div>
                 ) : financialReport ? (
                   <div className="space-y-6">
-                    {/* Summary Cards */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <Card>
-                        <CardContent className="p-4">
-                          <p className="text-sm text-muted-foreground">{t("admin.weeklyOrders")}</p>
-                          <p className="text-2xl font-bold" data-testid="text-weekly-orders">{financialReport.summary.totalOrders}</p>
-                        </CardContent>
-                      </Card>
-                      <Card>
-                        <CardContent className="p-4">
-                          <p className="text-sm text-muted-foreground">{t("admin.weeklyBookings")}</p>
-                          <p className="text-2xl font-bold" data-testid="text-weekly-bookings">{financialReport.summary.totalBookings}</p>
-                        </CardContent>
-                      </Card>
-                      <Card>
-                        <CardContent className="p-4">
-                          <p className="text-sm text-muted-foreground">{t("admin.platformRevenue")}</p>
-                          <p className="text-2xl font-bold text-green-600" data-testid="text-platform-revenue">
-                            ${financialReport.summary.totalPlatformRevenue.toFixed(2)}
-                          </p>
-                        </CardContent>
-                      </Card>
-                      <Card>
-                        <CardContent className="p-4">
-                          <p className="text-sm text-muted-foreground">{t("admin.totalPayouts")}</p>
-                          <p className="text-2xl font-bold" data-testid="text-total-payouts">
-                            ${financialReport.summary.totalPayouts.toFixed(2)}
-                          </p>
-                        </CardContent>
-                      </Card>
-                    </div>
+                    {(() => {
+                      const filteredRestaurants = reportFilter === "all"
+                        ? financialReport.restaurants
+                        : reportFilter.startsWith("restaurant-")
+                          ? financialReport.restaurants.filter(r => r.id === reportFilter.replace("restaurant-", ""))
+                          : [];
+                      const filteredProviders = reportFilter === "all"
+                        ? financialReport.providers
+                        : reportFilter.startsWith("provider-")
+                          ? financialReport.providers.filter(p => p.id === reportFilter.replace("provider-", ""))
+                          : [];
 
-                    {/* Restaurants Section */}
-                    {financialReport.restaurants.length > 0 && (
-                      <div>
-                        <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
-                          <Store className="h-5 w-5" />
-                          {t("admin.restaurantPayouts")}
-                        </h3>
-                        <div className="space-y-3">
-                          {financialReport.restaurants.map(r => (
-                            <Card key={r.id} data-testid={`report-restaurant-${r.id}`}>
+                      const summaryOrders = filteredRestaurants.reduce((s, r) => s + r.totalOrders, 0);
+                      const summaryBookings = filteredProviders.reduce((s, p) => s + p.totalBookings, 0);
+                      const summaryPlatformRev = filteredRestaurants.reduce((s, r) => s + r.platformFee, 0)
+                        + filteredProviders.reduce((s, p) => s + p.platformFee, 0);
+                      const summaryPayouts = filteredRestaurants.reduce((s, r) => s + r.netPayout, 0)
+                        + filteredProviders.reduce((s, p) => s + p.netPayout, 0);
+
+                      return (
+                        <>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <Card>
                               <CardContent className="p-4">
-                                <div
-                                  className="flex items-center justify-between gap-4 cursor-pointer flex-wrap"
-                                  onClick={() => setExpandedBusiness(expandedBusiness === r.id ? null : r.id)}
-                                  data-testid={`button-expand-${r.id}`}
-                                >
-                                  <div className="flex items-center gap-3">
-                                    <Store className="h-4 w-4 text-muted-foreground" />
-                                    <div>
-                                      <p className="font-medium">{r.name}</p>
-                                      <p className="text-sm text-muted-foreground">{r.totalOrders} {t("admin.ordersThisWeek")}</p>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-6 flex-wrap">
-                                    <div className="text-right">
-                                      <p className="text-xs text-muted-foreground">{t("admin.grossRevenue")}</p>
-                                      <p className="font-medium">${r.grossRevenue.toFixed(2)}</p>
-                                    </div>
-                                    <div className="text-right">
-                                      <p className="text-xs text-muted-foreground">{t("admin.platformFee8")}</p>
-                                      <p className="font-medium text-green-600">${r.platformFee.toFixed(2)}</p>
-                                    </div>
-                                    <div className="text-right">
-                                      <p className="text-xs text-muted-foreground">{t("admin.netPayout")}</p>
-                                      <p className="font-bold">${r.netPayout.toFixed(2)}</p>
-                                    </div>
-                                    <ChevronRight className={`h-4 w-4 transition-transform ${expandedBusiness === r.id ? "rotate-90" : ""}`} />
-                                  </div>
-                                </div>
-                                {expandedBusiness === r.id && (
-                                  <div className="mt-4 overflow-x-auto">
-                                    <table className="w-full text-sm">
-                                      <thead>
-                                        <tr className="border-b">
-                                          <th className="text-left py-2 pr-4 font-medium">{t("admin.day")}</th>
-                                          <th className="text-left py-2 pr-4 font-medium">{t("admin.date")}</th>
-                                          <th className="text-right py-2 pr-4 font-medium">{t("admin.colOrders")}</th>
-                                          <th className="text-right py-2 pr-4 font-medium">{t("admin.gross")}</th>
-                                          <th className="text-right py-2 pr-4 font-medium">{t("admin.fee")}</th>
-                                          <th className="text-right py-2 font-medium">{t("admin.colPayout")}</th>
-                                        </tr>
-                                      </thead>
-                                      <tbody>
-                                        {r.dailyBreakdown.map(day => (
-                                          <tr key={day.date} className="border-b last:border-0">
-                                            <td className="py-2 pr-4">{day.day}</td>
-                                            <td className="py-2 pr-4 text-muted-foreground">{day.date}</td>
-                                            <td className="py-2 pr-4 text-right">{day.orders}</td>
-                                            <td className="py-2 pr-4 text-right">${day.grossRevenue.toFixed(2)}</td>
-                                            <td className="py-2 pr-4 text-right text-green-600">${day.platformFee.toFixed(2)}</td>
-                                            <td className="py-2 text-right font-medium">${day.netPayout.toFixed(2)}</td>
-                                          </tr>
-                                        ))}
-                                        <tr className="font-bold border-t-2">
-                                          <td className="py-2 pr-4" colSpan={2}>{t("admin.weekTotal")}</td>
-                                          <td className="py-2 pr-4 text-right">{r.totalOrders}</td>
-                                          <td className="py-2 pr-4 text-right">${r.grossRevenue.toFixed(2)}</td>
-                                          <td className="py-2 pr-4 text-right text-green-600">${r.platformFee.toFixed(2)}</td>
-                                          <td className="py-2 text-right">${r.netPayout.toFixed(2)}</td>
-                                        </tr>
-                                      </tbody>
-                                    </table>
-                                  </div>
-                                )}
+                                <p className="text-sm text-muted-foreground">{t("admin.orders")}</p>
+                                <p className="text-2xl font-bold" data-testid="text-summary-orders">{summaryOrders}</p>
                               </CardContent>
                             </Card>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Service Providers Section */}
-                    {financialReport.providers.length > 0 && (
-                      <div>
-                        <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
-                          <Briefcase className="h-5 w-5" />
-                          {t("admin.providerPayouts")}
-                        </h3>
-                        <div className="space-y-3">
-                          {financialReport.providers.map(p => (
-                            <Card key={p.id} data-testid={`report-provider-${p.id}`}>
+                            <Card>
                               <CardContent className="p-4">
-                                <div
-                                  className="flex items-center justify-between gap-4 cursor-pointer flex-wrap"
-                                  onClick={() => setExpandedBusiness(expandedBusiness === p.id ? null : p.id)}
-                                  data-testid={`button-expand-${p.id}`}
-                                >
-                                  <div className="flex items-center gap-3">
-                                    <Briefcase className="h-4 w-4 text-muted-foreground" />
-                                    <div>
-                                      <p className="font-medium">{p.name}</p>
-                                      <p className="text-sm text-muted-foreground">{p.totalBookings} {t("admin.bookingsThisWeek")}</p>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-6 flex-wrap">
-                                    <div className="text-right">
-                                      <p className="text-xs text-muted-foreground">{t("admin.totalCollected")}</p>
-                                      <p className="font-medium">${p.totalPaid.toFixed(2)}</p>
-                                    </div>
-                                    <div className="text-right">
-                                      <p className="text-xs text-muted-foreground">{t("admin.platformFee8")}</p>
-                                      <p className="font-medium text-green-600">${p.platformFee.toFixed(2)}</p>
-                                    </div>
-                                    <div className="text-right">
-                                      <p className="text-xs text-muted-foreground">{t("admin.netPayout")}</p>
-                                      <p className="font-bold">${p.netPayout.toFixed(2)}</p>
-                                    </div>
-                                    <ChevronRight className={`h-4 w-4 transition-transform ${expandedBusiness === p.id ? "rotate-90" : ""}`} />
-                                  </div>
-                                </div>
-                                {expandedBusiness === p.id && (
-                                  <div className="mt-4 overflow-x-auto">
-                                    <table className="w-full text-sm">
-                                      <thead>
-                                        <tr className="border-b">
-                                          <th className="text-left py-2 pr-4 font-medium">{t("admin.day")}</th>
-                                          <th className="text-left py-2 pr-4 font-medium">{t("admin.date")}</th>
-                                          <th className="text-right py-2 pr-4 font-medium">{t("admin.colBookings")}</th>
-                                          <th className="text-right py-2 pr-4 font-medium">{t("admin.colServices")}</th>
-                                          <th className="text-right py-2 pr-4 font-medium">{t("admin.bookingFees")}</th>
-                                          <th className="text-right py-2 pr-4 font-medium">{t("admin.fee")}</th>
-                                          <th className="text-right py-2 font-medium">{t("admin.colPayout")}</th>
-                                        </tr>
-                                      </thead>
-                                      <tbody>
-                                        {p.dailyBreakdown.map(day => (
-                                          <tr key={day.date} className="border-b last:border-0">
-                                            <td className="py-2 pr-4">{day.day}</td>
-                                            <td className="py-2 pr-4 text-muted-foreground">{day.date}</td>
-                                            <td className="py-2 pr-4 text-right">{day.bookings}</td>
-                                            <td className="py-2 pr-4 text-right">${day.serviceRevenue.toFixed(2)}</td>
-                                            <td className="py-2 pr-4 text-right">${day.bookingFeeRevenue.toFixed(2)}</td>
-                                            <td className="py-2 pr-4 text-right text-green-600">${day.platformFee.toFixed(2)}</td>
-                                            <td className="py-2 text-right font-medium">${day.netPayout.toFixed(2)}</td>
-                                          </tr>
-                                        ))}
-                                        <tr className="font-bold border-t-2">
-                                          <td className="py-2 pr-4" colSpan={2}>{t("admin.weekTotal")}</td>
-                                          <td className="py-2 pr-4 text-right">{p.totalBookings}</td>
-                                          <td className="py-2 pr-4 text-right">${p.serviceRevenue.toFixed(2)}</td>
-                                          <td className="py-2 pr-4 text-right">${p.bookingFeeRevenue.toFixed(2)}</td>
-                                          <td className="py-2 pr-4 text-right text-green-600">${p.platformFee.toFixed(2)}</td>
-                                          <td className="py-2 text-right">${p.netPayout.toFixed(2)}</td>
-                                        </tr>
-                                      </tbody>
-                                    </table>
-                                  </div>
-                                )}
+                                <p className="text-sm text-muted-foreground">{t("admin.bookings")}</p>
+                                <p className="text-2xl font-bold" data-testid="text-summary-bookings">{summaryBookings}</p>
                               </CardContent>
                             </Card>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                            <Card>
+                              <CardContent className="p-4">
+                                <p className="text-sm text-muted-foreground">{t("admin.platformRevenue")}</p>
+                                <p className="text-2xl font-bold text-green-600" data-testid="text-platform-revenue">
+                                  ${summaryPlatformRev.toFixed(2)}
+                                </p>
+                              </CardContent>
+                            </Card>
+                            <Card>
+                              <CardContent className="p-4">
+                                <p className="text-sm text-muted-foreground">{t("admin.totalPayouts")}</p>
+                                <p className="text-2xl font-bold" data-testid="text-total-payouts">
+                                  ${summaryPayouts.toFixed(2)}
+                                </p>
+                              </CardContent>
+                            </Card>
+                          </div>
 
-                    {financialReport.restaurants.every(r => r.totalOrders === 0) && 
-                     financialReport.providers.every(p => p.totalBookings === 0) && (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-30" />
-                        <p>{t("admin.noTransactionsWeek")}</p>
-                      </div>
-                    )}
+                          {filteredRestaurants.length > 0 && (
+                            <div>
+                              <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
+                                <Store className="h-5 w-5" />
+                                {t("admin.restaurantPayouts")}
+                              </h3>
+                              <div className="space-y-3">
+                                {filteredRestaurants.map(r => (
+                                  <Card key={r.id} data-testid={`report-restaurant-${r.id}`}>
+                                    <CardContent className="p-4">
+                                      <div
+                                        className="flex items-center justify-between gap-4 cursor-pointer flex-wrap"
+                                        onClick={() => setExpandedBusiness(expandedBusiness === r.id ? null : r.id)}
+                                        data-testid={`button-expand-${r.id}`}
+                                      >
+                                        <div className="flex items-center gap-3">
+                                          <Store className="h-4 w-4 text-muted-foreground" />
+                                          <div>
+                                            <p className="font-medium">{r.name}</p>
+                                            <p className="text-sm text-muted-foreground">{r.totalOrders} {t("admin.ordersPeriod")}</p>
+                                          </div>
+                                        </div>
+                                        <div className="flex items-center gap-6 flex-wrap">
+                                          <div className="text-right">
+                                            <p className="text-xs text-muted-foreground">{t("admin.grossRevenue")}</p>
+                                            <p className="font-medium">${r.grossRevenue.toFixed(2)}</p>
+                                          </div>
+                                          <div className="text-right">
+                                            <p className="text-xs text-muted-foreground">{t("admin.platformFee8")}</p>
+                                            <p className="font-medium text-green-600">${r.platformFee.toFixed(2)}</p>
+                                          </div>
+                                          <div className="text-right">
+                                            <p className="text-xs text-muted-foreground">{t("admin.netPayout")}</p>
+                                            <p className="font-bold">${r.netPayout.toFixed(2)}</p>
+                                          </div>
+                                          <ChevronRight className={`h-4 w-4 transition-transform ${expandedBusiness === r.id ? "rotate-90" : ""}`} />
+                                        </div>
+                                      </div>
+                                      {expandedBusiness === r.id && (
+                                        <div className="mt-4 overflow-x-auto">
+                                          <table className="w-full text-sm">
+                                            <thead>
+                                              <tr className="border-b">
+                                                <th className="text-left py-2 pr-4 font-medium">{t("admin.day")}</th>
+                                                <th className="text-left py-2 pr-4 font-medium">{t("admin.date")}</th>
+                                                <th className="text-right py-2 pr-4 font-medium">{t("admin.colOrders")}</th>
+                                                <th className="text-right py-2 pr-4 font-medium">{t("admin.gross")}</th>
+                                                <th className="text-right py-2 pr-4 font-medium">{t("admin.fee")}</th>
+                                                <th className="text-right py-2 font-medium">{t("admin.colPayout")}</th>
+                                              </tr>
+                                            </thead>
+                                            <tbody>
+                                              {r.dailyBreakdown.map(day => (
+                                                <tr key={day.date} className="border-b last:border-0">
+                                                  <td className="py-2 pr-4">{day.day}</td>
+                                                  <td className="py-2 pr-4 text-muted-foreground">{day.date}</td>
+                                                  <td className="py-2 pr-4 text-right">{day.orders}</td>
+                                                  <td className="py-2 pr-4 text-right">${day.grossRevenue.toFixed(2)}</td>
+                                                  <td className="py-2 pr-4 text-right text-green-600">${day.platformFee.toFixed(2)}</td>
+                                                  <td className="py-2 text-right font-medium">${day.netPayout.toFixed(2)}</td>
+                                                </tr>
+                                              ))}
+                                              <tr className="font-bold border-t-2">
+                                                <td className="py-2 pr-4" colSpan={2}>{t("admin.periodTotal")}</td>
+                                                <td className="py-2 pr-4 text-right">{r.totalOrders}</td>
+                                                <td className="py-2 pr-4 text-right">${r.grossRevenue.toFixed(2)}</td>
+                                                <td className="py-2 pr-4 text-right text-green-600">${r.platformFee.toFixed(2)}</td>
+                                                <td className="py-2 text-right">${r.netPayout.toFixed(2)}</td>
+                                              </tr>
+                                            </tbody>
+                                          </table>
+                                        </div>
+                                      )}
+                                    </CardContent>
+                                  </Card>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {filteredProviders.length > 0 && (
+                            <div>
+                              <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
+                                <Briefcase className="h-5 w-5" />
+                                {t("admin.providerPayouts")}
+                              </h3>
+                              <div className="space-y-3">
+                                {filteredProviders.map(p => (
+                                  <Card key={p.id} data-testid={`report-provider-${p.id}`}>
+                                    <CardContent className="p-4">
+                                      <div
+                                        className="flex items-center justify-between gap-4 cursor-pointer flex-wrap"
+                                        onClick={() => setExpandedBusiness(expandedBusiness === p.id ? null : p.id)}
+                                        data-testid={`button-expand-${p.id}`}
+                                      >
+                                        <div className="flex items-center gap-3">
+                                          <Briefcase className="h-4 w-4 text-muted-foreground" />
+                                          <div>
+                                            <p className="font-medium">{p.name}</p>
+                                            <p className="text-sm text-muted-foreground">{p.totalBookings} {t("admin.bookingsPeriod")}</p>
+                                          </div>
+                                        </div>
+                                        <div className="flex items-center gap-6 flex-wrap">
+                                          <div className="text-right">
+                                            <p className="text-xs text-muted-foreground">{t("admin.totalCollected")}</p>
+                                            <p className="font-medium">${p.totalPaid.toFixed(2)}</p>
+                                          </div>
+                                          <div className="text-right">
+                                            <p className="text-xs text-muted-foreground">{t("admin.platformFee8")}</p>
+                                            <p className="font-medium text-green-600">${p.platformFee.toFixed(2)}</p>
+                                          </div>
+                                          <div className="text-right">
+                                            <p className="text-xs text-muted-foreground">{t("admin.netPayout")}</p>
+                                            <p className="font-bold">${p.netPayout.toFixed(2)}</p>
+                                          </div>
+                                          <ChevronRight className={`h-4 w-4 transition-transform ${expandedBusiness === p.id ? "rotate-90" : ""}`} />
+                                        </div>
+                                      </div>
+                                      {expandedBusiness === p.id && (
+                                        <div className="mt-4 overflow-x-auto">
+                                          <table className="w-full text-sm">
+                                            <thead>
+                                              <tr className="border-b">
+                                                <th className="text-left py-2 pr-4 font-medium">{t("admin.day")}</th>
+                                                <th className="text-left py-2 pr-4 font-medium">{t("admin.date")}</th>
+                                                <th className="text-right py-2 pr-4 font-medium">{t("admin.colBookings")}</th>
+                                                <th className="text-right py-2 pr-4 font-medium">{t("admin.colServices")}</th>
+                                                <th className="text-right py-2 pr-4 font-medium">{t("admin.bookingFees")}</th>
+                                                <th className="text-right py-2 pr-4 font-medium">{t("admin.fee")}</th>
+                                                <th className="text-right py-2 font-medium">{t("admin.colPayout")}</th>
+                                              </tr>
+                                            </thead>
+                                            <tbody>
+                                              {p.dailyBreakdown.map(day => (
+                                                <tr key={day.date} className="border-b last:border-0">
+                                                  <td className="py-2 pr-4">{day.day}</td>
+                                                  <td className="py-2 pr-4 text-muted-foreground">{day.date}</td>
+                                                  <td className="py-2 pr-4 text-right">{day.bookings}</td>
+                                                  <td className="py-2 pr-4 text-right">${day.serviceRevenue.toFixed(2)}</td>
+                                                  <td className="py-2 pr-4 text-right">${day.bookingFeeRevenue.toFixed(2)}</td>
+                                                  <td className="py-2 pr-4 text-right text-green-600">${day.platformFee.toFixed(2)}</td>
+                                                  <td className="py-2 text-right font-medium">${day.netPayout.toFixed(2)}</td>
+                                                </tr>
+                                              ))}
+                                              <tr className="font-bold border-t-2">
+                                                <td className="py-2 pr-4" colSpan={2}>{t("admin.periodTotal")}</td>
+                                                <td className="py-2 pr-4 text-right">{p.totalBookings}</td>
+                                                <td className="py-2 pr-4 text-right">${p.serviceRevenue.toFixed(2)}</td>
+                                                <td className="py-2 pr-4 text-right">${p.bookingFeeRevenue.toFixed(2)}</td>
+                                                <td className="py-2 pr-4 text-right text-green-600">${p.platformFee.toFixed(2)}</td>
+                                                <td className="py-2 text-right">${p.netPayout.toFixed(2)}</td>
+                                              </tr>
+                                            </tbody>
+                                          </table>
+                                        </div>
+                                      )}
+                                    </CardContent>
+                                  </Card>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {filteredRestaurants.every(r => r.totalOrders === 0) && 
+                           filteredProviders.every(p => p.totalBookings === 0) && (
+                            <div className="text-center py-8 text-muted-foreground">
+                              <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-30" />
+                              <p>{t("admin.noTransactionsPeriod")}</p>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                 ) : null}
               </CardContent>
@@ -1503,7 +1599,7 @@ export default function AdminPage() {
                         <p className="text-sm text-muted-foreground">
                           {listing.category} - {listing.city} {listing.price ? `- $${listing.price}` : ""}
                         </p>
-                        <p className="text-xs text-muted-foreground truncate">{listing.contactInfo}</p>
+                        <p className="text-xs text-muted-foreground truncate">{listing.contactName} {listing.contactPhone ? `- ${listing.contactPhone}` : ""}</p>
                       </div>
                       <div className="flex items-center gap-4 flex-wrap">
                         <div className="flex items-center gap-2">
