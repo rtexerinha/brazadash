@@ -51,7 +51,7 @@ function SectionHeader({ title, subtitle, onSeeAll }: { title: string; subtitle?
 function RestaurantCard({ item, onPress }: { item: Restaurant; onPress: () => void }) {
   const [imageError, setImageError] = useState(false);
   const fallbackColors = ["#E8F5EF", "#FFF8E1", "#E3F2FD", "#FCE4EC", "#F3E5F5"];
-  const bgColor = fallbackColors[item.id % fallbackColors.length];
+  const bgColor = fallbackColors[Number(item.id) % fallbackColors.length];
 
   return (
     <TouchableOpacity style={styles.restaurantCard} onPress={onPress} activeOpacity={0.8}>

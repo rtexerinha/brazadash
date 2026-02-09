@@ -10,14 +10,18 @@
       "backgroundColor": "#1B9B59",
       "resizeMode": "contain"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.brazadash.app",
       "infoPlist": {
         "NSCameraUsageDescription": "Allow BrazaDash to access your camera for photos.",
-        "NSPhotoLibraryUsageDescription": "Allow BrazaDash to access your photos."
-      }
+        "NSPhotoLibraryUsageDescription": "Allow BrazaDash to access your photos.",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "buildNumber": "1.0.0"
     },
     "android": {
       "adaptiveIcon": {
@@ -33,7 +37,14 @@
           "icon": "./assets/notification-icon.png",
           "color": "#1B9B59"
         }
-      ]
-    ]
+      ],
+      "expo-font",
+      "expo-asset"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "fc998959-1ecb-47a8-846a-19cd6a95bdfa"
+      }
+    }
   }
 }

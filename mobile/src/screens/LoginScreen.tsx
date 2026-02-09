@@ -1,98 +1,75 @@
-import React, { useRef, useState } from "react";
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from "react-native";
-import { WebView } from "react-native-webview";
+import React, { useState, useEffect } from "react";
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Alert } from "react-native";
+import * as WebBrowser from "expo-web-browser";
 import { useNavigation } from "@react-navigation/native";
-import { setSessionCookie } from "../api/client";
 import { api } from "../api/client";
 import { useAuth } from "../contexts/AuthContext";
 import { colors, spacing, fontSize, fontWeight } from "../constants/theme";
 
 const AUTH_URL = "https://brazadash.replit.app/api/login";
 
+WebBrowser.maybeCompleteAuthSession();
+
 export default function LoginScreen() {
   const navigation = useNavigation<any>();
   const { setAuthenticated } = useAuth();
-  const webViewRef = useRef<WebView>(null);
-  const [loading, setLoading] = useState(true);
   const [authenticating, setAuthenticating] = useState(false);
 
-  const extractCookiesJS = `
-    (function() {
-      window.ReactNativeWebView.postMessage(JSON.stringify({
-        type: 'cookies',
-        value: document.cookie
-      }));
-    })();
-    true;
-  `;
+  const handleLogin = async () => {
+    setAuthenticating(true);
+    
+    try {
+      const result = await WebBrowser.openAuthSessionAsync(
+        AUTH_URL,
+        "brazadash://oauth-callback"
+      );
 
-  const handleNavigationChange = async (navState: any) => {
-    const { url } = navState;
-    if (authenticating) return;
-
-    const isPostLogin =
-      url.includes("brazadash.replit.app") &&
-      !url.includes("/api/login") &&
-      !url.includes("replit.com") &&
-      !url.includes("accounts.google.com") &&
-      !url.includes("github.com/login");
-
-    if (isPostLogin) {
-      setAuthenticating(true);
-      webViewRef.current?.injectJavaScript(extractCookiesJS);
-
-      setTimeout(async () => {
+      if (result.type === "success") {
+        // Wait a moment for cookies to be set
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Try to get the user profile
         try {
           const profile = await api.getMobileProfile();
           setAuthenticated(profile);
           navigation.goBack();
-        } catch {
+        } catch (error) {
+          Alert.alert("Login Failed", "Could not authenticate. Please try again.");
           setAuthenticating(false);
         }
-      }, 500);
+      } else {
+        setAuthenticating(false);
+      }
+    } catch (error) {
+      Alert.alert("Error", "An error occurred during login.");
+      setAuthenticating(false);
     }
   };
 
-  const handleMessage = async (event: any) => {
-    try {
-      const data = JSON.parse(event.nativeEvent.data);
-      if (data.type === "cookies" && data.value) {
-        await setSessionCookie(data.value);
-      }
-    } catch {}
-  };
+  useEffect(() => {
+    handleLogin();
+  }, []);
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} data-testid="button-cancel-login">
+        <TouchableOpacity 
+          onPress={() => navigation.goBack()} 
+          data-testid="button-cancel-login"
+          disabled={authenticating}
+        >
           <Text style={styles.cancelText}>Cancel</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Sign In</Text>
         <View style={{ width: 60 }} />
       </View>
 
-      {(loading || authenticating) && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>
-            {authenticating ? "Signing you in..." : "Loading sign-in page..."}
-          </Text>
-        </View>
-      )}
-
-      <WebView
-        ref={webViewRef}
-        source={{ uri: AUTH_URL }}
-        style={styles.webView}
-        onNavigationStateChange={handleNavigationChange}
-        onMessage={handleMessage}
-        onLoadEnd={() => setLoading(false)}
-        javaScriptEnabled
-        domStorageEnabled
-        sharedCookiesEnabled
-        thirdPartyCookiesEnabled
-      />
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.loadingText}>
+          {authenticating ? "Signing you in..." : "Opening browser..."}
+        </Text>
+      </View>
     </View>
   );
 }
@@ -119,17 +96,10 @@ const styles = StyleSheet.create({
     fontWeight: fontWeight.semibold,
     color: colors.text,
   },
-  webView: { flex: 1 },
-  loadingOverlay: {
-    position: "absolute",
-    top: 60,
-    left: 0,
-    right: 0,
-    bottom: 0,
+  loadingContainer: {
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: colors.background,
-    zIndex: 1,
   },
   loadingText: {
     marginTop: spacing.md,
