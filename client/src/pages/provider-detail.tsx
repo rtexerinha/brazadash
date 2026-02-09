@@ -18,11 +18,14 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { 
   Star, MapPin, Phone, Mail, Globe, Check, Clock, Calendar as CalendarIcon,
-  Languages, Award, MessageSquare, ChevronLeft
+  Languages, Award, MessageSquare, ChevronLeft, CreditCard, DollarSign
 } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
+import { useLanguage } from "@/lib/language-context";
 import type { ServiceProvider, Service, ServiceReview } from "@shared/schema";
+
+const PLATFORM_FEE_PERCENT = 0.08;
 
 function BookingDialog({ provider, service }: { provider: ServiceProvider; service?: Service }) {
   const [open, setOpen] = useState(false);
@@ -32,33 +35,40 @@ function BookingDialog({ provider, service }: { provider: ServiceProvider; servi
   const [notes, setNotes] = useState("");
   const { toast } = useToast();
   const { user } = useAuth();
+  const { t } = useLanguage();
 
-  const createBooking = useMutation({
+  const servicePrice = parseFloat(service?.price || "0");
+  const platformFee = Math.round(servicePrice * PLATFORM_FEE_PERCENT * 100) / 100;
+  const providerBookingFee = parseFloat(provider.bookingFee || "0");
+  const totalFees = platformFee + providerBookingFee;
+  const totalAmount = servicePrice + totalFees;
+
+  const createBookingCheckout = useMutation({
     mutationFn: async () => {
-      return apiRequest("POST", "/api/bookings", {
+      const res = await apiRequest("POST", "/api/bookings/checkout", {
         providerId: provider.id,
         serviceId: service?.id,
         requestedDate: date?.toISOString(),
         requestedTime: time,
         address,
         notes,
-        price: service?.price,
       });
+      return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
-      toast({ title: "Booking request sent!", description: "The provider will respond soon." });
-      setOpen(false);
+    onSuccess: (data: { url: string }) => {
+      if (data.url) {
+        window.location.href = data.url;
+      }
     },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to create booking.", variant: "destructive" });
+    onError: (error: Error) => {
+      toast({ title: t("booking.error"), description: error.message || t("booking.checkoutFailed"), variant: "destructive" });
     },
   });
 
   if (!user) {
     return (
       <Link href="/">
-        <Button data-testid="button-login-to-book">Login to Book</Button>
+        <Button data-testid="button-login-to-book">{t("booking.loginToBook")}</Button>
       </Link>
     );
   }
@@ -67,24 +77,24 @@ function BookingDialog({ provider, service }: { provider: ServiceProvider; servi
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button data-testid={`button-book-${service?.id || "provider"}`}>
-          {service ? `Book - $${parseFloat(service.price || "0").toFixed(2)}` : "Request Booking"}
+          {totalAmount > 0 ? `${t("booking.book")} - $${totalAmount.toFixed(2)}` : t("booking.requestBooking")}
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Book {service?.name || provider.businessName}</DialogTitle>
+          <DialogTitle>{t("booking.book")} {service?.name || provider.businessName}</DialogTitle>
           <DialogDescription>
-            Select your preferred date and time for the service
+            {t("booking.selectDateTime")}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label>Date</Label>
+            <Label>{t("booking.date")}</Label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="outline" className="w-full justify-start" data-testid="button-select-date">
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {date ? format(date, "PPP") : "Select date"}
+                  {date ? format(date, "PPP") : t("booking.selectDate")}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0">
@@ -98,7 +108,7 @@ function BookingDialog({ provider, service }: { provider: ServiceProvider; servi
             </Popover>
           </div>
           <div className="space-y-2">
-            <Label>Time</Label>
+            <Label>{t("booking.time")}</Label>
             <Input
               type="time"
               value={time}
@@ -107,32 +117,70 @@ function BookingDialog({ provider, service }: { provider: ServiceProvider; servi
             />
           </div>
           <div className="space-y-2">
-            <Label>Address</Label>
+            <Label>{t("booking.address")}</Label>
             <Input
-              placeholder="Service location address"
+              placeholder={t("booking.addressPlaceholder")}
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               data-testid="input-booking-address"
             />
           </div>
           <div className="space-y-2">
-            <Label>Notes (optional)</Label>
+            <Label>{t("booking.notes")}</Label>
             <Textarea
-              placeholder="Any special requests or details..."
+              placeholder={t("booking.notesPlaceholder")}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               className="resize-none"
               data-testid="input-booking-notes"
             />
           </div>
+
+          {totalAmount > 0 && (
+            <Card>
+              <CardContent className="p-4 space-y-2">
+                <div className="flex items-center gap-2 mb-2">
+                  <CreditCard className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium text-sm">{t("booking.paymentSummary")}</span>
+                </div>
+                {service && servicePrice > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span>{service.name}</span>
+                    <span data-testid="text-service-price">${servicePrice.toFixed(2)}</span>
+                  </div>
+                )}
+                {platformFee > 0 && (
+                  <div className="flex justify-between text-sm text-muted-foreground">
+                    <span>{t("booking.platformFee")} (8%)</span>
+                    <span data-testid="text-platform-fee">${platformFee.toFixed(2)}</span>
+                  </div>
+                )}
+                {providerBookingFee > 0 && (
+                  <div className="flex justify-between text-sm text-muted-foreground">
+                    <span>{t("booking.bookingFee")}</span>
+                    <span data-testid="text-booking-fee">${providerBookingFee.toFixed(2)}</span>
+                  </div>
+                )}
+                <div className="border-t pt-2 flex justify-between font-semibold">
+                  <span>{t("booking.total")}</span>
+                  <span data-testid="text-booking-total">${totalAmount.toFixed(2)}</span>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
         <DialogFooter>
           <Button 
-            onClick={() => createBooking.mutate()} 
-            disabled={!date || createBooking.isPending}
+            onClick={() => createBookingCheckout.mutate()} 
+            disabled={!date || createBookingCheckout.isPending || totalAmount <= 0}
             data-testid="button-submit-booking"
           >
-            {createBooking.isPending ? "Sending..." : "Send Request"}
+            {createBookingCheckout.isPending ? t("booking.processing") : (
+              <>
+                <CreditCard className="mr-2 h-4 w-4" />
+                {t("booking.payAndBook")} ${totalAmount.toFixed(2)}
+              </>
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

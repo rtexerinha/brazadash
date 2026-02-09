@@ -10,6 +10,7 @@ export const userRoles = pgTable("user_roles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),
   role: varchar("role", { enum: ["customer", "vendor", "service_provider", "admin"] }).notNull().default("customer"),
+  approvalStatus: varchar("approval_status", { enum: ["approved", "pending", "rejected"] }).notNull().default("approved"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -24,10 +25,16 @@ export const restaurants = pgTable("restaurants", {
   city: varchar("city", { length: 100 }),
   phone: varchar("phone", { length: 20 }),
   imageUrl: text("image_url"),
+  galleryImages: jsonb("gallery_images"),
   rating: decimal("rating", { precision: 2, scale: 1 }).default("0"),
   reviewCount: integer("review_count").default(0),
   deliveryFee: decimal("delivery_fee", { precision: 10, scale: 2 }).default("3.99"),
   deliveryTime: varchar("delivery_time", { length: 50 }).default("30-45 min"),
+  bankName: varchar("bank_name", { length: 255 }),
+  routingNumber: varchar("routing_number", { length: 20 }),
+  bankAccountNumber: varchar("bank_account_number", { length: 30 }),
+  zelleInfo: varchar("zelle_info", { length: 255 }),
+  venmoInfo: varchar("venmo_info", { length: 255 }),
   isOpen: boolean("is_open").default(true),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
@@ -42,6 +49,7 @@ export const menuItems = pgTable("menu_items", {
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   imageUrl: text("image_url"),
   category: varchar("category", { length: 100 }),
+  quantity: integer("quantity").default(-1),
   isAvailable: boolean("is_available").default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -124,6 +132,7 @@ export const serviceProviders = pgTable("service_providers", {
   phone: varchar("phone", { length: 20 }),
   email: varchar("email", { length: 255 }),
   website: varchar("website", { length: 255 }),
+  einNumber: varchar("ein_number", { length: 20 }),
   imageUrl: text("image_url"),
   galleryImages: jsonb("gallery_images"), // Array of image URLs
   certifications: jsonb("certifications"), // Array of {name, issuer, year}
@@ -132,7 +141,13 @@ export const serviceProviders = pgTable("service_providers", {
   rating: decimal("rating", { precision: 2, scale: 1 }).default("0"),
   reviewCount: integer("review_count").default(0),
   priceRange: varchar("price_range", { length: 20 }).default("$$"), // $, $$, $$$
+  bookingFee: decimal("booking_fee", { precision: 10, scale: 2 }).default("0"),
   availability: jsonb("availability"), // {monday: {start: "09:00", end: "17:00"}, ...}
+  bankName: varchar("bank_name", { length: 255 }),
+  routingNumber: varchar("routing_number", { length: 20 }),
+  bankAccountNumber: varchar("bank_account_number", { length: 30 }),
+  zelleInfo: varchar("zelle_info", { length: 255 }),
+  venmoInfo: varchar("venmo_info", { length: 255 }),
   isVerified: boolean("is_verified").default(false),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
@@ -169,6 +184,10 @@ export const bookings = pgTable("bookings", {
   address: text("address"),
   notes: text("notes"),
   price: decimal("price", { precision: 10, scale: 2 }),
+  bookingFee: decimal("booking_fee", { precision: 10, scale: 2 }).default("0"),
+  totalPaid: decimal("total_paid", { precision: 10, scale: 2 }),
+  stripeSessionId: varchar("stripe_session_id"),
+  isPaid: boolean("is_paid").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -345,6 +364,28 @@ export const announcements = pgTable("announcements", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Yellow Pages listings table
+export const yellowPages = pgTable("yellow_pages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  createdBy: varchar("created_by").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  category: varchar("category", { length: 100 }).notNull(),
+  price: varchar("price", { length: 100 }),
+  city: varchar("city", { length: 100 }).notNull(),
+  state: varchar("state", { length: 50 }).default("CA"),
+  address: text("address"),
+  contactName: varchar("contact_name", { length: 255 }),
+  contactPhone: varchar("contact_phone", { length: 30 }),
+  contactEmail: varchar("contact_email", { length: 255 }),
+  contactWhatsapp: varchar("contact_whatsapp", { length: 30 }),
+  imageUrl: text("image_url"),
+  images: jsonb("images").$type<string[]>(),
+  isApproved: boolean("is_approved").default(false),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Event RSVPs
 export const eventRsvps = pgTable("event_rsvps", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -359,6 +400,7 @@ export const insertEventSchema = createInsertSchema(events).omit({ id: true, cre
 export const insertBusinessSchema = createInsertSchema(businesses).omit({ id: true, createdAt: true });
 export const insertAnnouncementSchema = createInsertSchema(announcements).omit({ id: true, createdAt: true, viewCount: true });
 export const insertEventRsvpSchema = createInsertSchema(eventRsvps).omit({ id: true, createdAt: true });
+export const insertYellowPageSchema = createInsertSchema(yellowPages).omit({ id: true, createdAt: true });
 
 // Community Hub Types
 export type InsertEvent = z.infer<typeof insertEventSchema>;
@@ -372,6 +414,9 @@ export type Announcement = typeof announcements.$inferSelect;
 
 export type InsertEventRsvp = z.infer<typeof insertEventRsvpSchema>;
 export type EventRsvp = typeof eventRsvps.$inferSelect;
+
+export type InsertYellowPage = z.infer<typeof insertYellowPageSchema>;
+export type YellowPage = typeof yellowPages.$inferSelect;
 
 export type EventCategory = typeof eventCategories[number];
 

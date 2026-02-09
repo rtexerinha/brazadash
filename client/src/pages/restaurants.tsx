@@ -6,9 +6,11 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Star, Clock, MapPin, Search, Utensils } from "lucide-react";
 import { useState, useMemo } from "react";
+import { useLanguage } from "@/lib/language-context";
 import type { Restaurant } from "@shared/schema";
 
 function RestaurantCard({ restaurant }: { restaurant: Restaurant }) {
+  const { t } = useLanguage();
   return (
     <Link href={`/restaurant/${restaurant.id}`}>
       <Card className="overflow-hidden hover-elevate cursor-pointer h-full" data-testid={`card-restaurant-${restaurant.id}`}>
@@ -32,10 +34,10 @@ function RestaurantCard({ restaurant }: { restaurant: Restaurant }) {
             </h3>
             {restaurant.isOpen ? (
               <Badge variant="secondary" className="shrink-0 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                Open
+                {t("restaurants.open")}
               </Badge>
             ) : (
-              <Badge variant="secondary" className="shrink-0">Closed</Badge>
+              <Badge variant="secondary" className="shrink-0">{t("restaurants.closed")}</Badge>
             )}
           </div>
           
@@ -58,7 +60,7 @@ function RestaurantCard({ restaurant }: { restaurant: Restaurant }) {
           <div className="flex items-center gap-1 mt-2 text-sm text-muted-foreground">
             <MapPin className="h-4 w-4" />
             <span className="line-clamp-1">{restaurant.city}</span>
-            <span className="ml-auto font-medium text-foreground">${parseFloat(restaurant.deliveryFee || "0").toFixed(2)} delivery</span>
+            <span className="ml-auto font-medium text-foreground">${parseFloat(restaurant.deliveryFee || "0").toFixed(2)} {t("home.delivery")}</span>
           </div>
         </CardContent>
       </Card>
@@ -80,6 +82,7 @@ function RestaurantSkeleton() {
 }
 
 export default function RestaurantsPage() {
+  const { t } = useLanguage();
   const [searchTerm, setSearchTerm] = useState("");
   
   const { data: restaurants, isLoading } = useQuery<Restaurant[]>({
@@ -104,15 +107,15 @@ export default function RestaurantsPage() {
       <div className="container mx-auto px-4">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Restaurants</h1>
-          <p className="text-muted-foreground">Explore authentic Brazilian restaurants near you</p>
+          <h1 className="text-3xl font-bold mb-2">{t("restaurants.title")}</h1>
+          <p className="text-muted-foreground">{t("restaurants.subtitle")}</p>
         </div>
 
         {/* Search */}
         <div className="relative mb-8 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search restaurants, cuisine, or city..."
+            placeholder={t("restaurants.search")}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
@@ -139,11 +142,11 @@ export default function RestaurantsPage() {
               <Search className="h-8 w-8 text-muted-foreground" />
             </div>
             <h3 className="text-lg font-semibold mb-2">
-              {searchTerm ? "No restaurants found" : "No restaurants yet"}
+              {searchTerm ? t("restaurants.noResults") : "No restaurants yet"}
             </h3>
             <p className="text-muted-foreground">
               {searchTerm
-                ? "Try adjusting your search terms"
+                ? t("restaurants.noResultsDesc")
                 : "Be the first to add your restaurant to BrazaDash!"}
             </p>
           </Card>

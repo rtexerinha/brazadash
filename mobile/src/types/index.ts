@@ -222,6 +222,30 @@ export interface Announcement {
   createdAt: string;
 }
 
+export type YellowPageCategory =
+  | "room" | "shared-room" | "house" | "apartment" | "car" | "other";
+
+export interface YellowPageListing {
+  id: string;
+  createdBy: string;
+  title: string;
+  description: string | null;
+  category: string;
+  price: string | null;
+  city: string;
+  state: string;
+  address: string | null;
+  contactName: string | null;
+  contactPhone: string | null;
+  contactEmail: string | null;
+  contactWhatsapp: string | null;
+  imageUrl: string | null;
+  images: string[] | null;
+  isApproved: boolean;
+  isActive: boolean;
+  createdAt: string;
+}
+
 export interface MobileProfile {
   id: string;
   email: string | null;

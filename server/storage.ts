@@ -1,7 +1,7 @@
 import { 
   restaurants, menuItems, orders, reviews, notifications, userRoles,
   serviceProviders, services, bookings, serviceReviews, messages,
-  events, businesses, announcements, eventRsvps, pushTokens,
+  events, businesses, announcements, eventRsvps, yellowPages, pushTokens,
   type Restaurant, type InsertRestaurant,
   type MenuItem, type InsertMenuItem,
   type Order, type InsertOrder,
@@ -17,6 +17,7 @@ import {
   type Business, type InsertBusiness,
   type Announcement, type InsertAnnouncement,
   type EventRsvp, type InsertEventRsvp,
+  type YellowPage, type InsertYellowPage,
   type PushToken, type InsertPushToken
 } from "@shared/schema";
 import { db } from "./db";
@@ -60,6 +61,8 @@ export interface IStorage {
   // User Roles
   getUserRole(userId: string): Promise<UserRole | undefined>;
   createUserRole(role: InsertUserRole): Promise<UserRole>;
+  updateUserRoleApproval(userId: string, role: string, approvalStatus: string): Promise<UserRole | undefined>;
+  getPendingApprovals(): Promise<UserRole[]>;
   
   // Service Providers
   getServiceProviders(category?: string): Promise<ServiceProvider[]>;
@@ -80,6 +83,7 @@ export interface IStorage {
   getBookings(customerId: string): Promise<(Booking & { provider?: { businessName: string } })[]>;
   getBooking(id: string): Promise<(Booking & { provider?: ServiceProvider; service?: Service }) | undefined>;
   getBookingsByProvider(providerId: string): Promise<Booking[]>;
+  getBookingByStripeSession(sessionId: string): Promise<Booking | undefined>;
   createBooking(booking: InsertBooking): Promise<Booking>;
   updateBookingStatus(id: string, status: string, data?: Partial<InsertBooking>): Promise<Booking | undefined>;
   
@@ -118,6 +122,15 @@ export interface IStorage {
   updateBusiness(id: string, data: Partial<InsertBusiness>): Promise<Business | undefined>;
   deleteBusiness(id: string): Promise<void>;
   
+  // Yellow Pages (Community Hub)
+  getYellowPages(category?: string, city?: string, search?: string): Promise<YellowPage[]>;
+  getYellowPage(id: string): Promise<YellowPage | undefined>;
+  createYellowPage(listing: InsertYellowPage): Promise<YellowPage>;
+  updateYellowPage(id: string, data: Partial<InsertYellowPage>): Promise<YellowPage | undefined>;
+  deleteYellowPage(id: string): Promise<void>;
+  getAllYellowPages(): Promise<YellowPage[]>;
+  getYellowPageCities(): Promise<string[]>;
+
   // Announcements (Community Hub)
   getAnnouncements(): Promise<Announcement[]>;
   getActiveAnnouncements(): Promise<Announcement[]>;
@@ -151,14 +164,18 @@ export interface IStorage {
   addUserRole(userId: string, role: string): Promise<UserRole>;
   removeUserRole(userId: string, role: string): Promise<void>;
   getAllRestaurants(): Promise<Restaurant[]>;
-  getAllOrders(): Promise<Order[]>;
+  getAllOrders(): Promise<(Order & { restaurant?: { name: string } })[]>;
   getAllBookings(): Promise<Booking[]>;
   getAllEvents(): Promise<Event[]>;
   getAllBusinesses(): Promise<Business[]>;
   getAllAnnouncements(): Promise<Announcement[]>;
   getAllServiceProviders(): Promise<ServiceProvider[]>;
   getAllReviews(): Promise<Review[]>;
+  getAllServiceReviews(): Promise<ServiceReview[]>;
   deleteReview(id: string): Promise<void>;
+  deleteServiceReview(id: string): Promise<void>;
+  deleteRestaurant(id: string): Promise<void>;
+  deleteServiceProvider(id: string): Promise<void>;
 }
 
 class DatabaseStorage implements IStorage {
@@ -313,6 +330,18 @@ class DatabaseStorage implements IStorage {
     return created;
   }
 
+  async updateUserRoleApproval(userId: string, role: string, approvalStatus: string): Promise<UserRole | undefined> {
+    const [updated] = await db.update(userRoles)
+      .set({ approvalStatus: approvalStatus as any })
+      .where(and(eq(userRoles.userId, userId), eq(userRoles.role, role as any)))
+      .returning();
+    return updated;
+  }
+
+  async getPendingApprovals(): Promise<UserRole[]> {
+    return db.select().from(userRoles).where(eq(userRoles.approvalStatus, "pending")).orderBy(desc(userRoles.createdAt));
+  }
+
   // Service Providers
   async getServiceProviders(category?: string): Promise<ServiceProvider[]> {
     if (category) {
@@ -428,6 +457,11 @@ class DatabaseStorage implements IStorage {
     return db.select().from(bookings)
       .where(eq(bookings.providerId, providerId))
       .orderBy(desc(bookings.createdAt));
+  }
+
+  async getBookingByStripeSession(sessionId: string): Promise<Booking | undefined> {
+    const [booking] = await db.select().from(bookings).where(eq(bookings.stripeSessionId, sessionId));
+    return booking;
   }
 
   async createBooking(booking: InsertBooking): Promise<Booking> {
@@ -580,7 +614,7 @@ class DatabaseStorage implements IStorage {
 
   async updateEventRsvp(eventId: string, userId: string, status: string): Promise<EventRsvp | undefined> {
     const [updated] = await db.update(eventRsvps)
-      .set({ status })
+      .set({ status: status as any })
       .where(and(eq(eventRsvps.eventId, eventId), eq(eventRsvps.userId, userId)))
       .returning();
     return updated;
@@ -645,6 +679,54 @@ class DatabaseStorage implements IStorage {
 
   async deleteBusiness(id: string): Promise<void> {
     await db.delete(businesses).where(eq(businesses.id, id));
+  }
+
+  // Yellow Pages (Community Hub)
+  async getYellowPages(category?: string, city?: string, search?: string): Promise<YellowPage[]> {
+    const conditions = [eq(yellowPages.isApproved, true), eq(yellowPages.isActive, true)];
+    if (category) conditions.push(eq(yellowPages.category, category));
+    if (city) conditions.push(eq(yellowPages.city, city));
+    if (search) {
+      const searchPattern = `%${search}%`;
+      conditions.push(or(
+        ilike(yellowPages.title, searchPattern),
+        ilike(yellowPages.description, searchPattern)
+      )!);
+    }
+    return db.select().from(yellowPages)
+      .where(and(...conditions))
+      .orderBy(desc(yellowPages.createdAt));
+  }
+
+  async getYellowPage(id: string): Promise<YellowPage | undefined> {
+    const [listing] = await db.select().from(yellowPages).where(eq(yellowPages.id, id));
+    return listing;
+  }
+
+  async createYellowPage(listing: InsertYellowPage): Promise<YellowPage> {
+    const [created] = await db.insert(yellowPages).values(listing).returning();
+    return created;
+  }
+
+  async updateYellowPage(id: string, data: Partial<InsertYellowPage>): Promise<YellowPage | undefined> {
+    const [updated] = await db.update(yellowPages).set(data).where(eq(yellowPages.id, id)).returning();
+    return updated;
+  }
+
+  async deleteYellowPage(id: string): Promise<void> {
+    await db.delete(yellowPages).where(eq(yellowPages.id, id));
+  }
+
+  async getAllYellowPages(): Promise<YellowPage[]> {
+    return db.select().from(yellowPages).orderBy(desc(yellowPages.createdAt));
+  }
+
+  async getYellowPageCities(): Promise<string[]> {
+    const results = await db.selectDistinct({ city: yellowPages.city })
+      .from(yellowPages)
+      .where(and(eq(yellowPages.isApproved, true), eq(yellowPages.isActive, true)))
+      .orderBy(yellowPages.city);
+    return results.map(r => r.city);
   }
 
   // Announcements (Community Hub)
@@ -760,20 +842,28 @@ class DatabaseStorage implements IStorage {
   }
 
   async addUserRole(userId: string, role: string): Promise<UserRole> {
-    const [created] = await db.insert(userRoles).values({ userId, role }).returning();
+    const [created] = await db.insert(userRoles).values({ userId, role: role as any }).returning();
     return created;
   }
 
   async removeUserRole(userId: string, role: string): Promise<void> {
-    await db.delete(userRoles).where(and(eq(userRoles.userId, userId), eq(userRoles.role, role)));
+    await db.delete(userRoles).where(and(eq(userRoles.userId, userId), eq(userRoles.role, role as any)));
   }
 
   async getAllRestaurants(): Promise<Restaurant[]> {
     return db.select().from(restaurants).orderBy(desc(restaurants.createdAt));
   }
 
-  async getAllOrders(): Promise<Order[]> {
-    return db.select().from(orders).orderBy(desc(orders.createdAt));
+  async getAllOrders(): Promise<(Order & { restaurant?: { name: string } })[]> {
+    const [orderList, allRestaurants] = await Promise.all([
+      db.select().from(orders).orderBy(desc(orders.createdAt)),
+      db.select().from(restaurants),
+    ]);
+    const restaurantMap = new Map(allRestaurants.map(r => [r.id, r.name]));
+    return orderList.map((order) => ({
+      ...order,
+      restaurant: restaurantMap.has(order.restaurantId) ? { name: restaurantMap.get(order.restaurantId)! } : undefined,
+    }));
   }
 
   async getAllBookings(): Promise<Booking[]> {
@@ -802,6 +892,24 @@ class DatabaseStorage implements IStorage {
 
   async deleteReview(id: string): Promise<void> {
     await db.delete(reviews).where(eq(reviews.id, id));
+  }
+
+  async getAllServiceReviews(): Promise<ServiceReview[]> {
+    return db.select().from(serviceReviews).orderBy(desc(serviceReviews.createdAt));
+  }
+
+  async deleteServiceReview(id: string): Promise<void> {
+    await db.delete(serviceReviews).where(eq(serviceReviews.id, id));
+  }
+
+  async deleteRestaurant(id: string): Promise<void> {
+    await db.delete(menuItems).where(eq(menuItems.restaurantId, id));
+    await db.delete(restaurants).where(eq(restaurants.id, id));
+  }
+
+  async deleteServiceProvider(id: string): Promise<void> {
+    await db.delete(services).where(eq(services.providerId, id));
+    await db.delete(serviceProviders).where(eq(serviceProviders.id, id));
   }
 
   // Push Tokens (Mobile)

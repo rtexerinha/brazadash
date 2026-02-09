@@ -3,10 +3,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useCart } from "@/lib/cart-context";
+import { useLanguage } from "@/lib/language-context";
 import { Plus, Minus, Trash2, ShoppingBag, ChevronRight } from "lucide-react";
 
 export default function CartPage() {
   const { items, updateQuantity, removeItem, clearCart, getSubtotal } = useCart();
+  const { t } = useLanguage();
 
   const subtotal = getSubtotal();
   const deliveryFee = items.length > 0 ? 3.99 : 0;
@@ -19,13 +21,13 @@ export default function CartPage() {
           <div className="mx-auto h-20 w-20 rounded-full bg-muted flex items-center justify-center mb-6">
             <ShoppingBag className="h-10 w-10 text-muted-foreground" />
           </div>
-          <h1 className="text-2xl font-bold mb-2">Your cart is empty</h1>
+          <h1 className="text-2xl font-bold mb-2">{t("cart.empty")}</h1>
           <p className="text-muted-foreground mb-8 max-w-md mx-auto">
-            Looks like you haven't added any items yet. Explore our delicious Brazilian restaurants!
+            {t("cart.emptyDesc")}
           </p>
           <Button size="lg" asChild data-testid="button-browse-restaurants">
             <Link href="/restaurants">
-              Browse Restaurants
+              {t("cart.browseRestaurants")}
               <ChevronRight className="ml-2 h-4 w-4" />
             </Link>
           </Button>
@@ -39,9 +41,9 @@ export default function CartPage() {
   return (
     <div className="min-h-screen py-8">
       <div className="container mx-auto px-4">
-        <h1 className="text-3xl font-bold mb-2">Your Cart</h1>
+        <h1 className="text-3xl font-bold mb-2">{t("cart.title")}</h1>
         <p className="text-muted-foreground mb-8">
-          Order from <span className="font-medium text-foreground">{restaurantName}</span>
+          {t("cart.orderFrom")} <span className="font-medium text-foreground">{restaurantName}</span>
         </p>
 
         <div className="grid lg:grid-cols-3 gap-8">
@@ -49,7 +51,7 @@ export default function CartPage() {
           <div className="lg:col-span-2">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between gap-4">
-                <CardTitle>Order Items</CardTitle>
+                <CardTitle>{t("cart.items")}</CardTitle>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -58,7 +60,7 @@ export default function CartPage() {
                   data-testid="button-clear-cart"
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
-                  Clear Cart
+                  {t("cart.clearCart")}
                 </Button>
               </CardHeader>
               <CardContent className="divide-y">
@@ -107,7 +109,7 @@ export default function CartPage() {
                       </div>
                     </div>
                     <p className="text-sm font-medium mt-2" data-testid={`text-item-total-${item.menuItemId}`}>
-                      Subtotal: ${(parseFloat(item.price) * item.quantity).toFixed(2)}
+                      {t("cart.subtotal")}: ${(parseFloat(item.price) * item.quantity).toFixed(2)}
                     </p>
                   </div>
                 ))}
@@ -123,23 +125,23 @@ export default function CartPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Subtotal</span>
+                  <span className="text-muted-foreground">{t("cart.subtotal")}</span>
                   <span data-testid="text-subtotal">${subtotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Delivery Fee</span>
+                  <span className="text-muted-foreground">{t("cart.deliveryFee")}</span>
                   <span>${deliveryFee.toFixed(2)}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between text-lg font-semibold">
-                  <span>Total</span>
+                  <span>{t("cart.total")}</span>
                   <span data-testid="text-total">${total.toFixed(2)}</span>
                 </div>
               </CardContent>
               <CardFooter>
                 <Button className="w-full" size="lg" asChild data-testid="button-checkout">
                   <Link href="/checkout">
-                    Proceed to Checkout
+                    {t("cart.proceedToCheckout")}
                     <ChevronRight className="ml-2 h-4 w-4" />
                   </Link>
                 </Button>

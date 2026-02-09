@@ -13,22 +13,33 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/use-auth";
 import { useCart } from "@/lib/cart-context";
 import { useTheme } from "@/components/theme-provider";
-import { ShoppingCart, Sun, Moon, User, LogOut, Store, Bell, Menu, Briefcase, Calendar, Users, Shield } from "lucide-react";
+import { useLanguage } from "@/lib/language-context";
+import { LanguageToggle } from "@/components/language-toggle";
+import { ShoppingCart, Sun, Moon, LogOut, Store, Bell, Briefcase, Calendar, Shield } from "lucide-react";
 import { useState } from "react";
+import { AuthDialog, useAuthDialog } from "@/components/auth-dialog";
 
 export function Navbar() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { getItemCount } = useCart();
   const { theme, toggleTheme } = useTheme();
+  const { t } = useLanguage();
   const [location] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { openAuthDialog, authDialogProps } = useAuthDialog();
   const itemCount = getItemCount();
 
-  const { data: adminStatus } = useQuery<{ isAdmin: boolean }>({
-    queryKey: ["/api/user/is-admin"],
+  const { data: roleData } = useQuery<{ roles: string[] }>({
+    queryKey: ["/api/user/role"],
     enabled: isAuthenticated,
-    staleTime: 60000,
+    staleTime: 1000 * 60 * 5,
   });
+
+  const roles = roleData?.roles || [];
+  const isAdmin = roles.includes("admin");
+  const isVendor = roles.includes("vendor");
+  const isProvider = roles.includes("service_provider");
+  const isCustomer = roles.includes("customer");
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -47,16 +58,45 @@ export function Navbar() {
 
         {isAuthenticated && (
           <nav className="hidden md:flex items-center gap-6">
-            <Link href="/">
-              <span
-                className={`text-sm font-medium transition-colors cursor-pointer ${
-                  location === "/" ? "text-primary" : "text-muted-foreground hover:text-foreground"
-                }`}
-                data-testid="link-home"
-              >
-                Home
-              </span>
-            </Link>
+            {isVendor && (
+              <Link href="/vendor">
+                <span
+                  className={`text-sm font-medium transition-colors cursor-pointer ${
+                    location === "/vendor" ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  data-testid="link-vendor-dashboard"
+                >
+                  {t("nav.myRestaurant")}
+                </span>
+              </Link>
+            )}
+
+            {isProvider && (
+              <Link href="/provider-portal">
+                <span
+                  className={`text-sm font-medium transition-colors cursor-pointer ${
+                    location === "/provider-portal" ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  data-testid="link-provider-dashboard"
+                >
+                  {t("nav.myServices")}
+                </span>
+              </Link>
+            )}
+
+            {isCustomer && (
+              <Link href="/">
+                <span
+                  className={`text-sm font-medium transition-colors cursor-pointer ${
+                    location === "/" ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  data-testid="link-home"
+                >
+                  {t("nav.home")}
+                </span>
+              </Link>
+            )}
+
             <Link href="/restaurants">
               <span
                 className={`text-sm font-medium transition-colors cursor-pointer ${
@@ -64,7 +104,7 @@ export function Navbar() {
                 }`}
                 data-testid="link-restaurants"
               >
-                Food
+                {t("nav.food")}
               </span>
             </Link>
             <Link href="/services">
@@ -74,7 +114,7 @@ export function Navbar() {
                 }`}
                 data-testid="link-services"
               >
-                Services
+                {t("nav.services")}
               </span>
             </Link>
             <Link href="/community">
@@ -86,23 +126,27 @@ export function Navbar() {
                 }`}
                 data-testid="link-community"
               >
-                Community
+                {t("nav.community")}
               </span>
             </Link>
-            <Link href="/orders">
-              <span
-                className={`text-sm font-medium transition-colors cursor-pointer ${
-                  location === "/orders" ? "text-primary" : "text-muted-foreground hover:text-foreground"
-                }`}
-                data-testid="link-orders"
-              >
-                My Orders
-              </span>
-            </Link>
+            {isCustomer && (
+              <Link href="/orders">
+                <span
+                  className={`text-sm font-medium transition-colors cursor-pointer ${
+                    location === "/orders" ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  data-testid="link-orders"
+                >
+                  {t("nav.myOrders")}
+                </span>
+              </Link>
+            )}
           </nav>
         )}
 
         <div className="flex items-center gap-2">
+          <LanguageToggle />
+
           <Button
             variant="ghost"
             size="icon"
@@ -114,16 +158,18 @@ export function Navbar() {
 
           {isAuthenticated && (
             <>
-              <Link href="/cart">
-                <Button variant="ghost" size="icon" className="relative" data-testid="button-cart">
-                  <ShoppingCart className="h-5 w-5" />
-                  {itemCount > 0 && (
-                    <Badge className="absolute -right-1 -top-1 h-5 w-5 flex items-center justify-center p-0 text-xs">
-                      {itemCount}
-                    </Badge>
-                  )}
-                </Button>
-              </Link>
+              {(isCustomer || isVendor) && (
+                <Link href="/cart">
+                  <Button variant="ghost" size="icon" className="relative" data-testid="button-cart">
+                    <ShoppingCart className="h-5 w-5" />
+                    {itemCount > 0 && (
+                      <Badge className="absolute -right-1 -top-1 h-5 w-5 flex items-center justify-center p-0 text-xs">
+                        {itemCount}
+                      </Badge>
+                    )}
+                  </Button>
+                </Link>
+              )}
 
               <Link href="/notifications">
                 <Button variant="ghost" size="icon" data-testid="button-notifications">
@@ -155,32 +201,49 @@ export function Navbar() {
                           {user.email}
                         </p>
                       )}
+                      <Badge variant="outline" className="w-fit text-xs mt-1" data-testid="badge-user-role">
+                        {isVendor ? t("nav.restaurantVendor") : isProvider ? t("nav.serviceProvider") : t("nav.customer")}
+                      </Badge>
                     </div>
                   </div>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link href="/vendor" className="cursor-pointer" data-testid="link-vendor-portal">
-                      <Store className="mr-2 h-4 w-4" />
-                      <span>Restaurant Portal</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/provider-portal" className="cursor-pointer" data-testid="link-provider-portal">
-                      <Briefcase className="mr-2 h-4 w-4" />
-                      <span>Service Provider</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/bookings" className="cursor-pointer" data-testid="link-bookings">
-                      <Calendar className="mr-2 h-4 w-4" />
-                      <span>My Bookings</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  {adminStatus?.isAdmin && (
+                  {isVendor && (
+                    <DropdownMenuItem asChild>
+                      <Link href="/vendor" className="cursor-pointer" data-testid="link-vendor-portal">
+                        <Store className="mr-2 h-4 w-4" />
+                        <span>{t("nav.restaurantPortal")}</span>
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
+                  {isProvider && (
+                    <DropdownMenuItem asChild>
+                      <Link href="/provider-portal" className="cursor-pointer" data-testid="link-provider-portal">
+                        <Briefcase className="mr-2 h-4 w-4" />
+                        <span>{t("nav.serviceProviderPortal")}</span>
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
+                  {isCustomer && (
+                    <>
+                      <DropdownMenuItem asChild>
+                        <Link href="/orders" className="cursor-pointer" data-testid="link-orders-menu">
+                          <ShoppingCart className="mr-2 h-4 w-4" />
+                          <span>{t("nav.myOrders")}</span>
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href="/bookings" className="cursor-pointer" data-testid="link-bookings">
+                          <Calendar className="mr-2 h-4 w-4" />
+                          <span>{t("nav.myBookings")}</span>
+                        </Link>
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  {isAdmin && (
                     <DropdownMenuItem asChild>
                       <Link href="/admin" className="cursor-pointer" data-testid="link-admin">
                         <Shield className="mr-2 h-4 w-4" />
-                        <span>Admin Dashboard</span>
+                        <span>{t("nav.adminDashboard")}</span>
                       </Link>
                     </DropdownMenuItem>
                   )}
@@ -188,7 +251,7 @@ export function Navbar() {
                   <DropdownMenuItem asChild>
                     <a href="/api/logout" className="cursor-pointer text-destructive" data-testid="button-logout">
                       <LogOut className="mr-2 h-4 w-4" />
-                      <span>Log out</span>
+                      <span>{t("nav.logout")}</span>
                     </a>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -197,12 +260,13 @@ export function Navbar() {
           )}
 
           {!isLoading && !isAuthenticated && (
-            <Button asChild data-testid="button-login">
-              <a href="/api/login">Get Started</a>
+            <Button onClick={openAuthDialog} data-testid="button-login">
+              {t("nav.getStarted")}
             </Button>
           )}
         </div>
       </div>
+      <AuthDialog {...authDialogProps} />
     </header>
   );
 }

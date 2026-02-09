@@ -1,11 +1,12 @@
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent } from "@/components/ui/card";
+import { useLanguage } from "@/lib/language-context";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-import { Package, ChevronRight, Clock, MapPin } from "lucide-react";
+import { Package, ChevronRight, Store } from "lucide-react";
 import type { Order } from "@shared/schema";
 
 const statusColors: Record<string, string> = {
@@ -18,54 +19,66 @@ const statusColors: Record<string, string> = {
   cancelled: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
 };
 
-const statusLabels: Record<string, string> = {
-  pending: "Pending",
-  confirmed: "Confirmed",
-  preparing: "Preparing",
-  ready: "Ready",
-  out_for_delivery: "Out for Delivery",
-  delivered: "Delivered",
-  cancelled: "Cancelled",
+const statusTranslationKeys: Record<string, string> = {
+  pending: "orders.pending",
+  confirmed: "orders.confirmed",
+  preparing: "orders.preparing",
+  ready: "orders.ready",
+  out_for_delivery: "orders.outForDelivery",
+  delivered: "orders.delivered",
+  cancelled: "orders.cancelled",
 };
 
-function OrderCard({ order }: { order: Order & { restaurant?: { name: string } } }) {
+type OrderWithRestaurant = Order & { restaurant?: { name: string } };
+
+function groupOrdersByRestaurant(orders: OrderWithRestaurant[]) {
+  const grouped: Record<string, { restaurantName: string; restaurantId: string; orders: OrderWithRestaurant[] }> = {};
+  for (const order of orders) {
+    const key = order.restaurantId;
+    if (!grouped[key]) {
+      grouped[key] = {
+        restaurantName: order.restaurant?.name || "Unknown Restaurant",
+        restaurantId: order.restaurantId,
+        orders: [],
+      };
+    }
+    grouped[key].orders.push(order);
+  }
+  return Object.values(grouped);
+}
+
+function OrderCard({ order }: { order: OrderWithRestaurant }) {
+  const { t } = useLanguage();
   const items = order.items as Array<{ name: string; quantity: number }>;
   const itemSummary = items.map((i) => `${i.quantity}x ${i.name}`).slice(0, 3).join(", ");
   const moreItems = items.length > 3 ? ` +${items.length - 3} more` : "";
 
   return (
-    <Link href={`/orders/${order.id}`}>
-      <Card className="hover-elevate cursor-pointer" data-testid={`card-order-${order.id}`}>
-        <CardContent className="p-4">
-          <div className="flex items-start justify-between gap-4 mb-3">
-            <div>
-              <h3 className="font-semibold" data-testid={`text-order-restaurant-${order.id}`}>
-                {(order as any).restaurant?.name || "Restaurant"}
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                {format(new Date(order.createdAt!), "MMM d, yyyy 'at' h:mm a")}
-              </p>
-            </div>
+    <Link href={`/orders/${order.id}`} data-testid={`link-order-${order.id}`}>
+      <div className="flex items-center justify-between gap-4 p-4 border rounded-md hover-elevate cursor-pointer" data-testid={`card-order-${order.id}`}>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2 flex-wrap mb-1">
+            <p className="text-sm text-muted-foreground">
+              {format(new Date(order.createdAt!), "MMM d, yyyy 'at' h:mm a")}
+            </p>
             <Badge className={statusColors[order.status] || ""} data-testid={`badge-status-${order.id}`}>
-              {statusLabels[order.status] || order.status}
+              {statusTranslationKeys[order.status] ? t(statusTranslationKeys[order.status]) : order.status}
             </Badge>
           </div>
-
-          <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+          <p className="text-sm text-muted-foreground line-clamp-1">
             {itemSummary}{moreItems}
           </p>
-
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2 mt-2">
             <span className="font-semibold" data-testid={`text-order-total-${order.id}`}>
               ${parseFloat(order.total).toFixed(2)}
             </span>
-            <Button variant="ghost" size="sm">
-              View Details
+            <Button variant="ghost" size="sm" data-testid={`button-view-order-${order.id}`}>
+              {t("orders.viewDetails")}
               <ChevronRight className="ml-1 h-4 w-4" />
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </Link>
   );
 }
@@ -89,15 +102,18 @@ function OrderSkeleton() {
 }
 
 export default function OrdersPage() {
-  const { data: orders, isLoading } = useQuery<(Order & { restaurant?: { name: string } })[]>({
+  const { t } = useLanguage();
+  const { data: orders, isLoading } = useQuery<OrderWithRestaurant[]>({
     queryKey: ["/api/orders"],
   });
+
+  const grouped = orders ? groupOrdersByRestaurant(orders) : [];
 
   return (
     <div className="min-h-screen py-8">
       <div className="container mx-auto px-4">
-        <h1 className="text-3xl font-bold mb-2">My Orders</h1>
-        <p className="text-muted-foreground mb-8">Track and manage your order history</p>
+        <h1 className="text-3xl font-bold mb-2" data-testid="text-orders-title">{t("orders.title")}</h1>
+        <p className="text-muted-foreground mb-8">{t("orders.subtitle")}</p>
 
         {isLoading ? (
           <div className="space-y-4 max-w-2xl">
@@ -105,10 +121,31 @@ export default function OrdersPage() {
               <OrderSkeleton key={i} />
             ))}
           </div>
-        ) : orders && orders.length > 0 ? (
-          <div className="space-y-4 max-w-2xl">
-            {orders.map((order) => (
-              <OrderCard key={order.id} order={order} />
+        ) : grouped.length > 0 ? (
+          <div className="space-y-6 max-w-2xl">
+            {grouped.map((group) => (
+              <Card key={group.restaurantId} data-testid={`group-restaurant-${group.restaurantId}`}>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
+                      <Store className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg" data-testid={`text-group-name-${group.restaurantId}`}>
+                        {group.restaurantName}
+                      </CardTitle>
+                      <p className="text-sm text-muted-foreground">
+                        {group.orders.length} order{group.orders.length !== 1 ? "s" : ""}
+                      </p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3 pt-0">
+                  {group.orders.map((order) => (
+                    <OrderCard key={order.id} order={order} />
+                  ))}
+                </CardContent>
+              </Card>
             ))}
           </div>
         ) : (
@@ -116,12 +153,12 @@ export default function OrdersPage() {
             <div className="mx-auto h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-4">
               <Package className="h-8 w-8 text-muted-foreground" />
             </div>
-            <h3 className="text-lg font-semibold mb-2">No orders yet</h3>
+            <h3 className="text-lg font-semibold mb-2">{t("orders.noOrders")}</h3>
             <p className="text-muted-foreground mb-6">
-              When you place your first order, it will appear here.
+              {t("orders.noOrdersDesc")}
             </p>
-            <Button asChild>
-              <Link href="/restaurants">Browse Restaurants</Link>
+            <Button asChild data-testid="button-browse-restaurants">
+              <Link href="/restaurants">{t("orders.browseRestaurants")}</Link>
             </Button>
           </Card>
         )}

@@ -1,14 +1,17 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, Redirect } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
 import { CartProvider } from "@/lib/cart-context";
+import { LanguageProvider } from "@/lib/language-context";
 import { useAuth } from "@/hooks/use-auth";
 import { Navbar } from "@/components/navbar";
 import NotFound from "@/pages/not-found";
 import LandingPage from "@/pages/landing";
+import OnboardingPage from "@/pages/onboarding";
 import HomePage from "@/pages/home";
 import RestaurantsPage from "@/pages/restaurants";
 import RestaurantDetailPage from "@/pages/restaurant-detail";
@@ -28,11 +31,42 @@ import CommunityPage from "@/pages/community";
 import EventsPage from "@/pages/events";
 import BusinessesPage from "@/pages/businesses";
 import AdminPage from "@/pages/admin";
+import PendingApprovalPage from "@/pages/pending-approval";
+
+function RoleBasedHome({ roles, approvalStatus }: { roles: string[]; approvalStatus: Record<string, string> }) {
+  if (roles.includes("vendor")) {
+    if (approvalStatus?.vendor !== "approved") {
+      return <Redirect to="/pending-approval" />;
+    }
+    return <Redirect to="/vendor" />;
+  }
+  if (roles.includes("service_provider")) {
+    if (approvalStatus?.service_provider !== "approved") {
+      return <Redirect to="/pending-approval" />;
+    }
+    return <Redirect to="/provider-portal" />;
+  }
+  if (roles.includes("admin") && !roles.includes("customer")) {
+    return <Redirect to="/admin" />;
+  }
+  return <HomePage />;
+}
 
 function AppContent() {
   const { isAuthenticated, isLoading } = useAuth();
 
-  if (isLoading) {
+  const { data: roleData, isLoading: rolesLoading, isError: rolesError } = useQuery<{ roles: string[]; approvalStatus: Record<string, string> }>({
+    queryKey: ["/api/user/role"],
+    enabled: isAuthenticated,
+    staleTime: 1000 * 60 * 5,
+    retry: 1,
+  });
+
+  if (rolesError && isAuthenticated) {
+    queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+  }
+
+  if (isLoading || (isAuthenticated && rolesLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
@@ -49,11 +83,22 @@ function AppContent() {
     return <LandingPage />;
   }
 
+  const roles = roleData?.roles || [];
+  const approvalStatus = roleData?.approvalStatus || {};
+  const hasNonAdminRole = roles.some(r => r !== "admin");
+  const isAdmin = roles.includes("admin");
+
+  if (!hasNonAdminRole && !isAdmin) {
+    return <OnboardingPage />;
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
       <Switch>
-        <Route path="/" component={HomePage} />
+        <Route path="/">
+          <RoleBasedHome roles={roles} approvalStatus={approvalStatus} />
+        </Route>
         <Route path="/restaurants" component={RestaurantsPage} />
         <Route path="/restaurant/:id" component={RestaurantDetailPage} />
         <Route path="/cart" component={CartPage} />
@@ -68,6 +113,7 @@ function AppContent() {
         <Route path="/bookings" component={BookingsPage} />
         <Route path="/bookings/:id" component={BookingDetailPage} />
         <Route path="/provider-portal" component={ProviderPortalPage} />
+        <Route path="/pending-approval" component={PendingApprovalPage} />
         <Route path="/community" component={CommunityPage} />
         <Route path="/events" component={EventsPage} />
         <Route path="/businesses" component={BusinessesPage} />
@@ -82,12 +128,14 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <CartProvider>
-          <TooltipProvider>
-            <Toaster />
-            <AppContent />
-          </TooltipProvider>
-        </CartProvider>
+        <LanguageProvider>
+          <CartProvider>
+            <TooltipProvider>
+              <Toaster />
+              <AppContent />
+            </TooltipProvider>
+          </CartProvider>
+        </LanguageProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

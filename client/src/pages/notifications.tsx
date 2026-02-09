@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useLanguage } from "@/lib/language-context";
 import { format } from "date-fns";
 import { Bell, Package, Tag, Info, Check } from "lucide-react";
 import type { Notification } from "@shared/schema";
@@ -21,6 +22,7 @@ const typeColors: Record<string, string> = {
 };
 
 export default function NotificationsPage() {
+  const { t } = useLanguage();
   const { data: notifications, isLoading } = useQuery<Notification[]>({
     queryKey: ["/api/notifications"],
   });
@@ -50,7 +52,7 @@ export default function NotificationsPage() {
       <div className="container mx-auto px-4 max-w-2xl">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold">Notifications</h1>
+            <h1 className="text-3xl font-bold">{t("notifications.title")}</h1>
             <p className="text-muted-foreground">
               {unreadCount > 0 ? `${unreadCount} unread` : "All caught up!"}
             </p>
@@ -128,9 +130,9 @@ export default function NotificationsPage() {
             <div className="mx-auto h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-4">
               <Bell className="h-8 w-8 text-muted-foreground" />
             </div>
-            <h3 className="text-lg font-semibold mb-2">No notifications</h3>
+            <h3 className="text-lg font-semibold mb-2">{t("notifications.noNotifications")}</h3>
             <p className="text-muted-foreground">
-              When you receive notifications, they will appear here.
+              {t("notifications.noNotificationsDesc")}
             </p>
           </Card>
         )}

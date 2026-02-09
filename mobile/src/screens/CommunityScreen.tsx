@@ -11,9 +11,18 @@ import { LoadingScreen } from "../components/LoadingScreen";
 import { EmptyState } from "../components/EmptyState";
 import { EVENT_CATEGORIES } from "../constants/categories";
 import { colors, spacing, borderRadius, fontSize, fontWeight } from "../constants/theme";
-import type { CommunityEvent, Business, Announcement } from "../types";
+import type { CommunityEvent, Business, Announcement, YellowPageListing } from "../types";
 
-type Tab = "events" | "businesses" | "announcements";
+type Tab = "events" | "businesses" | "yellowpages" | "announcements";
+
+const YELLOW_PAGE_CATEGORY_LABELS: Record<string, string> = {
+  room: "Room",
+  "shared-room": "Shared Room",
+  house: "House",
+  apartment: "Apartment",
+  car: "Car",
+  other: "Other",
+};
 
 function EventCard({ item, onPress }: { item: CommunityEvent; onPress: () => void }) {
   const date = new Date(item.eventDate);
@@ -152,12 +161,90 @@ function AnnouncementCard({ item }: { item: Announcement }) {
   );
 }
 
+function YellowPageCard({ item }: { item: YellowPageListing }) {
+  const categoryLabel = YELLOW_PAGE_CATEGORY_LABELS[item.category] || item.category;
+  const categoryIcons: Record<string, keyof typeof Ionicons.glyphMap> = {
+    room: "bed-outline",
+    "shared-room": "people-outline",
+    house: "home-outline",
+    apartment: "business-outline",
+    car: "car-outline",
+    other: "pricetag-outline",
+  };
+
+  return (
+    <View style={styles.card}>
+      {item.imageUrl ? (
+        <Image source={{ uri: item.imageUrl }} style={styles.eventImage} />
+      ) : (
+        <View style={[styles.eventImage, { height: 120 }, styles.eventImagePlaceholder]}>
+          <Ionicons name={categoryIcons[item.category] || "pricetag-outline"} size={32} color={colors.primary} />
+        </View>
+      )}
+      <View style={styles.cardBody}>
+        <View style={styles.cardHeader}>
+          <Text style={styles.cardName} numberOfLines={2}>{item.title}</Text>
+          {item.price && (
+            <View style={[styles.badge, { backgroundColor: colors.primary + "15" }]}>
+              <Text style={[styles.badgeText, { color: colors.primary }]}>{item.price}</Text>
+            </View>
+          )}
+        </View>
+        <View style={[styles.cardMeta, { marginTop: spacing.xs }]}>
+          <Ionicons name={categoryIcons[item.category] || "pricetag-outline"} size={13} color={colors.textSecondary} />
+          <Text style={styles.metaText}>{categoryLabel}</Text>
+        </View>
+        <View style={styles.cardMeta}>
+          <Ionicons name="location-outline" size={13} color={colors.textSecondary} />
+          <Text style={styles.metaText}>{item.city}{item.state ? `, ${item.state}` : ""}</Text>
+        </View>
+        {item.description && (
+          <Text style={styles.businessDesc} numberOfLines={2}>{item.description}</Text>
+        )}
+        <View style={[styles.cardMeta, { marginTop: spacing.sm }]}>
+          {item.contactPhone && (
+            <TouchableOpacity
+              onPress={() => Linking.openURL(`tel:${item.contactPhone}`)}
+              style={styles.yellowPageContact}
+            >
+              <Ionicons name="call-outline" size={14} color={colors.primary} />
+              <Text style={styles.yellowPageContactText}>Call</Text>
+            </TouchableOpacity>
+          )}
+          {item.contactWhatsapp && (
+            <TouchableOpacity
+              onPress={() => Linking.openURL(`https://wa.me/${item.contactWhatsapp?.replace(/\D/g, "")}`)}
+              style={styles.yellowPageContact}
+            >
+              <Ionicons name="logo-whatsapp" size={14} color="#25D366" />
+              <Text style={[styles.yellowPageContactText, { color: "#25D366" }]}>WhatsApp</Text>
+            </TouchableOpacity>
+          )}
+          {item.contactEmail && (
+            <TouchableOpacity
+              onPress={() => Linking.openURL(`mailto:${item.contactEmail}`)}
+              style={styles.yellowPageContact}
+            >
+              <Ionicons name="mail-outline" size={14} color={colors.primary} />
+              <Text style={styles.yellowPageContactText}>Email</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    </View>
+  );
+}
+
 export default function CommunityScreen() {
   const navigation = useNavigation<any>();
   const [activeTab, setActiveTab] = useState<Tab>("events");
   const [eventCategory, setEventCategory] = useState<string | null>(null);
   const [businessSearch, setBusinessSearch] = useState("");
   const [showEventDropdown, setShowEventDropdown] = useState(false);
+  const [ypCategory, setYpCategory] = useState<string | null>(null);
+  const [ypCity, setYpCity] = useState<string | null>(null);
+  const [showYpCategoryDropdown, setShowYpCategoryDropdown] = useState(false);
+  const [showYpCityDropdown, setShowYpCityDropdown] = useState(false);
 
   const { data: events, isLoading: loadingEvents, refetch: refetchEvents, isRefetching: refetchingEvents } = useQuery({
     queryKey: ["events", eventCategory],
@@ -171,6 +258,18 @@ export default function CommunityScreen() {
     enabled: activeTab === "businesses",
   });
 
+  const { data: yellowPages, isLoading: loadingYp, refetch: refetchYp, isRefetching: refetchingYp } = useQuery({
+    queryKey: ["yellowPages", ypCategory, ypCity],
+    queryFn: () => api.getYellowPages({ category: ypCategory || undefined, city: ypCity || undefined }),
+    enabled: activeTab === "yellowpages",
+  });
+
+  const { data: ypCities } = useQuery({
+    queryKey: ["yellowPageCities"],
+    queryFn: () => api.getYellowPageCities(),
+    enabled: activeTab === "yellowpages",
+  });
+
   const { data: announcements, isLoading: loadingAnnouncements } = useQuery({
     queryKey: ["announcements"],
     queryFn: () => api.getAnnouncements(),
@@ -180,6 +279,7 @@ export default function CommunityScreen() {
   const tabs: { key: Tab; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
     { key: "events", label: "Events", icon: "calendar" },
     { key: "businesses", label: "Directory", icon: "business" },
+    { key: "yellowpages", label: "Rentals", icon: "home" },
     { key: "announcements", label: "News", icon: "megaphone" },
   ];
 
@@ -297,6 +397,106 @@ export default function CommunityScreen() {
                 <EmptyState icon="business-outline" title="No businesses found" message="The directory is growing! Check back later." />
               }
               renderItem={({ item }) => <BusinessCard item={item} />}
+            />
+          )}
+        </>
+      )}
+
+      {activeTab === "yellowpages" && (
+        <>
+          <View style={styles.ypFilters}>
+            <TouchableOpacity
+              style={styles.ypFilterBtn}
+              onPress={() => setShowYpCategoryDropdown(true)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="filter-outline" size={14} color={colors.textSecondary} />
+              <Text style={styles.ypFilterText} numberOfLines={1}>
+                {ypCategory ? (YELLOW_PAGE_CATEGORY_LABELS[ypCategory] || ypCategory) : "All Types"}
+              </Text>
+              <Ionicons name="chevron-down" size={14} color={colors.textSecondary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.ypFilterBtn}
+              onPress={() => setShowYpCityDropdown(true)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="location-outline" size={14} color={colors.textSecondary} />
+              <Text style={styles.ypFilterText} numberOfLines={1}>
+                {ypCity || "All Cities"}
+              </Text>
+              <Ionicons name="chevron-down" size={14} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+
+          <Modal visible={showYpCategoryDropdown} transparent animationType="fade">
+            <Pressable style={styles.modalOverlay} onPress={() => setShowYpCategoryDropdown(false)}>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>Listing Type</Text>
+                <TouchableOpacity
+                  style={[styles.modalItem, !ypCategory && styles.modalItemActive]}
+                  onPress={() => { setYpCategory(null); setShowYpCategoryDropdown(false); }}
+                >
+                  <Text style={[styles.modalItemText, !ypCategory && styles.modalItemTextActive]}>All Types</Text>
+                  {!ypCategory && <Ionicons name="checkmark" size={18} color={colors.primary} />}
+                </TouchableOpacity>
+                {Object.entries(YELLOW_PAGE_CATEGORY_LABELS).map(([id, label]) => (
+                  <TouchableOpacity
+                    key={id}
+                    style={[styles.modalItem, ypCategory === id && styles.modalItemActive]}
+                    onPress={() => { setYpCategory(id); setShowYpCategoryDropdown(false); }}
+                  >
+                    <Text style={[styles.modalItemText, ypCategory === id && styles.modalItemTextActive]}>
+                      {label}
+                    </Text>
+                    {ypCategory === id && <Ionicons name="checkmark" size={18} color={colors.primary} />}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </Pressable>
+          </Modal>
+
+          <Modal visible={showYpCityDropdown} transparent animationType="fade">
+            <Pressable style={styles.modalOverlay} onPress={() => setShowYpCityDropdown(false)}>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>Select City</Text>
+                <TouchableOpacity
+                  style={[styles.modalItem, !ypCity && styles.modalItemActive]}
+                  onPress={() => { setYpCity(null); setShowYpCityDropdown(false); }}
+                >
+                  <Text style={[styles.modalItemText, !ypCity && styles.modalItemTextActive]}>All Cities</Text>
+                  {!ypCity && <Ionicons name="checkmark" size={18} color={colors.primary} />}
+                </TouchableOpacity>
+                {(ypCities || []).map((city: string) => (
+                  <TouchableOpacity
+                    key={city}
+                    style={[styles.modalItem, ypCity === city && styles.modalItemActive]}
+                    onPress={() => { setYpCity(city); setShowYpCityDropdown(false); }}
+                  >
+                    <Text style={[styles.modalItemText, ypCity === city && styles.modalItemTextActive]}>
+                      {city}
+                    </Text>
+                    {ypCity === city && <Ionicons name="checkmark" size={18} color={colors.primary} />}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </Pressable>
+          </Modal>
+
+          {loadingYp ? (
+            <LoadingScreen />
+          ) : (
+            <FlatList
+              data={yellowPages}
+              keyExtractor={(item) => String(item.id)}
+              refreshControl={
+                <RefreshControl refreshing={refetchingYp} onRefresh={refetchYp} colors={[colors.primary]} />
+              }
+              contentContainerStyle={styles.listContent}
+              ListEmptyComponent={
+                <EmptyState icon="home-outline" title="No listings yet" message="Check back soon for rental listings and more!" />
+              }
+              renderItem={({ item }) => <YellowPageCard item={item} />}
             />
           )}
         </>
@@ -572,5 +772,48 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: fontWeight.semibold,
     marginTop: spacing.xs,
+  },
+
+  ypFilters: {
+    flexDirection: "row",
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+    gap: spacing.sm,
+  },
+  ypFilterBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: spacing.xs,
+  },
+  ypFilterText: {
+    flex: 1,
+    fontSize: fontSize.sm,
+    color: colors.text,
+    fontWeight: fontWeight.medium,
+  },
+  yellowPageContact: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    gap: spacing.xs,
+    marginRight: spacing.xs,
+  },
+  yellowPageContactText: {
+    fontSize: fontSize.xs,
+    color: colors.primary,
+    fontWeight: fontWeight.medium,
   },
 });

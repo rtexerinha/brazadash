@@ -9,6 +9,10 @@ import {
 } from "@shared/schema";
 import { z } from "zod";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+import crypto from "crypto";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -17,6 +21,43 @@ export async function registerRoutes(
   // Setup authentication
   await setupAuth(app);
   registerAuthRoutes(app);
+
+  const uploadsDir = path.join(process.cwd(), "uploads");
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+
+  const uploadStorage = multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, uploadsDir),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname);
+      const name = crypto.randomBytes(16).toString("hex");
+      cb(null, `${name}${ext}`);
+    },
+  });
+
+  const upload = multer({
+    storage: uploadStorage,
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+      const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+      if (allowed.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error("Only JPEG, PNG, WebP and GIF images are allowed"));
+      }
+    },
+  });
+
+  app.use("/uploads", (await import("express")).default.static(uploadsDir));
+
+  app.post("/api/upload", isAuthenticated, upload.single("image"), (req: any, res) => {
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+    const url = `/uploads/${req.file.filename}`;
+    res.json({ url });
+  });
 
   // =================
   // PUBLIC ROUTES
@@ -237,8 +278,30 @@ export async function registerRoutes(
   // VENDOR ROUTES
   // =================
 
+  const isApprovedVendor = async (req: any, res: any, next: any) => {
+    const userId = req.user?.claims?.sub;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+    const roles = await storage.getUserRoles(userId);
+    const vendorRole = roles.find(r => r.role === "vendor");
+    if (!vendorRole || vendorRole.approvalStatus !== "approved") {
+      return res.status(403).json({ error: "Your vendor account is pending approval" });
+    }
+    next();
+  };
+
+  const isApprovedProvider = async (req: any, res: any, next: any) => {
+    const userId = req.user?.claims?.sub;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+    const roles = await storage.getUserRoles(userId);
+    const providerRole = roles.find(r => r.role === "service_provider");
+    if (!providerRole || providerRole.approvalStatus !== "approved") {
+      return res.status(403).json({ error: "Your service provider account is pending approval" });
+    }
+    next();
+  };
+
   // Get vendor's restaurants
-  app.get("/api/vendor/restaurants", isAuthenticated, async (req: any, res) => {
+  app.get("/api/vendor/restaurants", isAuthenticated, isApprovedVendor, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const restaurants = await storage.getRestaurantsByOwner(userId);
@@ -250,7 +313,7 @@ export async function registerRoutes(
   });
 
   // Create restaurant
-  app.post("/api/vendor/restaurants", isAuthenticated, async (req: any, res) => {
+  app.post("/api/vendor/restaurants", isAuthenticated, isApprovedVendor, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       
@@ -276,7 +339,7 @@ export async function registerRoutes(
   });
 
   // Update restaurant
-  app.patch("/api/vendor/restaurants/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/vendor/restaurants/:id", isAuthenticated, isApprovedVendor, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const restaurant = await storage.getRestaurant(req.params.id);
@@ -302,7 +365,7 @@ export async function registerRoutes(
   });
 
   // Get vendor's restaurant menu
-  app.get("/api/vendor/restaurants/:id/menu", isAuthenticated, async (req: any, res) => {
+  app.get("/api/vendor/restaurants/:id/menu", isAuthenticated, isApprovedVendor, async (req: any, res) => {
     try {
       const menuItems = await storage.getMenuItems(req.params.id);
       res.json(menuItems);
@@ -313,7 +376,7 @@ export async function registerRoutes(
   });
 
   // Add menu item
-  app.post("/api/vendor/restaurants/:id/menu", isAuthenticated, async (req: any, res) => {
+  app.post("/api/vendor/restaurants/:id/menu", isAuthenticated, isApprovedVendor, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const restaurant = await storage.getRestaurant(req.params.id);
@@ -344,7 +407,7 @@ export async function registerRoutes(
   });
 
   // Get vendor's restaurant orders
-  app.get("/api/vendor/restaurants/:id/orders", isAuthenticated, async (req: any, res) => {
+  app.get("/api/vendor/restaurants/:id/orders", isAuthenticated, isApprovedVendor, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const restaurant = await storage.getRestaurant(req.params.id);
@@ -362,7 +425,7 @@ export async function registerRoutes(
   });
 
   // Update order status (vendor)
-  app.patch("/api/vendor/orders/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/vendor/orders/:id", isAuthenticated, isApprovedVendor, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { status } = req.body;
@@ -667,7 +730,7 @@ export async function registerRoutes(
   // =====================
 
   // Get current user's provider profile
-  app.get("/api/provider/profile", isAuthenticated, async (req: any, res) => {
+  app.get("/api/provider/profile", isAuthenticated, isApprovedProvider, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const provider = await storage.getServiceProviderByUser(userId);
@@ -679,7 +742,7 @@ export async function registerRoutes(
   });
 
   // Create provider profile
-  app.post("/api/provider/profile", isAuthenticated, async (req: any, res) => {
+  app.post("/api/provider/profile", isAuthenticated, isApprovedProvider, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       
@@ -709,7 +772,7 @@ export async function registerRoutes(
   });
 
   // Update provider profile
-  app.patch("/api/provider/profile", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/provider/profile", isAuthenticated, isApprovedProvider, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const provider = await storage.getServiceProviderByUser(userId);
@@ -734,7 +797,7 @@ export async function registerRoutes(
   });
 
   // Get provider's services
-  app.get("/api/provider/services", isAuthenticated, async (req: any, res) => {
+  app.get("/api/provider/services", isAuthenticated, isApprovedProvider, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const provider = await storage.getServiceProviderByUser(userId);
@@ -752,7 +815,7 @@ export async function registerRoutes(
   });
 
   // Add service
-  app.post("/api/provider/services", isAuthenticated, async (req: any, res) => {
+  app.post("/api/provider/services", isAuthenticated, isApprovedProvider, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const provider = await storage.getServiceProviderByUser(userId);
@@ -781,7 +844,7 @@ export async function registerRoutes(
   });
 
   // Get provider's bookings
-  app.get("/api/provider/bookings", isAuthenticated, async (req: any, res) => {
+  app.get("/api/provider/bookings", isAuthenticated, isApprovedProvider, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const provider = await storage.getServiceProviderByUser(userId);
@@ -799,7 +862,7 @@ export async function registerRoutes(
   });
 
   // Update booking status (provider)
-  app.patch("/api/provider/bookings/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/provider/bookings/:id", isAuthenticated, isApprovedProvider, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const provider = await storage.getServiceProviderByUser(userId);
@@ -867,7 +930,142 @@ export async function registerRoutes(
     }
   });
 
-  // Create checkout session for food order
+  // Create PaymentIntent for embedded card form
+  app.post("/api/checkout/create-payment-intent", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { items, restaurantId, deliveryAddress, notes, tip } = req.body;
+
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: "Cart is empty" });
+      }
+
+      if (!deliveryAddress || deliveryAddress.trim().length < 5) {
+        return res.status(400).json({ message: "Delivery address is required" });
+      }
+
+      const restaurant = await storage.getRestaurant(restaurantId);
+      if (!restaurant) {
+        return res.status(404).json({ message: "Restaurant not found" });
+      }
+
+      let subtotal = 0;
+      const itemDetails: any[] = [];
+
+      for (const item of items) {
+        const menuItem = await storage.getMenuItem(item.menuItemId);
+        if (!menuItem) {
+          return res.status(400).json({ message: `Menu item not found: ${item.menuItemId}` });
+        }
+        const itemTotal = parseFloat(menuItem.price) * item.quantity;
+        subtotal += itemTotal;
+        itemDetails.push({
+          menuItemId: item.menuItemId,
+          name: menuItem.name,
+          price: menuItem.price,
+          quantity: item.quantity,
+        });
+      }
+
+      const deliveryFee = restaurant.deliveryFee ? parseFloat(restaurant.deliveryFee) : 3.99;
+      const tipAmount = tip ? parseFloat(tip) : 0;
+      const platformFee = Math.round(subtotal * 0.08 * 100) / 100;
+      const total = subtotal + deliveryFee + tipAmount + platformFee;
+      const amountInCents = Math.round(total * 100);
+
+      const stripe = await getUncachableStripeClient();
+
+      const descriptorSuffix = (restaurant.businessName || 'Order')
+        .replace(/[^a-zA-Z0-9 ]/g, '')
+        .substring(0, 22)
+        .trim();
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amountInCents,
+        currency: 'usd',
+        automatic_payment_methods: { enabled: true },
+        statement_descriptor: 'BRAZADASH',
+        statement_descriptor_suffix: descriptorSuffix,
+        metadata: {
+          userId,
+          restaurantId,
+          deliveryAddress,
+          notes: notes || '',
+          items: JSON.stringify(itemDetails),
+          tip: tipAmount.toString(),
+          subtotal: subtotal.toFixed(2),
+          deliveryFee: deliveryFee.toFixed(2),
+          platformFee: platformFee.toFixed(2),
+        },
+      });
+
+      res.json({ clientSecret: paymentIntent.client_secret });
+    } catch (error) {
+      console.error("Error creating payment intent:", error);
+      res.status(500).json({ message: "Failed to create payment intent" });
+    }
+  });
+
+  // Confirm payment and create order
+  app.post("/api/checkout/confirm-payment", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { paymentIntentId } = req.body;
+
+      if (!paymentIntentId) {
+        return res.status(400).json({ message: "Payment intent ID required" });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+
+      if (paymentIntent.status !== 'succeeded') {
+        return res.status(400).json({ message: "Payment not completed" });
+      }
+
+      if (paymentIntent.metadata?.userId !== userId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      const existingOrder = await storage.getOrderByStripeSession(paymentIntentId);
+      if (existingOrder) {
+        return res.json(existingOrder);
+      }
+
+      const items = JSON.parse(paymentIntent.metadata?.items || '[]');
+      const total = paymentIntent.amount / 100;
+      const tipAmount = parseFloat(paymentIntent.metadata?.tip || '0');
+      const deliveryFee = parseFloat(paymentIntent.metadata?.deliveryFee || '3.99');
+      const subtotal = parseFloat(paymentIntent.metadata?.subtotal || '0');
+
+      const order = await storage.createOrder({
+        customerId: userId,
+        restaurantId: paymentIntent.metadata?.restaurantId || '',
+        items,
+        subtotal: subtotal.toFixed(2),
+        deliveryFee: deliveryFee.toFixed(2),
+        tip: tipAmount.toFixed(2),
+        total: total.toFixed(2),
+        deliveryAddress: paymentIntent.metadata?.deliveryAddress || '',
+        notes: paymentIntent.metadata?.notes || '',
+        stripeSessionId: paymentIntentId,
+      });
+
+      await storage.createNotification({
+        userId,
+        title: "Order Placed",
+        message: `Your order #${order.id.slice(0, 8)} has been placed successfully!`,
+        type: "order",
+      });
+
+      res.json(order);
+    } catch (error) {
+      console.error("Error confirming payment:", error);
+      res.status(500).json({ message: "Failed to confirm payment" });
+    }
+  });
+
+  // Create checkout session for food order (legacy redirect)
   app.post("/api/checkout/create-session", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -925,6 +1123,22 @@ export async function registerRoutes(
         quantity: 1,
       });
 
+      // Add platform fee (8%)
+      const platformFee = Math.round(subtotal * 0.08 * 100) / 100;
+      if (platformFee > 0) {
+        lineItems.push({
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: 'Platform Fee',
+              description: 'Platform fee (8%)',
+            },
+            unit_amount: Math.round(platformFee * 100),
+          },
+          quantity: 1,
+        });
+      }
+
       // Add tip if provided
       const tipAmount = tip ? parseFloat(tip) : 0;
       if (tipAmount > 0) {
@@ -956,6 +1170,7 @@ export async function registerRoutes(
           notes: notes || '',
           items: JSON.stringify(items),
           tip: tipAmount.toString(),
+          platformFee: platformFee.toFixed(2),
         },
       });
 
@@ -1044,6 +1259,202 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error getting session:", error);
       res.status(500).json({ message: "Failed to get session" });
+    }
+  });
+
+  // ============================================
+  // BOOKING CHECKOUT (Stripe payment for services)
+  // ============================================
+
+  const PLATFORM_FEE_PERCENT = 0.08; // 8% platform fee
+
+  app.post("/api/bookings/checkout", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { providerId, serviceId, requestedDate, requestedTime, address, notes } = req.body;
+
+      if (!providerId) {
+        return res.status(400).json({ message: "Provider ID is required" });
+      }
+
+      const provider = await storage.getServiceProvider(providerId);
+      if (!provider) {
+        return res.status(404).json({ message: "Provider not found" });
+      }
+
+      let serviceName = provider.businessName;
+      let servicePrice = 0;
+
+      if (serviceId) {
+        const service = await storage.getService(serviceId);
+        if (!service) {
+          return res.status(404).json({ message: "Service not found" });
+        }
+        serviceName = service.name;
+        servicePrice = parseFloat(service.price || "0");
+      }
+
+      const providerBookingFee = parseFloat(provider.bookingFee || "0");
+      const platformFee = Math.round(servicePrice * PLATFORM_FEE_PERCENT * 100) / 100;
+      const totalBookingFee = providerBookingFee + platformFee;
+      const totalAmount = servicePrice + totalBookingFee;
+
+      if (totalAmount <= 0) {
+        return res.status(400).json({ message: "No amount to charge. Service price or booking fee must be set." });
+      }
+
+      const stripe = await getUncachableStripeClient();
+
+      const lineItems: any[] = [];
+
+      if (servicePrice > 0) {
+        lineItems.push({
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: serviceName,
+              description: `Service by ${provider.businessName}`,
+            },
+            unit_amount: Math.round(servicePrice * 100),
+          },
+          quantity: 1,
+        });
+      }
+
+      if (platformFee > 0) {
+        lineItems.push({
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: 'Platform Fee',
+              description: 'Platform fee (8%)',
+            },
+            unit_amount: Math.round(platformFee * 100),
+          },
+          quantity: 1,
+        });
+      }
+
+      if (providerBookingFee > 0) {
+        lineItems.push({
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: 'Booking Fee',
+              description: `Reservation fee set by ${provider.businessName}`,
+            },
+            unit_amount: Math.round(providerBookingFee * 100),
+          },
+          quantity: 1,
+        });
+      }
+
+      const bookingDescriptorSuffix = (provider.businessName || 'Booking')
+        .replace(/[^a-zA-Z0-9 ]/g, '')
+        .substring(0, 22)
+        .trim();
+
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: lineItems,
+        mode: 'payment',
+        payment_intent_data: {
+          statement_descriptor: 'BRAZADASH',
+          statement_descriptor_suffix: bookingDescriptorSuffix,
+        },
+        success_url: `${req.protocol}://${req.get('host')}/bookings?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${req.protocol}://${req.get('host')}/services/provider/${providerId}`,
+        metadata: {
+          type: 'booking',
+          userId,
+          providerId,
+          serviceId: serviceId || '',
+          serviceName,
+          servicePrice: servicePrice.toString(),
+          bookingFee: totalBookingFee.toString(),
+          platformFee: platformFee.toString(),
+          providerBookingFee: providerBookingFee.toString(),
+          totalAmount: totalAmount.toString(),
+          requestedDate: requestedDate || '',
+          requestedTime: requestedTime || '',
+          address: address || '',
+          notes: notes || '',
+        },
+      });
+
+      res.json({ sessionId: session.id, url: session.url });
+    } catch (error) {
+      console.error("Error creating booking checkout:", error);
+      res.status(500).json({ message: "Failed to create booking checkout session" });
+    }
+  });
+
+  app.post("/api/bookings/checkout/complete", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { sessionId } = req.body;
+
+      if (!sessionId) {
+        return res.status(400).json({ message: "Session ID required" });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+
+      if (session.payment_status !== 'paid') {
+        return res.status(400).json({ message: "Payment not completed" });
+      }
+
+      if (session.metadata?.userId !== userId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      if (session.metadata?.type !== 'booking') {
+        return res.status(400).json({ message: "Invalid session type" });
+      }
+
+      const existingBooking = await storage.getBookingByStripeSession(sessionId);
+      if (existingBooking) {
+        return res.json(existingBooking);
+      }
+
+      const booking = await storage.createBooking({
+        customerId: userId,
+        providerId: session.metadata.providerId,
+        serviceId: session.metadata.serviceId || null,
+        requestedDate: session.metadata.requestedDate ? new Date(session.metadata.requestedDate) : null,
+        requestedTime: session.metadata.requestedTime || null,
+        address: session.metadata.address || null,
+        notes: session.metadata.notes || null,
+        price: session.metadata.servicePrice || '0',
+        bookingFee: session.metadata.bookingFee || '0',
+        totalPaid: session.metadata.totalAmount || '0',
+        stripeSessionId: sessionId,
+        isPaid: true,
+        status: 'pending',
+      });
+
+      const provider = await storage.getServiceProvider(booking.providerId);
+      if (provider) {
+        await storage.createNotification({
+          userId: provider.userId,
+          title: "New Paid Booking",
+          message: `New booking request for ${session.metadata.serviceName} on ${new Date(session.metadata.requestedDate || '').toLocaleDateString()}. Payment received.`,
+          type: "booking",
+        });
+      }
+
+      await storage.createNotification({
+        userId,
+        title: "Booking Confirmed",
+        message: `Your booking for ${session.metadata.serviceName} has been placed. Payment of $${parseFloat(session.metadata.totalAmount || '0').toFixed(2)} received.`,
+        type: "booking",
+      });
+
+      res.json(booking);
+    } catch (error) {
+      console.error("Error completing booking checkout:", error);
+      res.status(500).json({ message: "Failed to complete booking checkout" });
     }
   });
 
@@ -1164,6 +1575,95 @@ export async function registerRoutes(
     }
   });
 
+  // Yellow Pages - Public
+  app.get("/api/community/yellow-pages", async (req, res) => {
+    try {
+      const category = req.query.category as string | undefined;
+      const city = req.query.city as string | undefined;
+      const search = req.query.search as string | undefined;
+      const listings = await storage.getYellowPages(category, city, search);
+      res.json(listings);
+    } catch (error) {
+      console.error("Error fetching yellow pages:", error);
+      res.status(500).json({ message: "Failed to fetch listings" });
+    }
+  });
+
+  app.get("/api/community/yellow-pages/cities", async (req, res) => {
+    try {
+      const cities = await storage.getYellowPageCities();
+      res.json(cities);
+    } catch (error) {
+      console.error("Error fetching cities:", error);
+      res.status(500).json({ message: "Failed to fetch cities" });
+    }
+  });
+
+  app.get("/api/community/yellow-pages/categories", async (req, res) => {
+    res.json([
+      { id: "room", name: "Room" },
+      { id: "shared-room", name: "Shared Room" },
+      { id: "house", name: "House" },
+      { id: "apartment", name: "Apartment" },
+      { id: "car", name: "Car" },
+      { id: "other", name: "Other" },
+    ]);
+  });
+
+  app.get("/api/community/yellow-pages/:id", async (req, res) => {
+    try {
+      const listing = await storage.getYellowPage(req.params.id);
+      if (!listing) {
+        return res.status(404).json({ message: "Listing not found" });
+      }
+      res.json(listing);
+    } catch (error) {
+      console.error("Error fetching listing:", error);
+      res.status(500).json({ message: "Failed to fetch listing" });
+    }
+  });
+
+  // Yellow Pages - User submission (requires auth)
+  app.post("/api/community/yellow-pages", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const listing = await storage.createYellowPage({
+        ...req.body,
+        createdBy: userId,
+        isApproved: false,
+        isActive: true,
+      });
+      res.status(201).json(listing);
+    } catch (error) {
+      console.error("Error creating yellow page listing:", error);
+      res.status(500).json({ message: "Failed to create listing" });
+    }
+  });
+
+  // Events - User submission (requires auth)
+  app.post("/api/community/events", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const eventData = { ...req.body };
+      if (eventData.eventDate && typeof eventData.eventDate === "string") {
+        eventData.eventDate = new Date(eventData.eventDate);
+      }
+      if (eventData.endDate && typeof eventData.endDate === "string") {
+        eventData.endDate = new Date(eventData.endDate);
+      }
+      const event = await storage.createEvent({
+        ...eventData,
+        createdBy: userId,
+        isApproved: false,
+        isFeatured: false,
+      });
+      res.status(201).json(event);
+    } catch (error) {
+      console.error("Error creating event:", error);
+      res.status(500).json({ message: "Failed to create event" });
+    }
+  });
+
   // Announcements - Public
   app.get("/api/community/announcements", async (req, res) => {
     try {
@@ -1225,10 +1725,127 @@ export async function registerRoutes(
   });
 
   // ============================================
+  // USER ROLE ROUTES
+  // ============================================
+
+  app.get("/api/user/role", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const roles = await storage.getUserRoles(userId);
+      const roleNames = roles.map(r => r.role);
+
+      const adminEmail = process.env.ADMIN_EMAIL;
+      const userEmail = req.user?.claims?.email;
+      if (adminEmail && userEmail && adminEmail.toLowerCase() === userEmail.toLowerCase()) {
+        if (!roleNames.includes("admin")) {
+          await storage.addUserRole(userId, "admin");
+          roleNames.push("admin");
+        }
+      }
+
+      const approvalMap: Record<string, string> = {};
+      for (const r of roles) {
+        approvalMap[r.role] = r.approvalStatus || "approved";
+      }
+
+      res.json({ roles: roleNames, approvalStatus: approvalMap });
+    } catch (error) {
+      console.error("Error fetching user role:", error);
+      res.status(500).json({ error: "Failed to fetch user role" });
+    }
+  });
+
+  app.post("/api/user/role", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const { role, businessInfo } = req.body;
+      const validRoles = ["customer", "vendor", "service_provider"];
+      if (!validRoles.includes(role)) {
+        return res.status(400).json({ error: "Invalid role. Must be: customer, vendor, or service_provider" });
+      }
+
+      const existingRoles = await storage.getUserRoles(userId);
+      const nonAdminRoles = existingRoles.filter(r => r.role !== "admin");
+      if (nonAdminRoles.length > 0) {
+        return res.status(400).json({ error: "Role already assigned. Contact admin to change." });
+      }
+
+      const approvalStatus = role === "customer" ? "approved" : "pending";
+      const created = await storage.addUserRole(userId, role);
+      if (approvalStatus === "pending") {
+        await storage.updateUserRoleApproval(userId, role, "pending");
+      }
+
+      if (role === "vendor" && businessInfo) {
+        const existingRestaurants = await storage.getRestaurantsByOwner(userId);
+        const existing = existingRestaurants.length > 0 ? existingRestaurants[0] : null;
+        if (!existing) {
+          await storage.createRestaurant({
+            ownerId: userId,
+            name: businessInfo.name || "Unnamed Restaurant",
+            description: businessInfo.description || null,
+            cuisine: businessInfo.cuisine || null,
+            address: businessInfo.address || null,
+            city: businessInfo.city || null,
+            phone: businessInfo.phone || null,
+            bankName: businessInfo.bankName || null,
+            routingNumber: businessInfo.routingNumber || null,
+            bankAccountNumber: businessInfo.bankAccountNumber || null,
+            zelleInfo: businessInfo.zelleInfo || null,
+            venmoInfo: businessInfo.venmoInfo || null,
+            isActive: false,
+          });
+        }
+      }
+
+      if (role === "service_provider" && businessInfo) {
+        const existing = await storage.getServiceProviderByUser(userId);
+        if (!existing) {
+          await storage.createServiceProvider({
+            userId: userId,
+            businessName: businessInfo.businessName || "Unnamed Business",
+            description: businessInfo.description || null,
+            category: businessInfo.category || "other",
+            address: businessInfo.address || null,
+            city: businessInfo.city || null,
+            phone: businessInfo.phone || null,
+            email: businessInfo.email || null,
+            einNumber: businessInfo.einNumber || null,
+            imageUrl: businessInfo.imageUrl || null,
+            bankName: businessInfo.bankName || null,
+            routingNumber: businessInfo.routingNumber || null,
+            bankAccountNumber: businessInfo.bankAccountNumber || null,
+            zelleInfo: businessInfo.zelleInfo || null,
+            venmoInfo: businessInfo.venmoInfo || null,
+            isActive: false,
+          });
+        }
+      }
+
+      const allRoles = await storage.getUserRoles(userId);
+      const approvalMap: Record<string, string> = {};
+      for (const r of allRoles) {
+        approvalMap[r.role] = r.approvalStatus || "approved";
+      }
+
+      res.json({ roles: allRoles.map(r => r.role), approvalStatus: approvalMap });
+    } catch (error) {
+      console.error("Error setting user role:", error);
+      res.status(500).json({ error: "Failed to set user role" });
+    }
+  });
+
+  // ============================================
   // ADMIN PLATFORM ROUTES (EPIC 9)
   // ============================================
 
-  // Check if current user is admin (for frontend to determine if admin link should show)
   app.get("/api/user/is-admin", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
@@ -1302,6 +1919,86 @@ export async function registerRoutes(
       res.json(roles);
     } catch (error) {
       res.status(500).json({ error: "Failed to update user roles" });
+    }
+  });
+
+  // Pending approvals management
+  app.get("/api/admin/pending-approvals", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const pending = await storage.getPendingApprovals();
+      const enriched = await Promise.all(pending.map(async (p) => {
+        const user = await storage.getUserById(p.userId);
+        let businessInfo: Record<string, any> | null = null;
+
+        if (p.role === "vendor") {
+          const restaurants = await storage.getRestaurantsByOwner(p.userId);
+          if (restaurants.length > 0) {
+            const r = restaurants[0];
+            businessInfo = {
+              name: r.name,
+              description: r.description,
+              cuisine: r.cuisine,
+              city: r.city,
+              address: r.address,
+              phone: r.phone,
+            };
+          }
+        } else if (p.role === "service_provider") {
+          const provider = await storage.getServiceProviderByUser(p.userId);
+          if (provider) {
+            businessInfo = {
+              businessName: provider.businessName,
+              description: provider.description,
+              category: provider.category,
+              city: provider.city,
+              address: provider.address,
+              phone: provider.phone,
+              email: provider.email,
+            };
+          }
+        }
+
+        return {
+          ...p,
+          userName: user ? `${user.firstName} ${user.lastName}`.trim() : "Unknown",
+          userEmail: user?.email || "",
+          businessInfo,
+        };
+      }));
+      res.json(enriched);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch pending approvals" });
+    }
+  });
+
+  app.patch("/api/admin/approve-role", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { userId, role, status } = req.body;
+      if (!["approved", "rejected"].includes(status)) {
+        return res.status(400).json({ error: "Status must be 'approved' or 'rejected'" });
+      }
+      const updated = await storage.updateUserRoleApproval(userId, role, status);
+      if (!updated) {
+        return res.status(404).json({ error: "Role not found" });
+      }
+
+      if (status === "approved") {
+        if (role === "vendor") {
+          const restaurants = await storage.getRestaurantsByOwner(userId);
+          if (restaurants.length > 0 && !restaurants[0].isActive) {
+            await storage.updateRestaurant(restaurants[0].id, { isActive: true });
+          }
+        } else if (role === "service_provider") {
+          const provider = await storage.getServiceProviderByUser(userId);
+          if (provider && !provider.isActive) {
+            await storage.updateServiceProvider(provider.id, { isActive: true });
+          }
+        }
+      }
+
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update approval status" });
     }
   });
 
@@ -1445,6 +2142,35 @@ export async function registerRoutes(
     }
   });
 
+  // Yellow Pages management
+  app.get("/api/admin/yellow-pages", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const allListings = await storage.getAllYellowPages();
+      res.json(allListings);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch yellow pages" });
+    }
+  });
+
+  app.patch("/api/admin/yellow-pages/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { isApproved, isActive } = req.body;
+      const updated = await storage.updateYellowPage(req.params.id, { isApproved, isActive });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update listing" });
+    }
+  });
+
+  app.delete("/api/admin/yellow-pages/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      await storage.deleteYellowPage(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete listing" });
+    }
+  });
+
   // Reviews management
   app.get("/api/admin/reviews", isAuthenticated, isAdmin, async (req, res) => {
     try {
@@ -1461,6 +2187,235 @@ export async function registerRoutes(
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ error: "Failed to delete review" });
+    }
+  });
+
+  app.get("/api/admin/service-reviews", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const reviews = await storage.getAllServiceReviews();
+      res.json(reviews);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch service reviews" });
+    }
+  });
+
+  app.delete("/api/admin/service-reviews/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      await storage.deleteServiceReview(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete service review" });
+    }
+  });
+
+  app.delete("/api/admin/restaurants/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      await storage.deleteRestaurant(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete restaurant" });
+    }
+  });
+
+  app.delete("/api/admin/providers/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      await storage.deleteServiceProvider(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete provider" });
+    }
+  });
+
+  app.delete("/api/admin/events/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      await storage.deleteEvent(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete event" });
+    }
+  });
+
+  app.delete("/api/admin/businesses/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      await storage.deleteBusiness(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete business" });
+    }
+  });
+
+  // =================
+  // ADMIN FINANCIAL REPORT
+  // =================
+
+  app.get("/api/admin/financial-report", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      const PLATFORM_FEE_RATE = 0.08;
+
+      let rangeStart: Date;
+      let rangeEnd: Date;
+
+      if (req.query.startDate && req.query.endDate) {
+        rangeStart = new Date(req.query.startDate as string);
+        rangeStart.setHours(0, 0, 0, 0);
+        rangeEnd = new Date(req.query.endDate as string);
+        rangeEnd.setHours(23, 59, 59, 999);
+      } else {
+        const weekOffset = parseInt(req.query.weekOffset as string || "0");
+        const now = new Date();
+        const currentDay = now.getDay();
+        rangeStart = new Date(now);
+        rangeStart.setDate(now.getDate() - currentDay + (weekOffset * 7));
+        rangeStart.setHours(0, 0, 0, 0);
+        rangeEnd = new Date(rangeStart);
+        rangeEnd.setDate(rangeStart.getDate() + 6);
+        rangeEnd.setHours(23, 59, 59, 999);
+      }
+
+      const rangeEndExclusive = new Date(rangeEnd);
+      rangeEndExclusive.setMilliseconds(rangeEndExclusive.getMilliseconds() + 1);
+
+      const numDays = Math.round((rangeEnd.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+      const allOrders = await storage.getAllOrders();
+      const allBookings = await storage.getAllBookings();
+      const allRestaurants = await storage.getAllRestaurants();
+      const allProviders = await storage.getAllServiceProviders();
+
+      const periodOrders = allOrders.filter(o => {
+        const d = o.createdAt ? new Date(o.createdAt) : null;
+        return d && d >= rangeStart && d < rangeEndExclusive && o.status !== "cancelled";
+      });
+
+      const periodBookings = allBookings.filter(b => {
+        const d = b.createdAt ? new Date(b.createdAt) : null;
+        return d && d >= rangeStart && d < rangeEndExclusive && b.isPaid && b.status !== "cancelled";
+      });
+
+      const restaurantReports = allRestaurants.map(r => {
+        const rOrders = periodOrders.filter(o => o.restaurantId === r.id);
+        const dailyBreakdown = Array.from({ length: numDays }, (_, i) => {
+          const dayDate = new Date(rangeStart);
+          dayDate.setDate(rangeStart.getDate() + i);
+          const dayEnd = new Date(dayDate);
+          dayEnd.setDate(dayDate.getDate() + 1);
+
+          const dayOrders = rOrders.filter(o => {
+            const d = new Date(o.createdAt!);
+            return d >= dayDate && d < dayEnd;
+          });
+
+          const grossRevenue = dayOrders.reduce((sum, o) => sum + parseFloat(o.subtotal || "0"), 0);
+          const platformFee = Math.round(grossRevenue * PLATFORM_FEE_RATE * 100) / 100;
+          const netPayout = Math.round((grossRevenue - platformFee) * 100) / 100;
+
+          return {
+            day: dayNames[dayDate.getDay()],
+            date: dayDate.toISOString().split("T")[0],
+            orders: dayOrders.length,
+            grossRevenue: Math.round(grossRevenue * 100) / 100,
+            platformFee,
+            netPayout,
+          };
+        });
+
+        const totalGross = dailyBreakdown.reduce((s, d) => s + d.grossRevenue, 0);
+        const totalPlatformFee = dailyBreakdown.reduce((s, d) => s + d.platformFee, 0);
+        const totalNet = dailyBreakdown.reduce((s, d) => s + d.netPayout, 0);
+        const totalOrders = dailyBreakdown.reduce((s, d) => s + d.orders, 0);
+
+        return {
+          type: "restaurant" as const,
+          id: r.id,
+          name: r.name,
+          totalOrders,
+          grossRevenue: Math.round(totalGross * 100) / 100,
+          platformFee: Math.round(totalPlatformFee * 100) / 100,
+          netPayout: Math.round(totalNet * 100) / 100,
+          dailyBreakdown,
+        };
+      }).filter(r => r.totalOrders > 0 || true);
+
+      const providerReports = allProviders.map(p => {
+        const pBookings = periodBookings.filter(b => b.providerId === p.id);
+        const dailyBreakdown = Array.from({ length: numDays }, (_, i) => {
+          const dayDate = new Date(rangeStart);
+          dayDate.setDate(rangeStart.getDate() + i);
+          const dayEnd = new Date(dayDate);
+          dayEnd.setDate(dayDate.getDate() + 1);
+
+          const dayBookings = pBookings.filter(b => {
+            const d = new Date(b.createdAt!);
+            return d >= dayDate && d < dayEnd;
+          });
+
+          const serviceRevenue = dayBookings.reduce((sum, b) => sum + parseFloat(b.price || "0"), 0);
+          const bookingFeeRevenue = dayBookings.reduce((sum, b) => sum + parseFloat(b.bookingFee || "0"), 0);
+          const totalPaid = dayBookings.reduce((sum, b) => sum + parseFloat(b.totalPaid || "0"), 0);
+          const platformFee = Math.round(serviceRevenue * PLATFORM_FEE_RATE * 100) / 100;
+          const netPayout = Math.round((serviceRevenue + bookingFeeRevenue - platformFee) * 100) / 100;
+
+          return {
+            day: dayNames[dayDate.getDay()],
+            date: dayDate.toISOString().split("T")[0],
+            bookings: dayBookings.length,
+            serviceRevenue: Math.round(serviceRevenue * 100) / 100,
+            bookingFeeRevenue: Math.round(bookingFeeRevenue * 100) / 100,
+            totalPaid: Math.round(totalPaid * 100) / 100,
+            platformFee,
+            netPayout,
+          };
+        });
+
+        const totalServiceRev = dailyBreakdown.reduce((s, d) => s + d.serviceRevenue, 0);
+        const totalBookingFeeRev = dailyBreakdown.reduce((s, d) => s + d.bookingFeeRevenue, 0);
+        const totalPlatformFee = dailyBreakdown.reduce((s, d) => s + d.platformFee, 0);
+        const totalNet = dailyBreakdown.reduce((s, d) => s + d.netPayout, 0);
+        const totalBookings = dailyBreakdown.reduce((s, d) => s + d.bookings, 0);
+        const totalPaidAmount = dailyBreakdown.reduce((s, d) => s + d.totalPaid, 0);
+
+        return {
+          type: "provider" as const,
+          id: p.id,
+          name: p.businessName,
+          totalBookings,
+          serviceRevenue: Math.round(totalServiceRev * 100) / 100,
+          bookingFeeRevenue: Math.round(totalBookingFeeRev * 100) / 100,
+          totalPaid: Math.round(totalPaidAmount * 100) / 100,
+          platformFee: Math.round(totalPlatformFee * 100) / 100,
+          netPayout: Math.round(totalNet * 100) / 100,
+          dailyBreakdown,
+        };
+      }).filter(p => p.totalBookings > 0 || true);
+
+      const startStr = rangeStart.toISOString().split("T")[0];
+      const endStr = rangeEnd.toISOString().split("T")[0];
+
+      const totalPlatformRevenue = 
+        restaurantReports.reduce((s, r) => s + r.platformFee, 0) +
+        providerReports.reduce((s, p) => s + p.platformFee, 0);
+
+      const totalPayouts =
+        restaurantReports.reduce((s, r) => s + r.netPayout, 0) +
+        providerReports.reduce((s, p) => s + p.netPayout, 0);
+
+      res.json({
+        weekStart: startStr,
+        weekEnd: endStr,
+        weekOffset: 0,
+        restaurants: restaurantReports,
+        providers: providerReports,
+        summary: {
+          totalPlatformRevenue: Math.round(totalPlatformRevenue * 100) / 100,
+          totalPayouts: Math.round(totalPayouts * 100) / 100,
+          totalOrders: periodOrders.length,
+          totalBookings: periodBookings.length,
+        },
+      });
+    } catch (error) {
+      console.error("Error generating financial report:", error);
+      res.status(500).json({ error: "Failed to generate financial report" });
     }
   });
 
