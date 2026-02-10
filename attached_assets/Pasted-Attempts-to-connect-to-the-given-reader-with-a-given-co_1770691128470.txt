@@ -1,0 +1,63 @@
+Attempts to connect to the given reader with a given connection configuration.
+
+To connect to mobile readers, your app must register that reader to a Location upon connection. The location is specified in the connection configuration for the reader.
+
+Throughout the lifetime of the connection, the reader will communicate with your app via the SCPReaderDelegate to announce reader related events.
+
+If the connection succeeds, the completion block will be called with the connected reader, and SCPTerminal.connectionStatus will change to .connected.
+
+If the connection fails, the completion block will be called with an error.
+
+If the SDK is actively discovery when connect is called the SDK will complete the discover command.
+
+When this method is called, the SDK uses a connection token and the given reader information to register the reader to your Stripe account. If the SDK does not already have a connection token, it will call the fetchConnectionToken method in your SCPConnectionTokenProvider implementation.
+
+If a mobile reader’s battery is critically low the connect call will fail with SCPErrorBluetoothDisconnected. Plug your reader in to start charging and try again.
+
+
+https://stripe.com/docs/terminal/readers/connecting
+
+Declaration
+
+- (void)connectReader:(nonnull SCPReader *)reader
+     connectionConfig:(nonnull SCPConnectionConfiguration *)connectionConfig
+           completion:(nonnull SCPReaderCompletionBlock)completion;
+
+func connectReader(_ reader: SCPReader, connectionConfig: ConnectionConfiguration) async throws -> SCPReader
+Parameters
+reader	
+The reader to connect to. This should be a reader recently returned to the didUpdateDiscoveredReaders: method in the discovery delegate.
+
+connectionConfig	
+The connection configuration for options while connecting to a reader. See SCPConnectionConfiguration and its subclasses for more details.
+
+completion	
+The completion block called when the command completes.
+
+-listLocations:completion:
+-installAvailableUpdate
+-rebootReader:
+-disconnectReader:
+Taking payments
+-createPaymentIntent:completion:
+-retrievePaymentIntent:completion:
+-collectPaymentMethod:completion:
+-collectPaymentMethod:collectConfig:completion:
+-confirmPaymentIntent:completion:
+-confirmPaymentIntent:confirmConfig:completion:
+-processPaymentIntent:collectConfig:confirmConfig:completion:
+-cancelPaymentIntent:completion:
+Saving payment details for later use
+-createSetupIntent:completion:
+-retrieveSetupIntent:completion:
+-cancelSetupIntent:completion:
+-collectSetupIntentPaymentMethod:allowRedisplay:completion:
+-collectSetupIntentPaymentMethod:allowRedisplay:setupConfig:completion:
+-confirmSetupIntent:completion:
+-processSetupIntent:allowRedisplay:collectConfig:completion:
+Card-present refunds
+-processRefund:collectConfig:completion:
+Offline mode
+offlineDelegate
+offlineStatus
+-createPaymentIntent:createConfig:completion:

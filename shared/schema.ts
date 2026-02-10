@@ -35,6 +35,8 @@ export const restaurants = pgTable("restaurants", {
   bankAccountNumber: varchar("bank_account_number", { length: 30 }),
   zelleInfo: varchar("zelle_info", { length: 255 }),
   venmoInfo: varchar("venmo_info", { length: 255 }),
+  terminalEnabled: boolean("terminal_enabled").default(false),
+  terminalLocationId: varchar("terminal_location_id", { length: 255 }),
   isOpen: boolean("is_open").default(true),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
