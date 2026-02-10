@@ -44,8 +44,14 @@ interface ProviderInfo {
 }
 
 export default function OnboardingPage() {
-  const [selectedRole, setSelectedRole] = useState<string | null>(null);
-  const [step, setStep] = useState(1);
+  const pendingRole = typeof window !== "undefined" ? localStorage.getItem("brazadash-pending-role") : null;
+  if (pendingRole) {
+    localStorage.removeItem("brazadash-pending-role");
+  }
+  const [selectedRole, setSelectedRole] = useState<string | null>(pendingRole);
+  const [step, setStep] = useState(
+    pendingRole && (pendingRole === "vendor" || pendingRole === "service_provider") ? 2 : 1
+  );
   const { toast } = useToast();
   const { t } = useLanguage();
 
