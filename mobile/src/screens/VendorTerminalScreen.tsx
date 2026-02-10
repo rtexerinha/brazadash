@@ -116,7 +116,7 @@ export default function VendorTerminalScreen() {
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={false} onRefresh={() => { refetch(); refetchReaders(); }} />}
+      refreshControl={<RefreshControl refreshing={false} onRefresh={() => { refetch(); if (isTerminalEnabled && hasLocation) refetchReaders(); }} />}
     >
       <View style={styles.header}>
         <View style={styles.headerIcon}>
