@@ -5,6 +5,7 @@ import type {
   CommunityEvent, Business, Announcement,
   YellowPageListing,
   MobileProfile, MobileHomeFeed,
+  TerminalReader, TerminalPaymentIntent,
 } from "../types";
 
 const API_BASE = "https://brazadash.replit.app";
@@ -172,4 +173,30 @@ export const api = {
     request("/api/mobile/push-token", { method: "DELETE", body: JSON.stringify({ token }) }),
 
   getAuthStatus: () => request<{ user?: { claims: Record<string, string> } }>("/api/auth/user"),
+
+  getVendorRestaurants: () => request<Restaurant[]>("/api/vendor/restaurants"),
+  
+  toggleTerminal: (restaurantId: string, terminalEnabled: boolean) =>
+    request("/api/terminal/settings", {
+      method: "PATCH",
+      body: JSON.stringify({ restaurantId, terminalEnabled }),
+    }),
+
+  setupTerminalLocation: (restaurantId: string, postalCode: string) =>
+    request<{ locationId: string }>("/api/terminal/locations", {
+      method: "POST",
+      body: JSON.stringify({ restaurantId, postalCode }),
+    }),
+
+  getTerminalReaders: (restaurantId: string) =>
+    request<{ readers: TerminalReader[] }>(`/api/terminal/readers?restaurantId=${restaurantId}`),
+
+  createTerminalPaymentIntent: (restaurantId: string, amount: string, description?: string) =>
+    request<TerminalPaymentIntent>("/api/terminal/payment-intents", {
+      method: "POST",
+      body: JSON.stringify({ restaurantId, amount, description }),
+    }),
+
+  createTerminalConnectionToken: () =>
+    request<{ secret: string }>("/api/terminal/connection-token", { method: "POST" }),
 };

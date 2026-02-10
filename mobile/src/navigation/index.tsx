@@ -22,6 +22,7 @@ import BookingsScreen from "../screens/BookingsScreen";
 import BookingDetailScreen from "../screens/BookingDetailScreen";
 import NotificationsScreen from "../screens/NotificationsScreen";
 import LoginScreen from "../screens/LoginScreen";
+import VendorTerminalScreen from "../screens/VendorTerminalScreen";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -71,6 +72,7 @@ function ProfileStack() {
       <Stack.Screen name="Bookings" component={BookingsScreen} options={{ title: "My Bookings" }} />
       <Stack.Screen name="BookingDetail" component={BookingDetailScreen} options={{ title: "Booking Details" }} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: "Notifications" }} />
+      <Stack.Screen name="VendorTerminal" component={VendorTerminalScreen} options={{ title: "In-Person Payments" }} />
     </Stack.Navigator>
   );
 }

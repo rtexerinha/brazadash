@@ -126,6 +126,13 @@ export default function ProfileScreen() {
         />
       </View>
 
+      {(p as any)?.roles?.includes("vendor") && (
+        <View style={styles.menuSection}>
+          <Text style={styles.menuSectionTitle}>Vendor</Text>
+          <MenuRow icon="card-outline" label="In-Person Payments" onPress={() => navigation.navigate("VendorTerminal")} />
+        </View>
+      )}
+
       <View style={styles.menuSection}>
         <Text style={styles.menuSectionTitle}>Account</Text>
         <MenuRow

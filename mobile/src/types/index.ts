@@ -14,6 +14,8 @@ export interface Restaurant {
   deliveryTime: string;
   isOpen: boolean;
   isActive: boolean;
+  terminalEnabled?: boolean;
+  terminalLocationId?: string | null;
   createdAt: string;
 }
 
@@ -266,4 +268,20 @@ export interface MobileHomeFeed {
   announcements: Announcement[];
   featuredProviders: ServiceProvider[];
   unreadNotifications: number;
+}
+
+export interface TerminalReader {
+  id: string;
+  label: string;
+  deviceType: string;
+  status: string;
+  serialNumber?: string;
+  ipAddress?: string;
+}
+
+export interface TerminalPaymentIntent {
+  clientSecret: string;
+  paymentIntentId: string;
+  amount: number;
+  platformFee: number;
 }
