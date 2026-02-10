@@ -103,11 +103,23 @@ export async function setupAuth(app: Express) {
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
   app.get("/api/login", (req, res, next) => {
-    ensureStrategy(req.hostname);
-    passport.authenticate(`replitauth:${req.hostname}`, {
-      prompt: "login consent",
-      scope: ["openid", "email", "profile", "offline_access"],
-    })(req, res, next);
+    if (req.isAuthenticated()) {
+      req.logout(() => {
+        req.session.destroy(() => {
+          ensureStrategy(req.hostname);
+          passport.authenticate(`replitauth:${req.hostname}`, {
+            prompt: "select_account consent",
+            scope: ["openid", "email", "profile", "offline_access"],
+          })(req, res, next);
+        });
+      });
+    } else {
+      ensureStrategy(req.hostname);
+      passport.authenticate(`replitauth:${req.hostname}`, {
+        prompt: "select_account consent",
+        scope: ["openid", "email", "profile", "offline_access"],
+      })(req, res, next);
+    }
   });
 
   app.get("/api/callback", (req, res, next) => {
