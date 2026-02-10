@@ -103,46 +103,7 @@ export async function setupAuth(app: Express) {
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
   app.get("/api/login", (req, res, next) => {
-    if (req.isAuthenticated()) {
-      req.logout(() => {
-        req.session.destroy(() => {
-          ensureStrategy(req.hostname);
-          passport.authenticate(`replitauth:${req.hostname}`, {
-            prompt: "login consent",
-            scope: ["openid", "email", "profile", "offline_access"],
-          })(req, res, next);
-        });
-      });
-    } else {
-      ensureStrategy(req.hostname);
-      passport.authenticate(`replitauth:${req.hostname}`, {
-        prompt: "login consent",
-        scope: ["openid", "email", "profile", "offline_access"],
-      })(req, res, next);
-    }
-  });
-
-  app.get("/api/callback", (req, res, next) => {
-    ensureStrategy(req.hostname);
-    passport.authenticate(`replitauth:${req.hostname}`, {
-      successReturnToOrRedirect: "/",
-      failureRedirect: "/",
-    })(req, res, next);
-  });
-
-  app.get("/api/logout", (req, res) => {
-    req.logout(() => {
-      res.redirect(
-        client.buildEndSessionUrl(config, {
-          client_id: process.env.REPL_ID!,
-          post_logout_redirect_uri: `${req.protocol}://${req.hostname}`,
-        }).href
-      );
-    });
-  });
-
-  app.get("/api/switch-account", (req, res, next) => {
-    const doLogin = () => {
+    const startAuth = () => {
       ensureStrategy(req.hostname);
       passport.authenticate(`replitauth:${req.hostname}`, {
         prompt: "login consent",
@@ -152,16 +113,60 @@ export async function setupAuth(app: Express) {
 
     if (req.isAuthenticated()) {
       req.logout(() => {
-        req.session.destroy(() => {
-          const endSessionUrl = client.buildEndSessionUrl(config, {
-            client_id: process.env.REPL_ID!,
-            post_logout_redirect_uri: `${req.protocol}://${req.hostname}/api/login`,
-          }).href;
-          res.redirect(endSessionUrl);
-        });
+        startAuth();
       });
     } else {
-      doLogin();
+      startAuth();
+    }
+  });
+
+  app.get("/api/callback", (req, res, next) => {
+    ensureStrategy(req.hostname);
+    passport.authenticate(`replitauth:${req.hostname}`, (err: any, user: any, info: any) => {
+      if (err) {
+        console.error("Auth callback error:", err.message || err);
+        return res.redirect("/?auth_error=callback_failed");
+      }
+      if (!user) {
+        console.error("Auth callback: no user returned", info);
+        return res.redirect("/?auth_error=no_user");
+      }
+      req.logIn(user, (loginErr) => {
+        if (loginErr) {
+          console.error("Auth login error:", loginErr);
+          return res.redirect("/?auth_error=login_failed");
+        }
+        return res.redirect("/");
+      });
+    })(req, res, next);
+  });
+
+  app.get("/api/logout", (req, res) => {
+    const protocol = req.headers["x-forwarded-proto"] || req.protocol;
+    req.logout(() => {
+      res.redirect(
+        client.buildEndSessionUrl(config, {
+          client_id: process.env.REPL_ID!,
+          post_logout_redirect_uri: `${protocol}://${req.hostname}`,
+        }).href
+      );
+    });
+  });
+
+  app.get("/api/switch-account", (req, res) => {
+    const protocol = req.headers["x-forwarded-proto"] || req.protocol;
+    const baseUrl = `${protocol}://${req.hostname}`;
+
+    if (req.isAuthenticated()) {
+      req.logout(() => {
+        const endSessionUrl = client.buildEndSessionUrl(config, {
+          client_id: process.env.REPL_ID!,
+          post_logout_redirect_uri: `${baseUrl}/api/login`,
+        }).href;
+        res.redirect(endSessionUrl);
+      });
+    } else {
+      res.redirect(`${baseUrl}/api/login`);
     }
   });
 }
