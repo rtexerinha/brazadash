@@ -6,7 +6,7 @@ import { api } from "../api/client";
 import { useAuth } from "../contexts/AuthContext";
 import { colors, spacing, fontSize, fontWeight } from "../constants/theme";
 
-const AUTH_URL = "https://brazadash.replit.app/api/login";
+const AUTH_URL = "https://brazadash.com/api/login";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -31,8 +31,16 @@ export default function LoginScreen() {
         // Try to get the user profile
         try {
           const profile = await api.getMobileProfile();
-          setAuthenticated(profile);
-          navigation.goBack();
+          
+          // Check if user has a role assigned
+          if (!profile.roles || profile.roles.length === 0) {
+            // New user needs onboarding
+            navigation.replace("Onboarding");
+          } else {
+            // Existing user with role, proceed to app
+            setAuthenticated(profile);
+            navigation.goBack();
+          }
         } catch (error) {
           Alert.alert("Login Failed", "Could not authenticate. Please try again.");
           setAuthenticating(false);

@@ -253,10 +253,13 @@ export default function HomeScreen() {
       <View style={styles.hero}>
         <View style={styles.heroGradient}>
           <View style={styles.heroTopRow}>
-            <View>
+            <TouchableOpacity 
+              onPress={() => navigation.navigate("HomeTab")}
+              activeOpacity={0.7}
+            >
               <Text style={styles.heroGreeting}>{greeting}</Text>
               <Text style={styles.heroTitle}>BrazaDash</Text>
-            </View>
+            </TouchableOpacity>
             {isAuthenticated ? (
               <TouchableOpacity
                 style={styles.notifButton}
@@ -275,10 +278,16 @@ export default function HomeScreen() {
             )}
           </View>
           <Text style={styles.heroSubtitle}>{subtitle}</Text>
-          <View style={styles.searchBarFake}>
+          <TouchableOpacity 
+            style={styles.searchBarFake}
+            onPress={() => {
+              // TODO: Navigate to search screen when implemented
+            }}
+            activeOpacity={0.8}
+          >
             <Ionicons name="search" size={18} color={colors.textTertiary} />
             <Text style={styles.searchBarText}>Search restaurants, services...</Text>
-          </View>
+          </TouchableOpacity>
         </View>
       </View>
 

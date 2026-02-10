@@ -22,6 +22,7 @@ import BookingsScreen from "../screens/BookingsScreen";
 import BookingDetailScreen from "../screens/BookingDetailScreen";
 import NotificationsScreen from "../screens/NotificationsScreen";
 import LoginScreen from "../screens/LoginScreen";
+import OnboardingScreen from "../screens/OnboardingScreen";
 import VendorTerminalScreen from "../screens/VendorTerminalScreen";
 
 const Stack = createNativeStackNavigator();
@@ -150,6 +151,11 @@ export default function AppNavigator() {
           name="Login"
           component={LoginScreen}
           options={{ presentation: "modal" }}
+        />
+        <Stack.Screen
+          name="Onboarding"
+          component={OnboardingScreen}
+          options={{ presentation: "modal", gestureEnabled: false }}
         />
       </Stack.Navigator>
     </NavigationContainer>

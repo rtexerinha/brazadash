@@ -8,7 +8,7 @@ import type {
   TerminalReader, TerminalPaymentIntent,
 } from "../types";
 
-const API_BASE = "https://brazadash.replit.app";
+const API_BASE = "https://brazadash.com";
 
 async function getSessionCookie(): Promise<string | null> {
   return SecureStore.getItemAsync("session_cookie");
@@ -199,4 +199,12 @@ export const api = {
 
   createTerminalConnectionToken: () =>
     request<{ secret: string }>("/api/terminal/connection-token", { method: "POST" }),
+
+  getUserRole: () => request<{ roles: string[]; approvalStatus: Record<string, string> }>("/api/user/role"),
+  
+  setUserRole: (role: "customer" | "vendor" | "service_provider", businessInfo?: any) =>
+    request<{ roles: string[]; approvalStatus: Record<string, string> }>("/api/user/role", {
+      method: "POST",
+      body: JSON.stringify({ role, businessInfo }),
+    }),
 };
