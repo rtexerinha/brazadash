@@ -1,5 +1,6 @@
 import * as client from "openid-client";
 import { Strategy, type VerifyFunction } from "openid-client/passport";
+import crypto from "crypto";
 
 import passport from "passport";
 import session from "express-session";
@@ -7,6 +8,17 @@ import type { Express, RequestHandler } from "express";
 import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
 import { authStorage } from "./storage";
+
+const mobileAuthCodes = new Map<string, { sessionID: string; cookie: string; expiresAt: number }>();
+
+function cleanExpiredCodes() {
+  const now = Date.now();
+  for (const [code, data] of mobileAuthCodes) {
+    if (data.expiresAt < now) {
+      mobileAuthCodes.delete(code);
+    }
+  }
+}
 
 const getOidcConfig = memoize(
   async () => {
@@ -167,6 +179,115 @@ export async function setupAuth(app: Express) {
       });
     } else {
       res.redirect(`${baseUrl}/api/login`);
+    }
+  });
+
+  const ensureMobileStrategy = (domain: string) => {
+    const strategyName = `replitauth-mobile:${domain}`;
+    if (!registeredStrategies.has(strategyName)) {
+      const strategy = new Strategy(
+        {
+          name: strategyName,
+          config,
+          scope: "openid email profile offline_access",
+          callbackURL: `https://${domain}/api/mobile/callback`,
+        },
+        verify
+      );
+      passport.use(strategy);
+      registeredStrategies.add(strategyName);
+    }
+  };
+
+  app.get("/api/mobile/login", (req, res, next) => {
+    const startAuth = () => {
+      ensureMobileStrategy(req.hostname);
+      passport.authenticate(`replitauth-mobile:${req.hostname}`, {
+        prompt: "login consent",
+        scope: ["openid", "email", "profile", "offline_access"],
+      })(req, res, next);
+    };
+
+    if (req.isAuthenticated()) {
+      req.logout(() => {
+        startAuth();
+      });
+    } else {
+      startAuth();
+    }
+  });
+
+  app.get("/api/mobile/callback", (req, res, next) => {
+    ensureMobileStrategy(req.hostname);
+    passport.authenticate(`replitauth-mobile:${req.hostname}`, (err: any, user: any, info: any) => {
+      if (err) {
+        console.error("Mobile auth callback error:", err.message || err);
+        return res.redirect("brazadash://oauth-callback?error=callback_failed");
+      }
+      if (!user) {
+        console.error("Mobile auth callback: no user returned", info);
+        return res.redirect("brazadash://oauth-callback?error=no_user");
+      }
+      req.logIn(user, (loginErr) => {
+        if (loginErr) {
+          console.error("Mobile auth login error:", loginErr);
+          return res.redirect("brazadash://oauth-callback?error=login_failed");
+        }
+        cleanExpiredCodes();
+        const authCode = crypto.randomBytes(32).toString("hex");
+        let sessionCookie = "";
+        const cookies = res.getHeader("set-cookie");
+        if (cookies) {
+          const cookieArray = Array.isArray(cookies) ? cookies : [cookies as string];
+          const connectCookie = cookieArray.find((c) => c.toString().startsWith("connect.sid="));
+          if (connectCookie) {
+            sessionCookie = connectCookie.toString().split(";")[0];
+          }
+        }
+        if (!sessionCookie && req.headers.cookie) {
+          const match = req.headers.cookie.match(/connect\.sid=([^;]+)/);
+          if (match) {
+            sessionCookie = `connect.sid=${match[1]}`;
+          }
+        }
+        mobileAuthCodes.set(authCode, {
+          sessionID: req.sessionID,
+          cookie: sessionCookie,
+          expiresAt: Date.now() + 60 * 1000,
+        });
+        return res.redirect(`brazadash://oauth-callback?code=${authCode}`);
+      });
+    })(req, res, next);
+  });
+
+  app.post("/api/mobile/exchange-code", (req, res) => {
+    const { code } = req.body;
+    if (!code || typeof code !== "string") {
+      return res.status(400).json({ error: "Missing auth code" });
+    }
+    cleanExpiredCodes();
+    const data = mobileAuthCodes.get(code);
+    if (!data) {
+      return res.status(401).json({ error: "Invalid or expired auth code" });
+    }
+    mobileAuthCodes.delete(code);
+    res.json({ session: data.cookie });
+  });
+
+  app.get("/api/mobile/switch-account", (req, res) => {
+    const protocol = req.headers["x-forwarded-proto"] || req.protocol;
+    const baseUrl = `${protocol}://${req.hostname}`;
+
+    if (req.isAuthenticated()) {
+      req.logout(() => {
+        const endSessionUrl = client.buildEndSessionUrl(config, {
+          client_id: process.env.REPL_ID!,
+          post_logout_redirect_uri: `${baseUrl}/api/mobile/login`,
+        }).href;
+        res.redirect(endSessionUrl);
+      });
+    } else {
+      res.redirect(`${baseUrl}/api/mobile/login`);
     }
   });
 }

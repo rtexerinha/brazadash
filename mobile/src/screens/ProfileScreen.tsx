@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as WebBrowser from "expo-web-browser";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
-import { api, clearSessionCookie } from "../api/client";
+import { api, clearSessionCookie, setSessionCookie } from "../api/client";
 import { useAuth } from "../contexts/AuthContext";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { colors, spacing, borderRadius, fontSize, fontWeight } from "../constants/theme";
@@ -151,11 +151,28 @@ export default function ProfileScreen() {
                   await logout();
                   try {
                     const result = await WebBrowser.openAuthSessionAsync(
-                      `${API_BASE}/api/switch-account`,
+                      `${API_BASE}/api/mobile/switch-account`,
                       "brazadash://oauth-callback"
                     );
-                    if (result.type === "success") {
-                      await new Promise((resolve) => setTimeout(resolve, 1000));
+                    if (result.type === "success" && result.url) {
+                      const url = new URL(result.url);
+                      const error = url.searchParams.get("error");
+                      if (error) {
+                        navigation.navigate("Login");
+                        return;
+                      }
+                      const authCode = url.searchParams.get("code");
+                      if (authCode) {
+                        try {
+                          const sessionCookie = await api.exchangeAuthCode(authCode);
+                          if (sessionCookie) {
+                            await setSessionCookie(sessionCookie);
+                          }
+                        } catch {
+                          navigation.navigate("Login");
+                          return;
+                        }
+                      }
                       try {
                         const newProfile = await api.getMobileProfile();
                         if (!newProfile.roles || newProfile.roles.length === 0) {
@@ -166,6 +183,8 @@ export default function ProfileScreen() {
                       } catch {
                         navigation.navigate("Login");
                       }
+                    } else {
+                      navigation.navigate("Login");
                     }
                   } catch {
                     navigation.navigate("Login");

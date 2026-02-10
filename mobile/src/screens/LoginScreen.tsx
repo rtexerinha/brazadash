@@ -11,12 +11,11 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import * as WebBrowser from "expo-web-browser";
 import { useNavigation } from "@react-navigation/native";
-import { api, clearSessionCookie } from "../api/client";
+import { api, clearSessionCookie, setSessionCookie } from "../api/client";
 import { useAuth } from "../contexts/AuthContext";
 import { colors, spacing, borderRadius, fontSize, fontWeight } from "../constants/theme";
 
 const API_BASE = "https://brazadash.com";
-const AUTH_URL = `${API_BASE}/api/login`;
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -25,31 +24,55 @@ export default function LoginScreen() {
   const { isAuthenticated, profile, setAuthenticated } = useAuth();
   const [authenticating, setAuthenticating] = useState(false);
 
+  const handleAuthResult = async (result: WebBrowser.WebBrowserAuthSessionResult) => {
+    if (result.type === "success" && result.url) {
+      const url = new URL(result.url);
+      const error = url.searchParams.get("error");
+      if (error) {
+        Alert.alert("Login Failed", `Authentication error: ${error}. Please try again.`);
+        setAuthenticating(false);
+        return;
+      }
+
+      const authCode = url.searchParams.get("code");
+      if (authCode) {
+        try {
+          const sessionCookie = await api.exchangeAuthCode(authCode);
+          if (sessionCookie) {
+            await setSessionCookie(sessionCookie);
+          }
+        } catch {
+          Alert.alert("Login Failed", "Could not complete authentication. Please try again.");
+          setAuthenticating(false);
+          return;
+        }
+      }
+
+      try {
+        const newProfile = await api.getMobileProfile();
+        if (!newProfile.roles || newProfile.roles.length === 0) {
+          navigation.replace("Onboarding");
+        } else {
+          setAuthenticated(newProfile);
+          navigation.goBack();
+        }
+      } catch {
+        Alert.alert("Login Failed", "Could not authenticate. Please try again.");
+        setAuthenticating(false);
+      }
+    } else {
+      setAuthenticating(false);
+    }
+  };
+
   const performLogin = async () => {
     setAuthenticating(true);
     try {
       const result = await WebBrowser.openAuthSessionAsync(
-        AUTH_URL,
+        `${API_BASE}/api/mobile/login`,
         "brazadash://oauth-callback"
       );
-
-      if (result.type === "success") {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        try {
-          const newProfile = await api.getMobileProfile();
-          if (!newProfile.roles || newProfile.roles.length === 0) {
-            navigation.replace("Onboarding");
-          } else {
-            setAuthenticated(newProfile);
-            navigation.goBack();
-          }
-        } catch {
-          Alert.alert("Login Failed", "Could not authenticate. Please try again.");
-          setAuthenticating(false);
-        }
-      } else {
-        setAuthenticating(false);
-      }
+      await handleAuthResult(result);
     } catch {
       Alert.alert("Error", "An error occurred during login.");
       setAuthenticating(false);
@@ -65,27 +88,10 @@ export default function LoginScreen() {
     setAuthenticating(true);
     try {
       const result = await WebBrowser.openAuthSessionAsync(
-        `${API_BASE}/api/switch-account`,
+        `${API_BASE}/api/mobile/switch-account`,
         "brazadash://oauth-callback"
       );
-
-      if (result.type === "success") {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        try {
-          const newProfile = await api.getMobileProfile();
-          if (!newProfile.roles || newProfile.roles.length === 0) {
-            navigation.replace("Onboarding");
-          } else {
-            setAuthenticated(newProfile);
-            navigation.goBack();
-          }
-        } catch {
-          Alert.alert("Login Failed", "Could not authenticate. Please try again.");
-          setAuthenticating(false);
-        }
-      } else {
-        setAuthenticating(false);
-      }
+      await handleAuthResult(result);
     } catch {
       Alert.alert("Error", "An error occurred. Please try again.");
       setAuthenticating(false);

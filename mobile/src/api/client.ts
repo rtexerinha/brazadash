@@ -207,4 +207,17 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ role, businessInfo }),
     }),
+
+  exchangeAuthCode: async (code: string): Promise<string> => {
+    const res = await fetch(`${API_BASE}/api/mobile/exchange-code`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code }),
+    });
+    if (!res.ok) {
+      throw new Error("Failed to exchange auth code");
+    }
+    const data = await res.json();
+    return data.session;
+  },
 };
