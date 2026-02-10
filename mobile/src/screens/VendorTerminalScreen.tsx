@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Alert,
   ActivityIndicator,
   RefreshControl,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -17,6 +18,15 @@ import { api } from "../api/client";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { colors, spacing, borderRadius, fontSize, fontWeight } from "../constants/theme";
 import type { Restaurant, TerminalReader } from "../types";
+
+// Bluetooth Discovery Interface (will be implemented with native module)
+interface DiscoveredReader {
+  id: string;
+  label: string;
+  deviceType: string;
+  serialNumber: string;
+  batteryLevel?: number;
+}
 
 function SectionCard({ children, title, subtitle }: { children: React.ReactNode; title: string; subtitle?: string }) {
   return (
@@ -28,21 +38,37 @@ function SectionCard({ children, title, subtitle }: { children: React.ReactNode;
   );
 }
 
-function ReaderItem({ reader }: { reader: TerminalReader }) {
+function ReaderItem({ reader, onConnect }: { reader: TerminalReader | DiscoveredReader; onConnect?: () => void }) {
+  const isDiscovered = 'batteryLevel' in reader;
+  const status = 'status' in reader ? reader.status : 'discovered';
+  
   return (
     <View style={styles.readerRow}>
       <View style={styles.readerInfo}>
-        <Ionicons name="card-outline" size={20} color={colors.primary} />
+        <Ionicons 
+          name={isDiscovered ? "bluetooth" : "card-outline"} 
+          size={20} 
+          color={isDiscovered ? colors.secondary : colors.primary} 
+        />
         <View style={{ marginLeft: spacing.md, flex: 1 }}>
           <Text style={styles.readerLabel}>{reader.label || reader.id}</Text>
-          <Text style={styles.readerDetail}>{reader.deviceType} - {reader.status}</Text>
+          <Text style={styles.readerDetail}>
+            {reader.deviceType} {reader.serialNumber ? `• ${reader.serialNumber}` : ''}
+            {isDiscovered && reader.batteryLevel ? ` • ${reader.batteryLevel}%` : ''}
+          </Text>
         </View>
       </View>
-      <View style={[styles.statusBadge, reader.status === "online" ? styles.statusOnline : styles.statusOffline]}>
-        <Text style={[styles.statusText, reader.status === "online" ? styles.statusTextOnline : styles.statusTextOffline]}>
-          {reader.status}
-        </Text>
-      </View>
+      {isDiscovered && onConnect ? (
+        <TouchableOpacity style={styles.connectButton} onPress={onConnect}>
+          <Text style={styles.connectButtonText}>Connect</Text>
+        </TouchableOpacity>
+      ) : (
+        <View style={[styles.statusBadge, status === "online" ? styles.statusOnline : styles.statusOffline]}>
+          <Text style={[styles.statusText, status === "online" ? styles.statusTextOnline : styles.statusTextOffline]}>
+            {status}
+          </Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -52,6 +78,9 @@ export default function VendorTerminalScreen() {
   const [postalCode, setPostalCode] = useState("");
   const [chargeAmount, setChargeAmount] = useState("");
   const [chargeDescription, setChargeDescription] = useState("");
+  const [isDiscovering, setIsDiscovering] = useState(false);
+  const [discoveredReaders, setDiscoveredReaders] = useState<DiscoveredReader[]>([]);
+  const [activeTab, setActiveTab] = useState<'registered' | 'discover'>('registered');
 
   const { data: restaurants, isLoading, refetch } = useQuery({
     queryKey: ["vendor-restaurants"],
@@ -65,6 +94,70 @@ export default function VendorTerminalScreen() {
     queryFn: () => api.getTerminalReaders(restaurant!.id),
     enabled: !!restaurant?.terminalEnabled && !!restaurant?.terminalLocationId,
   });
+
+  // Bluetooth Discovery Function (Placeholder - needs native module)
+  const discoverBluetoothReaders = async () => {
+    setIsDiscovering(true);
+    setDiscoveredReaders([]);
+
+    try {
+      // This is a placeholder. In a real implementation, you would:
+      // 1. Check Bluetooth permissions
+      // 2. Use @stripe/stripe-terminal-react-native to discover readers
+      // 3. Show discovered readers in the UI
+      
+      // For now, show an alert with instructions
+      Alert.alert(
+        "Bluetooth Discovery",
+        Platform.select({
+          ios: "To discover Bluetooth readers:\n\n1. Make sure Bluetooth is enabled\n2. Turn on your Stripe reader\n3. The reader should appear in the list\n\nNote: This requires the Stripe Terminal SDK which is not yet fully integrated.",
+          android: "To discover Bluetooth readers:\n\n1. Grant Bluetooth permissions\n2. Enable Location services\n3. Turn on your Stripe reader\n4. The reader will appear in the list\n\nNote: This requires the Stripe Terminal SDK which is not yet fully integrated.",
+          default: "Bluetooth discovery is only available on iOS and Android native apps."
+        }),
+        [
+          { text: "OK", onPress: () => setIsDiscovering(false) }
+        ]
+      );
+
+      // Simulated discovery (remove this in production)
+      setTimeout(() => {
+        // This is fake data for demonstration
+        // setDiscoveredReaders([
+        //   {
+        //     id: "tmr_FakeReader123",
+        //     label: "WisePad 3 (Demo)",
+        //     deviceType: "bbpos_wisepad3",
+        //     serialNumber: "WP3-123-456",
+        //     batteryLevel: 85,
+        //   }
+        // ]);
+        setIsDiscovering(false);
+      }, 2000);
+
+    } catch (error) {
+      Alert.alert("Discovery Failed", "Could not discover readers. Make sure Bluetooth is enabled.");
+      setIsDiscovering(false);
+    }
+  };
+
+  const connectToReader = async (reader: DiscoveredReader) => {
+    Alert.alert(
+      "Connect Reader",
+      `Connect to ${reader.label}?\n\nThis feature requires the Stripe Terminal SDK to be fully integrated with native code.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Connect", 
+          onPress: () => {
+            // In a real implementation:
+            // const terminal = useStripeTerminal();
+            // await terminal.connectReader(reader.id);
+            Alert.alert("Feature Coming Soon", "Reader connection will be available once the Stripe Terminal SDK is fully integrated.");
+          }
+        }
+      ]
+    );
+  };
 
   const toggleMutation = useMutation({
     mutationFn: (enabled: boolean) => api.toggleTerminal(restaurant!.id, enabled),
@@ -178,20 +271,114 @@ export default function VendorTerminalScreen() {
 
           {hasLocation && (
             <>
-              <SectionCard title="Connected Card Readers" subtitle="Card readers registered at your terminal location.">
-                {readers.length === 0 ? (
-                  <View style={styles.emptyReaders}>
-                    <Ionicons name="hardware-chip-outline" size={32} color={colors.textTertiary} />
-                    <Text style={styles.emptyReadersText}>No card readers found</Text>
-                    <Text style={styles.emptyReadersHint}>Register a reader through the Stripe Dashboard or use the Stripe Terminal SDK.</Text>
-                  </View>
-                ) : (
-                  readers.map((reader) => <ReaderItem key={reader.id} reader={reader} />)
+              <SectionCard title="Card Readers" subtitle="Connect and manage your Stripe Terminal readers.">
+                {/* Tab Selector */}
+                <View style={styles.tabContainer}>
+                  <TouchableOpacity
+                    style={[styles.tab, activeTab === 'registered' && styles.tabActive]}
+                    onPress={() => setActiveTab('registered')}
+                  >
+                    <Ionicons 
+                      name="list" 
+                      size={18} 
+                      color={activeTab === 'registered' ? colors.primary : colors.textSecondary} 
+                    />
+                    <Text style={[styles.tabText, activeTab === 'registered' && styles.tabTextActive]}>
+                      Registered ({readers.length})
+                    </Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={[styles.tab, activeTab === 'discover' && styles.tabActive]}
+                    onPress={() => setActiveTab('discover')}
+                  >
+                    <Ionicons 
+                      name="bluetooth" 
+                      size={18} 
+                      color={activeTab === 'discover' ? colors.secondary : colors.textSecondary} 
+                    />
+                    <Text style={[styles.tabText, activeTab === 'discover' && styles.tabTextActive]}>
+                      Discover
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Registered Readers Tab */}
+                {activeTab === 'registered' && (
+                  <>
+                    {readers.length === 0 ? (
+                      <View style={styles.emptyReaders}>
+                        <Ionicons name="hardware-chip-outline" size={32} color={colors.textTertiary} />
+                        <Text style={styles.emptyReadersText}>No readers registered</Text>
+                        <Text style={styles.emptyReadersHint}>
+                          Register readers in the Stripe Dashboard or discover them via Bluetooth
+                        </Text>
+                      </View>
+                    ) : (
+                      <View style={styles.readersList}>
+                        {readers.map((reader) => (
+                          <ReaderItem key={reader.id} reader={reader} />
+                        ))}
+                      </View>
+                    )}
+                    <TouchableOpacity style={styles.refreshButton} onPress={() => refetchReaders()}>
+                      <Ionicons name="refresh" size={16} color={colors.primary} />
+                      <Text style={styles.refreshButtonText}>Refresh List</Text>
+                    </TouchableOpacity>
+                  </>
                 )}
-                <TouchableOpacity style={styles.refreshButton} onPress={() => refetchReaders()}>
-                  <Ionicons name="refresh" size={16} color={colors.primary} />
-                  <Text style={styles.refreshButtonText}>Refresh Readers</Text>
-                </TouchableOpacity>
+
+                {/* Bluetooth Discovery Tab */}
+                {activeTab === 'discover' && (
+                  <>
+                    <View style={styles.discoveryInfo}>
+                      <Ionicons name="information-circle" size={20} color={colors.secondary} />
+                      <Text style={styles.discoveryInfoText}>
+                        Make sure your Stripe reader is powered on and in pairing mode
+                      </Text>
+                    </View>
+
+                    {discoveredReaders.length > 0 && (
+                      <View style={styles.readersList}>
+                        {discoveredReaders.map((reader) => (
+                          <ReaderItem 
+                            key={reader.id} 
+                            reader={reader} 
+                            onConnect={() => connectToReader(reader)}
+                          />
+                        ))}
+                      </View>
+                    )}
+
+                    {discoveredReaders.length === 0 && !isDiscovering && (
+                      <View style={styles.emptyReaders}>
+                        <Ionicons name="bluetooth-outline" size={32} color={colors.textTertiary} />
+                        <Text style={styles.emptyReadersText}>No readers discovered</Text>
+                        <Text style={styles.emptyReadersHint}>
+                          Tap the button below to scan for nearby Stripe readers
+                        </Text>
+                      </View>
+                    )}
+
+                    <TouchableOpacity 
+                      style={[styles.button, styles.discoverButton, isDiscovering && styles.buttonDisabled]} 
+                      onPress={discoverBluetoothReaders}
+                      disabled={isDiscovering}
+                    >
+                      {isDiscovering ? (
+                        <>
+                          <ActivityIndicator size="small" color={colors.white} />
+                          <Text style={styles.buttonText}>Scanning...</Text>
+                        </>
+                      ) : (
+                        <>
+                          <Ionicons name="bluetooth" size={18} color={colors.white} />
+                          <Text style={styles.buttonText}>Discover Readers</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  </>
+                )}
               </SectionCard>
 
               <SectionCard title="Create In-Person Charge" subtitle="Create a payment intent for an in-person card transaction.">
@@ -308,6 +495,7 @@ const styles = StyleSheet.create({
   buttonDisabled: { opacity: 0.5 },
   buttonText: { fontSize: fontSize.md, fontWeight: fontWeight.semibold, color: colors.white },
   chargeButton: { marginTop: spacing.sm },
+  discoverButton: { marginTop: spacing.md, backgroundColor: colors.secondary },
   chargeForm: { marginTop: spacing.sm },
   feeInfo: {
     backgroundColor: colors.surface,
@@ -317,6 +505,37 @@ const styles = StyleSheet.create({
   },
   feeText: { fontSize: fontSize.md, fontWeight: fontWeight.semibold, color: colors.text },
   feeDetail: { fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 2 },
+  tabContainer: {
+    flexDirection: "row",
+    marginBottom: spacing.lg,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.sm,
+    padding: 4,
+  },
+  tab: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.sm,
+  },
+  tabActive: {
+    backgroundColor: colors.background,
+  },
+  tabText: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    fontWeight: fontWeight.medium,
+  },
+  tabTextActive: {
+    color: colors.primary,
+    fontWeight: fontWeight.semibold,
+  },
+  readersList: {
+    marginTop: spacing.sm,
+  },
   readerRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -327,7 +546,18 @@ const styles = StyleSheet.create({
   },
   readerInfo: { flexDirection: "row", alignItems: "center", flex: 1 },
   readerLabel: { fontSize: fontSize.md, fontWeight: fontWeight.medium, color: colors.text },
-  readerDetail: { fontSize: fontSize.sm, color: colors.textSecondary },
+  readerDetail: { fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 2 },
+  connectButton: {
+    backgroundColor: colors.secondary,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.sm,
+  },
+  connectButtonText: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.semibold,
+    color: colors.white,
+  },
   statusBadge: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: borderRadius.full },
   statusOnline: { backgroundColor: colors.primaryLight },
   statusOffline: { backgroundColor: colors.surface },
@@ -343,9 +573,32 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   refreshButtonText: { fontSize: fontSize.sm, color: colors.primary, fontWeight: fontWeight.medium },
+  discoveryInfo: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+    backgroundColor: colors.surface,
+    padding: spacing.md,
+    borderRadius: borderRadius.sm,
+    marginBottom: spacing.md,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.secondary,
+  },
+  discoveryInfoText: {
+    flex: 1,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    lineHeight: 20,
+  },
   emptyReaders: { alignItems: "center", paddingVertical: spacing.xl },
   emptyReadersText: { fontSize: fontSize.md, color: colors.textSecondary, marginTop: spacing.sm },
-  emptyReadersHint: { fontSize: fontSize.sm, color: colors.textTertiary, marginTop: spacing.xs, textAlign: "center" },
+  emptyReadersHint: { 
+    fontSize: fontSize.sm, 
+    color: colors.textTertiary, 
+    marginTop: spacing.xs, 
+    textAlign: "center",
+    paddingHorizontal: spacing.lg,
+  },
   emptyContainer: { flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.xxxl },
   emptyTitle: { fontSize: fontSize.xl, fontWeight: fontWeight.bold, color: colors.text, marginTop: spacing.lg },
   emptySubtitle: { fontSize: fontSize.md, color: colors.textSecondary, textAlign: "center", marginTop: spacing.sm },
