@@ -1,12 +1,15 @@
 import React from "react";
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import * as WebBrowser from "expo-web-browser";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
-import { api } from "../api/client";
+import { api, clearSessionCookie } from "../api/client";
 import { useAuth } from "../contexts/AuthContext";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { colors, spacing, borderRadius, fontSize, fontWeight } from "../constants/theme";
+
+const API_BASE = "https://brazadash.com";
 
 function MenuRow({ icon, label, value, onPress }: {
   icon: keyof typeof Ionicons.glyphMap;
@@ -30,7 +33,7 @@ function MenuRow({ icon, label, value, onPress }: {
 
 export default function ProfileScreen() {
   const navigation = useNavigation<any>();
-  const { isAuthenticated, profile, login, logout } = useAuth();
+  const { isAuthenticated, profile, login, logout, setAuthenticated } = useAuth();
 
   const { data: mobileProfile, isLoading } = useQuery({
     queryKey: ["mobile-profile"],
@@ -135,6 +138,43 @@ export default function ProfileScreen() {
 
       <View style={styles.menuSection}>
         <Text style={styles.menuSectionTitle}>Account</Text>
+        <MenuRow
+          icon="swap-horizontal"
+          label="Switch Account"
+          onPress={() => {
+            Alert.alert("Switch Account", "Sign out and switch to a different account?", [
+              { text: "Cancel" },
+              {
+                text: "Switch",
+                onPress: async () => {
+                  await clearSessionCookie();
+                  await logout();
+                  try {
+                    const result = await WebBrowser.openAuthSessionAsync(
+                      `${API_BASE}/api/switch-account`,
+                      "brazadash://oauth-callback"
+                    );
+                    if (result.type === "success") {
+                      await new Promise((resolve) => setTimeout(resolve, 1000));
+                      try {
+                        const newProfile = await api.getMobileProfile();
+                        if (!newProfile.roles || newProfile.roles.length === 0) {
+                          navigation.navigate("Onboarding");
+                        } else {
+                          setAuthenticated(newProfile);
+                        }
+                      } catch {
+                        navigation.navigate("Login");
+                      }
+                    }
+                  } catch {
+                    navigation.navigate("Login");
+                  }
+                },
+              },
+            ]);
+          }}
+        />
         <MenuRow
           icon="log-out-outline"
           label="Sign Out"

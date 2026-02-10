@@ -140,6 +140,30 @@ export async function setupAuth(app: Express) {
       );
     });
   });
+
+  app.get("/api/switch-account", (req, res, next) => {
+    const doLogin = () => {
+      ensureStrategy(req.hostname);
+      passport.authenticate(`replitauth:${req.hostname}`, {
+        prompt: "login consent",
+        scope: ["openid", "email", "profile", "offline_access"],
+      })(req, res, next);
+    };
+
+    if (req.isAuthenticated()) {
+      req.logout(() => {
+        req.session.destroy(() => {
+          const endSessionUrl = client.buildEndSessionUrl(config, {
+            client_id: process.env.REPL_ID!,
+            post_logout_redirect_uri: `${req.protocol}://${req.hostname}/api/login`,
+          }).href;
+          res.redirect(endSessionUrl);
+        });
+      });
+    } else {
+      doLogin();
+    }
+  });
 }
 
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
