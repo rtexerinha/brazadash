@@ -108,7 +108,7 @@ export async function setupAuth(app: Express) {
         req.session.destroy(() => {
           ensureStrategy(req.hostname);
           passport.authenticate(`replitauth:${req.hostname}`, {
-            prompt: "select_account consent",
+            prompt: "login consent",
             scope: ["openid", "email", "profile", "offline_access"],
           })(req, res, next);
         });
@@ -116,7 +116,7 @@ export async function setupAuth(app: Express) {
     } else {
       ensureStrategy(req.hostname);
       passport.authenticate(`replitauth:${req.hostname}`, {
-        prompt: "select_account consent",
+        prompt: "login consent",
         scope: ["openid", "email", "profile", "offline_access"],
       })(req, res, next);
     }
