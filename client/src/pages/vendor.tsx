@@ -18,7 +18,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/lib/language-context";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Store, Plus, Utensils, Package, Star, DollarSign, Loader2, Pencil, Trash2, Clock, CheckCircle, Truck, MapPin, XCircle, ChefHat, Upload, ImageIcon, AlertTriangle, Calendar, TrendingUp, Filter, BarChart3 } from "lucide-react";
+import { Store, Plus, Utensils, Package, Star, DollarSign, Loader2, Pencil, Trash2, Clock, CheckCircle, Truck, MapPin, XCircle, ChefHat, Upload, ImageIcon, AlertTriangle, Calendar, TrendingUp, Filter, BarChart3, Smartphone, CreditCard, RefreshCw, Wifi } from "lucide-react";
 import { format, startOfDay, startOfWeek, startOfMonth } from "date-fns";
 import { z } from "zod";
 import type { Restaurant, MenuItem, Order } from "@shared/schema";
@@ -988,6 +988,9 @@ function VendorDashboard({ restaurant }: { restaurant: Restaurant }) {
               venmoInfo: restaurant.venmoInfo || "",
             }}
           />
+          <TerminalSettings
+            restaurant={restaurant}
+          />
         </TabsContent>
       </Tabs>
     </div>
@@ -1295,6 +1298,234 @@ function BankInfoSettings({ type, entityId, initialData }: {
           >
             {updateBankInfo.isPending ? t("common.saving") : t("vendor.saveBankInfo")}
           </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function TerminalSettings({ restaurant }: { restaurant: Restaurant }) {
+  const { t } = useLanguage();
+  const { toast } = useToast();
+  const [chargeAmount, setChargeAmount] = useState("");
+  const [chargeDescription, setChargeDescription] = useState("");
+
+  const readersQuery = useQuery<{ readers: any[] }>({
+    queryKey: ["/api/terminal/readers", restaurant.id],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/terminal/readers?restaurantId=${restaurant.id}`);
+      return res.json();
+    },
+    enabled: !!restaurant.terminalEnabled && !!restaurant.terminalLocationId,
+  });
+
+  const toggleTerminal = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      return apiRequest("PATCH", "/api/terminal/settings", {
+        restaurantId: restaurant.id,
+        terminalEnabled: enabled,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vendor/restaurants"] });
+      toast({ title: t("terminal.settingsUpdated") });
+    },
+    onError: () => {
+      toast({ title: t("common.error"), description: t("terminal.settingsUpdateFailed"), variant: "destructive" });
+    },
+  });
+
+  const setupLocation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/terminal/locations", {
+        restaurantId: restaurant.id,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vendor/restaurants"] });
+      toast({ title: t("terminal.locationCreated") });
+    },
+    onError: () => {
+      toast({ title: t("common.error"), description: t("terminal.locationCreateFailed"), variant: "destructive" });
+    },
+  });
+
+  const createCharge = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/terminal/payment-intents", {
+        restaurantId: restaurant.id,
+        amount: chargeAmount,
+        description: chargeDescription || undefined,
+      });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      toast({ title: t("terminal.chargeCreated"), description: `${t("terminal.paymentIntentId")}: ${data.paymentIntentId}` });
+      setChargeAmount("");
+      setChargeDescription("");
+    },
+    onError: () => {
+      toast({ title: t("common.error"), description: t("terminal.chargeCreateFailed"), variant: "destructive" });
+    },
+  });
+
+  const readers = readersQuery.data?.readers || [];
+
+  return (
+    <Card>
+      <CardContent className="p-6">
+        <div className="flex items-center gap-2 mb-2">
+          <Smartphone className="h-5 w-5 text-primary" />
+          <h3 className="text-lg font-semibold">{t("terminal.title")}</h3>
+        </div>
+        <p className="text-sm text-muted-foreground mb-6">{t("terminal.description")}</p>
+
+        <div className="space-y-6">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <Label className="text-base">{t("terminal.enableTerminal")}</Label>
+              <p className="text-sm text-muted-foreground">{t("terminal.enableDesc")}</p>
+            </div>
+            <Switch
+              checked={!!restaurant.terminalEnabled}
+              onCheckedChange={(checked) => toggleTerminal.mutate(checked)}
+              disabled={toggleTerminal.isPending}
+              data-testid="switch-terminal-enabled"
+            />
+          </div>
+
+          {restaurant.terminalEnabled && (
+            <>
+              <div className="border-t pt-4">
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div>
+                    <Label className="text-base">{t("terminal.location")}</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {restaurant.terminalLocationId
+                        ? `${t("terminal.locationId")}: ${restaurant.terminalLocationId}`
+                        : t("terminal.noLocation")}
+                    </p>
+                  </div>
+                  {!restaurant.terminalLocationId && (
+                    <Button
+                      onClick={() => setupLocation.mutate()}
+                      disabled={setupLocation.isPending}
+                      data-testid="button-setup-terminal-location"
+                    >
+                      {setupLocation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                      <MapPin className="h-4 w-4 mr-2" />
+                      {t("terminal.setupLocation")}
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {restaurant.terminalLocationId && (
+                <>
+                  <div className="border-t pt-4">
+                    <div className="flex items-center justify-between gap-4 mb-3 flex-wrap">
+                      <div>
+                        <Label className="text-base">{t("terminal.connectedReaders")}</Label>
+                        <p className="text-sm text-muted-foreground">{t("terminal.readersDesc")}</p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => readersQuery.refetch()}
+                        disabled={readersQuery.isFetching}
+                        data-testid="button-refresh-readers"
+                      >
+                        <RefreshCw className={`h-4 w-4 mr-2 ${readersQuery.isFetching ? "animate-spin" : ""}`} />
+                        {t("common.refresh")}
+                      </Button>
+                    </div>
+
+                    {readersQuery.isLoading ? (
+                      <div className="space-y-2">
+                        <Skeleton className="h-16" />
+                        <Skeleton className="h-16" />
+                      </div>
+                    ) : readers.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Wifi className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">{t("terminal.noReaders")}</p>
+                        <p className="text-xs mt-1">{t("terminal.noReadersHint")}</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {readers.map((reader: any) => (
+                          <div
+                            key={reader.id}
+                            className="flex items-center justify-between gap-4 p-3 border rounded-md flex-wrap"
+                            data-testid={`reader-card-${reader.id}`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <CreditCard className="h-5 w-5 text-muted-foreground" />
+                              <div>
+                                <p className="font-medium text-sm">{reader.label || reader.deviceType}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {reader.serialNumber} &middot; {reader.status}
+                                </p>
+                              </div>
+                            </div>
+                            <Badge variant={reader.status === "online" ? "default" : "secondary"}>
+                              {reader.status}
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="border-t pt-4">
+                    <Label className="text-base mb-1 block">{t("terminal.createCharge")}</Label>
+                    <p className="text-sm text-muted-foreground mb-3">{t("terminal.createChargeDesc")}</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor="terminal-amount">{t("terminal.amount")}</Label>
+                        <div className="relative mt-1.5">
+                          <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            id="terminal-amount"
+                            type="number"
+                            step="0.01"
+                            min="0.50"
+                            placeholder="0.00"
+                            value={chargeAmount}
+                            onChange={(e) => setChargeAmount(e.target.value)}
+                            className="pl-9"
+                            data-testid="input-terminal-amount"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="terminal-description">{t("terminal.chargeDescription")}</Label>
+                        <Input
+                          id="terminal-description"
+                          placeholder={t("terminal.chargeDescPlaceholder")}
+                          value={chargeDescription}
+                          onChange={(e) => setChargeDescription(e.target.value)}
+                          className="mt-1.5"
+                          data-testid="input-terminal-description"
+                        />
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => createCharge.mutate()}
+                      disabled={createCharge.isPending || !chargeAmount || parseFloat(chargeAmount) < 0.5}
+                      className="mt-3"
+                      data-testid="button-create-terminal-charge"
+                    >
+                      {createCharge.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                      <CreditCard className="h-4 w-4 mr-2" />
+                      {t("terminal.createPaymentIntent")}
+                    </Button>
+                  </div>
+                </>
+              )}
+            </>
+          )}
         </div>
       </CardContent>
     </Card>

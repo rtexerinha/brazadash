@@ -2535,5 +2535,201 @@ export async function registerRoutes(
     }
   });
 
+  // ===================== STRIPE TERMINAL ENDPOINTS =====================
+
+  app.post("/api/terminal/connection-token", isAuthenticated, isApprovedVendor, async (req: any, res) => {
+    try {
+      const stripe = await getUncachableStripeClient();
+      const connectionToken = await stripe.terminal.connectionTokens.create();
+      res.json({ secret: connectionToken.secret });
+    } catch (error: any) {
+      console.error("Error creating connection token:", error);
+      res.status(500).json({ message: "Failed to create connection token" });
+    }
+  });
+
+  app.post("/api/terminal/locations", isAuthenticated, isApprovedVendor, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { restaurantId } = req.body;
+      if (!restaurantId) return res.status(400).json({ message: "restaurantId is required" });
+
+      const restaurant = await storage.getRestaurant(restaurantId);
+      if (!restaurant || restaurant.ownerId !== userId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      if (restaurant.terminalLocationId) {
+        return res.json({ locationId: restaurant.terminalLocationId });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      const location = await stripe.terminal.locations.create({
+        display_name: restaurant.name,
+        address: {
+          line1: restaurant.address || "Address not set",
+          city: restaurant.city || "Unknown",
+          state: "CA",
+          country: "US",
+          postal_code: "00000",
+        },
+      });
+
+      await storage.updateRestaurant(restaurantId, {
+        terminalLocationId: location.id,
+        terminalEnabled: true,
+      });
+
+      res.json({ locationId: location.id });
+    } catch (error: any) {
+      console.error("Error creating terminal location:", error);
+      res.status(500).json({ message: "Failed to create terminal location" });
+    }
+  });
+
+  app.get("/api/terminal/readers", isAuthenticated, isApprovedVendor, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { restaurantId } = req.query;
+      if (!restaurantId) return res.status(400).json({ message: "restaurantId is required" });
+
+      const restaurant = await storage.getRestaurant(restaurantId as string);
+      if (!restaurant || restaurant.ownerId !== userId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      if (!restaurant.terminalLocationId) {
+        return res.json({ readers: [] });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      const readers = await stripe.terminal.readers.list({
+        location: restaurant.terminalLocationId,
+        limit: 100,
+      });
+
+      res.json({
+        readers: readers.data.map((r: any) => ({
+          id: r.id,
+          label: r.label,
+          deviceType: r.device_type,
+          status: r.status,
+          serialNumber: r.serial_number,
+          ipAddress: r.ip_address,
+        })),
+      });
+    } catch (error: any) {
+      console.error("Error listing readers:", error);
+      res.status(500).json({ message: "Failed to list readers" });
+    }
+  });
+
+  app.post("/api/terminal/payment-intents", isAuthenticated, isApprovedVendor, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { restaurantId, amount, description } = req.body;
+
+      if (!restaurantId || !amount) {
+        return res.status(400).json({ message: "restaurantId and amount are required" });
+      }
+
+      const restaurant = await storage.getRestaurant(restaurantId);
+      if (!restaurant || restaurant.ownerId !== userId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      if (!restaurant.terminalEnabled) {
+        return res.status(400).json({ message: "Terminal is not enabled for this restaurant" });
+      }
+
+      const amountCents = Math.round(parseFloat(amount) * 100);
+      if (isNaN(amountCents) || amountCents < 50) {
+        return res.status(400).json({ message: "Amount must be at least $0.50" });
+      }
+
+      const platformFee = Math.round(amountCents * 0.08);
+
+      const stripe = await getUncachableStripeClient();
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amountCents,
+        currency: "usd",
+        payment_method_types: ["card_present"],
+        capture_method: "manual",
+        statement_descriptor: "BRAZADASH ORDER",
+        metadata: {
+          restaurantId,
+          restaurantName: restaurant.name,
+          type: "terminal_in_person",
+          description: description || "In-person payment",
+          platformFee: platformFee.toString(),
+        },
+      });
+
+      res.json({
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id,
+        amount: amountCents,
+        platformFee,
+      });
+    } catch (error: any) {
+      console.error("Error creating terminal payment intent:", error);
+      res.status(500).json({ message: "Failed to create payment intent" });
+    }
+  });
+
+  app.post("/api/terminal/payment-intents/:id/capture", isAuthenticated, isApprovedVendor, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const paymentIntentId = req.params.id;
+
+      const stripe = await getUncachableStripeClient();
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+
+      const restaurantId = paymentIntent.metadata?.restaurantId;
+      if (!restaurantId) {
+        return res.status(400).json({ message: "Invalid payment intent" });
+      }
+
+      const restaurant = await storage.getRestaurant(restaurantId);
+      if (!restaurant || restaurant.ownerId !== userId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      const captured = await stripe.paymentIntents.capture(paymentIntentId);
+
+      res.json({
+        status: captured.status,
+        amount: captured.amount,
+        id: captured.id,
+      });
+    } catch (error: any) {
+      console.error("Error capturing payment:", error);
+      res.status(500).json({ message: "Failed to capture payment" });
+    }
+  });
+
+  app.patch("/api/terminal/settings", isAuthenticated, isApprovedVendor, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { restaurantId, terminalEnabled } = req.body;
+
+      if (!restaurantId) return res.status(400).json({ message: "restaurantId is required" });
+
+      const restaurant = await storage.getRestaurant(restaurantId);
+      if (!restaurant || restaurant.ownerId !== userId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      const updated = await storage.updateRestaurant(restaurantId, {
+        terminalEnabled: !!terminalEnabled,
+      });
+
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Error updating terminal settings:", error);
+      res.status(500).json({ message: "Failed to update terminal settings" });
+    }
+  });
+
   return httpServer;
 }
