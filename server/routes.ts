@@ -2551,7 +2551,7 @@ export async function registerRoutes(
   app.post("/api/terminal/locations", isAuthenticated, isApprovedVendor, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { restaurantId } = req.body;
+      const { restaurantId, postalCode } = req.body;
       if (!restaurantId) return res.status(400).json({ message: "restaurantId is required" });
 
       const restaurant = await storage.getRestaurant(restaurantId);
@@ -2563,15 +2563,28 @@ export async function registerRoutes(
         return res.json({ locationId: restaurant.terminalLocationId });
       }
 
+      let zipCode = postalCode || "";
+      if (!zipCode) {
+        const combinedAddr = `${restaurant.address || ""} ${restaurant.city || ""}`;
+        const zipMatch = combinedAddr.match(/\b(\d{5})(?:-\d{4})?\b/);
+        if (zipMatch) zipCode = zipMatch[1];
+      }
+      if (!zipCode || !/^\d{5}$/.test(zipCode)) {
+        return res.status(400).json({ message: "A valid 5-digit ZIP code is required to set up a terminal location. Please provide your restaurant's ZIP code." });
+      }
+
+      let cityName = restaurant.city || "Unknown";
+      cityName = cityName.replace(/,?\s*CA\s*$/i, "").trim() || "Unknown";
+
       const stripe = await getUncachableStripeClient();
       const location = await stripe.terminal.locations.create({
         display_name: restaurant.name,
         address: {
           line1: restaurant.address || "Address not set",
-          city: restaurant.city || "Unknown",
+          city: cityName,
           state: "CA",
           country: "US",
-          postal_code: "00000",
+          postal_code: zipCode,
         },
       });
 

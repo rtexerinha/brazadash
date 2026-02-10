@@ -1309,6 +1309,7 @@ function TerminalSettings({ restaurant }: { restaurant: Restaurant }) {
   const { toast } = useToast();
   const [chargeAmount, setChargeAmount] = useState("");
   const [chargeDescription, setChargeDescription] = useState("");
+  const [postalCode, setPostalCode] = useState("");
 
   const readersQuery = useQuery<{ readers: any[] }>({
     queryKey: ["/api/terminal/readers", restaurant.id],
@@ -1339,15 +1340,22 @@ function TerminalSettings({ restaurant }: { restaurant: Restaurant }) {
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/terminal/locations", {
         restaurantId: restaurant.id,
+        postalCode: postalCode || undefined,
       });
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vendor/restaurants"] });
       toast({ title: t("terminal.locationCreated") });
+      setPostalCode("");
     },
-    onError: () => {
-      toast({ title: t("common.error"), description: t("terminal.locationCreateFailed"), variant: "destructive" });
+    onError: (error: Error) => {
+      const msg = error.message || "";
+      if (msg.includes("ZIP")) {
+        toast({ title: t("common.error"), description: t("terminal.zipRequired"), variant: "destructive" });
+      } else {
+        toast({ title: t("common.error"), description: t("terminal.locationCreateFailed"), variant: "destructive" });
+      }
     },
   });
 
@@ -1408,15 +1416,30 @@ function TerminalSettings({ restaurant }: { restaurant: Restaurant }) {
                     </p>
                   </div>
                   {!restaurant.terminalLocationId && (
-                    <Button
-                      onClick={() => setupLocation.mutate()}
-                      disabled={setupLocation.isPending}
-                      data-testid="button-setup-terminal-location"
-                    >
-                      {setupLocation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                      <MapPin className="h-4 w-4 mr-2" />
-                      {t("terminal.setupLocation")}
-                    </Button>
+                    <div className="flex items-end gap-2 flex-wrap">
+                      <div>
+                        <Label htmlFor="terminal-zip">{t("terminal.zipCode")}</Label>
+                        <Input
+                          id="terminal-zip"
+                          type="text"
+                          placeholder="e.g. 90210"
+                          value={postalCode}
+                          onChange={(e) => setPostalCode(e.target.value.replace(/\D/g, "").slice(0, 5))}
+                          maxLength={5}
+                          className="w-28"
+                          data-testid="input-terminal-zip"
+                        />
+                      </div>
+                      <Button
+                        onClick={() => setupLocation.mutate()}
+                        disabled={setupLocation.isPending || postalCode.length !== 5}
+                        data-testid="button-setup-terminal-location"
+                      >
+                        {setupLocation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                        <MapPin className="h-4 w-4 mr-2" />
+                        {t("terminal.setupLocation")}
+                      </Button>
+                    </div>
                   )}
                 </div>
               </div>
