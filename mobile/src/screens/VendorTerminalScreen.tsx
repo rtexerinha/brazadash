@@ -84,6 +84,7 @@ export default function VendorTerminalScreen() {
   const [isDiscovering, setIsDiscovering] = useState(false);
   const [discoveredReaders, setDiscoveredReaders] = useState<DiscoveredReader[]>([]);
   const [activeTab, setActiveTab] = useState<'registered' | 'discover'>('registered');
+  const [selectedReaderId, setSelectedReaderId] = useState("");
 
   const { data: restaurants, isLoading, refetch } = useQuery({
     queryKey: ["vendor-restaurants"],
@@ -183,9 +184,17 @@ export default function VendorTerminalScreen() {
   });
 
   const chargeMutation = useMutation({
-    mutationFn: () => api.createTerminalPaymentIntent(restaurant!.id, chargeAmount, chargeDescription || undefined),
-    onSuccess: (data) => {
-      Alert.alert("Payment Intent Created", `ID: ${data.paymentIntentId}\nAmount: $${(data.amount / 100).toFixed(2)}\nPlatform Fee: $${(data.platformFee / 100).toFixed(2)}`);
+    mutationFn: () => api.createTerminalPaymentIntent(restaurant!.id, chargeAmount, chargeDescription || undefined, selectedReaderId || undefined),
+    onSuccess: (data: any) => {
+      if (data.readerAction && !data.readerAction.error) {
+        const selectedReader = readers.find((r: any) => r.id === selectedReaderId);
+        const readerName = selectedReader?.label || selectedReader?.deviceType || "reader";
+        Alert.alert("Payment Sent", `Payment of $${(data.amount / 100).toFixed(2)} sent to "${readerName}".\n\nThe customer can now tap or insert their card.`);
+      } else if (data.readerAction?.error) {
+        Alert.alert("Partial Success", `Payment intent created (${data.paymentIntentId}), but failed to send to reader:\n${data.readerAction.error}`);
+      } else {
+        Alert.alert("Payment Intent Created", `ID: ${data.paymentIntentId}\nAmount: $${(data.amount / 100).toFixed(2)}\nPlatform Fee: $${(data.platformFee / 100).toFixed(2)}`);
+      }
       setChargeAmount("");
       setChargeDescription("");
     },
@@ -205,6 +214,7 @@ export default function VendorTerminalScreen() {
   }
 
   const readers = readersData?.readers || [];
+  const onlineReaders = readers.filter((r: any) => r.status === "online");
   const isTerminalEnabled = !!restaurant.terminalEnabled;
   const hasLocation = !!restaurant.terminalLocationId;
 
@@ -379,50 +389,81 @@ export default function VendorTerminalScreen() {
             )}
           </SectionCard>
 
-          {hasLocation && (
-            <SectionCard title="Create In-Person Charge" subtitle="Create a payment intent for an in-person card transaction.">
-              <View style={styles.chargeForm}>
-                <Text style={styles.inputLabel}>Amount ($)</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="e.g. 25.50"
-                  value={chargeAmount}
-                  onChangeText={setChargeAmount}
-                  keyboardType="decimal-pad"
-                />
+          <SectionCard title="Create In-Person Charge" subtitle="Create a payment and send it to a card reader.">
+            <View style={styles.chargeForm}>
+              <Text style={styles.inputLabel}>Amount ($)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. 25.50"
+                value={chargeAmount}
+                onChangeText={setChargeAmount}
+                keyboardType="decimal-pad"
+              />
 
-                <Text style={[styles.inputLabel, { marginTop: spacing.md }]}>Description (optional)</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="e.g. Lunch order - Table 5"
-                  value={chargeDescription}
-                  onChangeText={setChargeDescription}
-                />
+              <Text style={[styles.inputLabel, { marginTop: spacing.md }]}>Description (optional)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. Lunch order - Table 5"
+                value={chargeDescription}
+                onChangeText={setChargeDescription}
+              />
 
-                {chargeAmount && parseFloat(chargeAmount) >= 0.5 && (
-                  <View style={styles.feeInfo}>
-                    <Text style={styles.feeText}>Total: ${parseFloat(chargeAmount).toFixed(2)}</Text>
-                    <Text style={styles.feeDetail}>Platform fee (8%): ${(parseFloat(chargeAmount) * 0.08).toFixed(2)}</Text>
-                  </View>
+              <Text style={[styles.inputLabel, { marginTop: spacing.md }]}>Send to Reader</Text>
+              {onlineReaders.length === 0 ? (
+                <View style={styles.noReaderWarning}>
+                  <Ionicons name="warning" size={16} color={colors.secondary} />
+                  <Text style={styles.noReaderWarningText}>No online readers available</Text>
+                </View>
+              ) : (
+                <View style={styles.readerPickerList}>
+                  {onlineReaders.map((reader: any) => (
+                    <TouchableOpacity
+                      key={reader.id}
+                      style={[styles.readerPickerItem, selectedReaderId === reader.id && styles.readerPickerItemSelected]}
+                      onPress={() => setSelectedReaderId(reader.id)}
+                    >
+                      <View style={styles.readerPickerRadio}>
+                        {selectedReaderId === reader.id && <View style={styles.readerPickerRadioInner} />}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.readerPickerLabel, selectedReaderId === reader.id && styles.readerPickerLabelSelected]}>
+                          {reader.label || reader.deviceType}
+                        </Text>
+                        <Text style={styles.readerPickerDetail}>
+                          {reader.ipAddress || reader.serialNumber || reader.id}
+                        </Text>
+                      </View>
+                      <View style={[styles.statusBadge, styles.statusOnline]}>
+                        <Text style={[styles.statusText, styles.statusTextOnline]}>online</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+              {chargeAmount && parseFloat(chargeAmount) >= 0.5 && (
+                <View style={styles.feeInfo}>
+                  <Text style={styles.feeText}>Total: ${parseFloat(chargeAmount).toFixed(2)}</Text>
+                  <Text style={styles.feeDetail}>Platform fee (8%): ${(parseFloat(chargeAmount) * 0.08).toFixed(2)}</Text>
+                </View>
+              )}
+
+              <TouchableOpacity
+                style={[styles.button, styles.chargeButton, (!chargeAmount || parseFloat(chargeAmount) < 0.5 || !selectedReaderId || chargeMutation.isPending) && styles.buttonDisabled]}
+                onPress={() => chargeMutation.mutate()}
+                disabled={!chargeAmount || parseFloat(chargeAmount) < 0.5 || !selectedReaderId || chargeMutation.isPending}
+              >
+                {chargeMutation.isPending ? (
+                  <ActivityIndicator size="small" color={colors.white} />
+                ) : (
+                  <>
+                    <Ionicons name="send" size={18} color={colors.white} />
+                    <Text style={styles.buttonText}>Send Payment to Reader</Text>
+                  </>
                 )}
-
-                <TouchableOpacity
-                  style={[styles.button, styles.chargeButton, (!chargeAmount || parseFloat(chargeAmount) < 0.5 || chargeMutation.isPending) && styles.buttonDisabled]}
-                  onPress={() => chargeMutation.mutate()}
-                  disabled={!chargeAmount || parseFloat(chargeAmount) < 0.5 || chargeMutation.isPending}
-                >
-                  {chargeMutation.isPending ? (
-                    <ActivityIndicator size="small" color={colors.white} />
-                  ) : (
-                    <>
-                      <Ionicons name="cash" size={18} color={colors.white} />
-                      <Text style={styles.buttonText}>Create Payment Intent</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </SectionCard>
-          )}
+              </TouchableOpacity>
+            </View>
+          </SectionCard>
         </>
       )}
 
@@ -600,4 +641,48 @@ const styles = StyleSheet.create({
   emptyContainer: { flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.xxxl },
   emptyTitle: { fontSize: fontSize.xl, fontWeight: fontWeight.bold, color: colors.text, marginTop: spacing.lg },
   emptySubtitle: { fontSize: fontSize.md, color: colors.textSecondary, textAlign: "center", marginTop: spacing.sm },
+  noReaderWarning: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    backgroundColor: colors.surface,
+    padding: spacing.md,
+    borderRadius: borderRadius.sm,
+    marginBottom: spacing.md,
+  },
+  noReaderWarningText: { fontSize: fontSize.sm, color: colors.textSecondary },
+  readerPickerList: { marginBottom: spacing.md },
+  readerPickerItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.sm,
+    marginBottom: spacing.sm,
+    backgroundColor: colors.background,
+  },
+  readerPickerItemSelected: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryLight,
+  },
+  readerPickerRadio: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  readerPickerRadioInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.primary,
+  },
+  readerPickerLabel: { fontSize: fontSize.md, fontWeight: fontWeight.medium, color: colors.text },
+  readerPickerLabelSelected: { color: colors.primary },
+  readerPickerDetail: { fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 2 },
 });

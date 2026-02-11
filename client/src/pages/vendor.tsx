@@ -1310,6 +1310,7 @@ function TerminalSettings({ restaurant }: { restaurant: Restaurant }) {
   const [chargeAmount, setChargeAmount] = useState("");
   const [chargeDescription, setChargeDescription] = useState("");
   const [postalCode, setPostalCode] = useState("");
+  const [selectedReaderId, setSelectedReaderId] = useState("");
 
   const readersQuery = useQuery<{ readers: any[] }>({
     queryKey: ["/api/terminal/readers", restaurant.id],
@@ -1365,11 +1366,30 @@ function TerminalSettings({ restaurant }: { restaurant: Restaurant }) {
         restaurantId: restaurant.id,
         amount: chargeAmount,
         description: chargeDescription || undefined,
+        readerId: selectedReaderId || undefined,
       });
       return res.json();
     },
     onSuccess: (data: any) => {
-      toast({ title: t("terminal.chargeCreated"), description: `${t("terminal.paymentIntentId")}: ${data.paymentIntentId}` });
+      if (data.readerAction && !data.readerAction.error) {
+        const selectedReader = readers.find((r: any) => r.id === selectedReaderId);
+        const readerName = selectedReader?.label || selectedReader?.deviceType || selectedReaderId;
+        toast({
+          title: t("terminal.chargeCreated"),
+          description: `Payment sent to "${readerName}". The customer can now tap or insert their card.`,
+        });
+      } else if (data.readerAction?.error) {
+        toast({
+          title: t("terminal.chargeCreated"),
+          description: `Payment intent created (${data.paymentIntentId}), but failed to send to reader: ${data.readerAction.error}`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: t("terminal.chargeCreated"),
+          description: `${t("terminal.paymentIntentId")}: ${data.paymentIntentId}. Select a reader to collect payment.`,
+        });
+      }
       setChargeAmount("");
       setChargeDescription("");
     },
@@ -1379,6 +1399,8 @@ function TerminalSettings({ restaurant }: { restaurant: Restaurant }) {
   });
 
   const readers = readersQuery.data?.readers || [];
+  const onlineReaders = readers.filter((r: any) => r.status === "online");
+  const offlineReaders = readers.filter((r: any) => r.status !== "online");
 
   return (
     <Card>
@@ -1501,54 +1523,92 @@ function TerminalSettings({ restaurant }: { restaurant: Restaurant }) {
                 )}
               </div>
 
-              {restaurant.terminalLocationId && (
-                <>
-                  <div className="border-t pt-4">
-                    <Label className="text-base mb-1 block">{t("terminal.createCharge")}</Label>
-                    <p className="text-sm text-muted-foreground mb-3">{t("terminal.createChargeDesc")}</p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <Label htmlFor="terminal-amount">{t("terminal.amount")}</Label>
-                        <div className="relative mt-1.5">
-                          <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                          <Input
-                            id="terminal-amount"
-                            type="number"
-                            step="0.01"
-                            min="0.50"
-                            placeholder="0.00"
-                            value={chargeAmount}
-                            onChange={(e) => setChargeAmount(e.target.value)}
-                            className="pl-9"
-                            data-testid="input-terminal-amount"
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <Label htmlFor="terminal-description">{t("terminal.chargeDescription")}</Label>
-                        <Input
-                          id="terminal-description"
-                          placeholder={t("terminal.chargeDescPlaceholder")}
-                          value={chargeDescription}
-                          onChange={(e) => setChargeDescription(e.target.value)}
-                          className="mt-1.5"
-                          data-testid="input-terminal-description"
-                        />
-                      </div>
+              <div className="border-t pt-4">
+                <Label className="text-base mb-1 block">{t("terminal.createCharge")}</Label>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Create a payment and send it to a card reader for the customer to pay.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="terminal-amount">{t("terminal.amount")}</Label>
+                    <div className="relative mt-1.5">
+                      <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="terminal-amount"
+                        type="number"
+                        step="0.01"
+                        min="0.50"
+                        placeholder="0.00"
+                        value={chargeAmount}
+                        onChange={(e) => setChargeAmount(e.target.value)}
+                        className="pl-9"
+                        data-testid="input-terminal-amount"
+                      />
                     </div>
-                    <Button
-                      onClick={() => createCharge.mutate()}
-                      disabled={createCharge.isPending || !chargeAmount || parseFloat(chargeAmount) < 0.5}
-                      className="mt-3"
-                      data-testid="button-create-terminal-charge"
-                    >
-                      {createCharge.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                      <CreditCard className="h-4 w-4 mr-2" />
-                      {t("terminal.createPaymentIntent")}
-                    </Button>
                   </div>
-                </>
-              )}
+                  <div>
+                    <Label htmlFor="terminal-description">{t("terminal.chargeDescription")}</Label>
+                    <Input
+                      id="terminal-description"
+                      placeholder={t("terminal.chargeDescPlaceholder")}
+                      value={chargeDescription}
+                      onChange={(e) => setChargeDescription(e.target.value)}
+                      className="mt-1.5"
+                      data-testid="input-terminal-description"
+                    />
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <Label>Send to Reader</Label>
+                  <Select value={selectedReaderId} onValueChange={setSelectedReaderId}>
+                    <SelectTrigger className="mt-1.5" data-testid="select-terminal-reader">
+                      <SelectValue placeholder={readers.length === 0 ? "No readers available" : "Select a card reader"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {onlineReaders.map((reader: any) => (
+                        <SelectItem key={reader.id} value={reader.id} data-testid={`select-reader-${reader.id}`}>
+                          <div className="flex items-center gap-2">
+                            <span>{reader.label || reader.deviceType}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {reader.ipAddress ? `(${reader.ipAddress})` : ""}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                      {offlineReaders.map((reader: any) => (
+                        <SelectItem key={reader.id} value={reader.id} disabled data-testid={`select-reader-${reader.id}`}>
+                          <div className="flex items-center gap-2">
+                            <span className="text-muted-foreground">{reader.label || reader.deviceType} (offline)</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {!selectedReaderId && readers.length > 0 && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Select an online reader to display the payment on the device
+                    </p>
+                  )}
+                </div>
+                {chargeAmount && parseFloat(chargeAmount) >= 0.5 && (
+                  <div className="mt-3 p-3 border rounded-md bg-muted/30">
+                    <div className="flex items-center justify-between gap-4 text-sm flex-wrap">
+                      <span>Total: <strong>${parseFloat(chargeAmount).toFixed(2)}</strong></span>
+                      <span className="text-muted-foreground">Platform fee (8%): ${(parseFloat(chargeAmount) * 0.08).toFixed(2)}</span>
+                    </div>
+                  </div>
+                )}
+                <Button
+                  onClick={() => createCharge.mutate()}
+                  disabled={createCharge.isPending || !chargeAmount || parseFloat(chargeAmount) < 0.5 || !selectedReaderId}
+                  className="mt-3"
+                  data-testid="button-create-terminal-charge"
+                >
+                  {createCharge.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                  <CreditCard className="h-4 w-4 mr-2" />
+                  Send Payment to Reader
+                </Button>
+              </div>
             </>
           )}
         </div>

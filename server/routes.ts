@@ -2652,7 +2652,7 @@ export async function registerRoutes(
   app.post("/api/terminal/payment-intents", isAuthenticated, isApprovedVendor, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { restaurantId, amount, description } = req.body;
+      const { restaurantId, amount, description, readerId } = req.body;
 
       if (!restaurantId || !amount) {
         return res.status(400).json({ message: "restaurantId and amount are required" });
@@ -2690,15 +2690,89 @@ export async function registerRoutes(
         },
       });
 
+      let readerAction = null;
+      if (readerId) {
+        try {
+          const reader = await stripe.terminal.readers.processPaymentIntent(readerId, {
+            payment_intent: paymentIntent.id,
+          });
+          readerAction = {
+            readerId: reader.id,
+            status: reader.action?.status || "in_progress",
+            type: reader.action?.type || "process_payment_intent",
+          };
+        } catch (readerError: any) {
+          console.error("Error sending payment to reader:", readerError.message);
+          readerAction = { error: readerError.message || "Failed to send to reader" };
+        }
+      }
+
       res.json({
         clientSecret: paymentIntent.client_secret,
         paymentIntentId: paymentIntent.id,
         amount: amountCents,
         platformFee,
+        readerAction,
       });
     } catch (error: any) {
       console.error("Error creating terminal payment intent:", error);
       res.status(500).json({ message: "Failed to create payment intent" });
+    }
+  });
+
+  app.post("/api/terminal/readers/:readerId/process", isAuthenticated, isApprovedVendor, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { readerId } = req.params;
+      const { paymentIntentId, restaurantId } = req.body;
+
+      if (!paymentIntentId || !restaurantId) {
+        return res.status(400).json({ message: "paymentIntentId and restaurantId are required" });
+      }
+
+      const restaurant = await storage.getRestaurant(restaurantId);
+      if (!restaurant || restaurant.ownerId !== userId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      const reader = await stripe.terminal.readers.processPaymentIntent(readerId, {
+        payment_intent: paymentIntentId,
+      });
+
+      res.json({
+        readerId: reader.id,
+        status: reader.action?.status || "in_progress",
+        type: reader.action?.type || "process_payment_intent",
+      });
+    } catch (error: any) {
+      console.error("Error processing payment on reader:", error);
+      res.status(500).json({ message: error.message || "Failed to process payment on reader" });
+    }
+  });
+
+  app.post("/api/terminal/readers/:readerId/cancel", isAuthenticated, isApprovedVendor, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { readerId } = req.params;
+      const { restaurantId } = req.body;
+
+      if (!restaurantId) {
+        return res.status(400).json({ message: "restaurantId is required" });
+      }
+
+      const restaurant = await storage.getRestaurant(restaurantId);
+      if (!restaurant || restaurant.ownerId !== userId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      const reader = await stripe.terminal.readers.cancelAction(readerId);
+
+      res.json({ readerId: reader.id, status: "cancelled" });
+    } catch (error: any) {
+      console.error("Error cancelling reader action:", error);
+      res.status(500).json({ message: error.message || "Failed to cancel reader action" });
     }
   });
 
