@@ -117,6 +117,17 @@ export async function setupAuth(app: Express) {
   app.get("/api/login", (req, res, next) => {
     const startAuth = () => {
       ensureStrategy(req.hostname);
+      const originalRedirect = res.redirect.bind(res);
+      (res as any).redirect = function (statusOrUrl: number | string, url?: string) {
+        const redirectUrl = typeof statusOrUrl === "string" ? statusOrUrl : url!;
+        const statusCode = typeof statusOrUrl === "number" ? statusOrUrl : 302;
+        req.session.save((err) => {
+          if (err) {
+            console.error("Session save before redirect error:", err);
+          }
+          originalRedirect(statusCode, redirectUrl);
+        });
+      };
       passport.authenticate(`replitauth:${req.hostname}`, {
         prompt: "login consent select_account",
         scope: ["openid", "email", "profile", "offline_access"],
@@ -218,6 +229,17 @@ export async function setupAuth(app: Express) {
   app.get("/api/mobile/login", (req, res, next) => {
     const startAuth = () => {
       ensureMobileStrategy(req.hostname);
+      const originalRedirect = res.redirect.bind(res);
+      (res as any).redirect = function (statusOrUrl: number | string, url?: string) {
+        const redirectUrl = typeof statusOrUrl === "string" ? statusOrUrl : url!;
+        const statusCode = typeof statusOrUrl === "number" ? statusOrUrl : 302;
+        req.session.save((err) => {
+          if (err) {
+            console.error("Mobile session save before redirect error:", err);
+          }
+          originalRedirect(statusCode, redirectUrl);
+        });
+      };
       passport.authenticate(`replitauth-mobile:${req.hostname}`, {
         prompt: "login consent select_account",
         scope: ["openid", "email", "profile", "offline_access"],
