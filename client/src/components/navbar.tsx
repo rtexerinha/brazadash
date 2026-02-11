@@ -15,7 +15,7 @@ import { useCart } from "@/lib/cart-context";
 import { useTheme } from "@/components/theme-provider";
 import { useLanguage } from "@/lib/language-context";
 import { LanguageToggle } from "@/components/language-toggle";
-import { ShoppingCart, Sun, Moon, LogOut, Store, Bell, Briefcase, Calendar, Shield } from "lucide-react";
+import { ShoppingCart, Sun, Moon, LogOut, Store, Bell, Briefcase, Calendar, Shield, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { AuthDialog, useAuthDialog } from "@/components/auth-dialog";
 
@@ -248,6 +248,12 @@ export function Navbar() {
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <a href="/api/switch-account" className="cursor-pointer" data-testid="button-switch-account">
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      <span>{t("nav.switchAccount")}</span>
+                    </a>
+                  </DropdownMenuItem>
                   <DropdownMenuItem asChild>
                     <a href="/api/logout" className="cursor-pointer text-destructive" data-testid="button-logout">
                       <LogOut className="mr-2 h-4 w-4" />

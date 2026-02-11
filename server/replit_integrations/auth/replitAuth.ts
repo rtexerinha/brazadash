@@ -118,14 +118,19 @@ export async function setupAuth(app: Express) {
     const startAuth = () => {
       ensureStrategy(req.hostname);
       passport.authenticate(`replitauth:${req.hostname}`, {
-        prompt: "login consent",
+        prompt: "login consent select_account",
         scope: ["openid", "email", "profile", "offline_access"],
       })(req, res, next);
     };
 
     if (req.isAuthenticated()) {
       req.logout(() => {
-        startAuth();
+        req.session.regenerate((err) => {
+          if (err) {
+            console.error("Session regenerate error:", err);
+          }
+          startAuth();
+        });
       });
     } else {
       startAuth();
@@ -137,10 +142,13 @@ export async function setupAuth(app: Express) {
     passport.authenticate(`replitauth:${req.hostname}`, (err: any, user: any, info: any) => {
       if (err) {
         console.error("Auth callback error:", err.message || err);
+        console.error("Auth callback error details:", JSON.stringify(err, Object.getOwnPropertyNames(err)));
         return res.redirect("/?auth_error=callback_failed");
       }
       if (!user) {
-        console.error("Auth callback: no user returned", info);
+        console.error("Auth callback: no user returned. Info:", JSON.stringify(info));
+        console.error("Auth callback: session ID:", req.sessionID);
+        console.error("Auth callback: session keys:", Object.keys(req.session || {}));
         return res.redirect("/?auth_error=no_user");
       }
       req.logIn(user, (loginErr) => {
@@ -156,12 +164,14 @@ export async function setupAuth(app: Express) {
   app.get("/api/logout", (req, res) => {
     const protocol = req.headers["x-forwarded-proto"] || req.protocol;
     req.logout(() => {
-      res.redirect(
-        client.buildEndSessionUrl(config, {
-          client_id: process.env.REPL_ID!,
-          post_logout_redirect_uri: `${protocol}://${req.hostname}`,
-        }).href
-      );
+      req.session.destroy(() => {
+        res.redirect(
+          client.buildEndSessionUrl(config, {
+            client_id: process.env.REPL_ID!,
+            post_logout_redirect_uri: `${protocol}://${req.hostname}`,
+          }).href
+        );
+      });
     });
   });
 
@@ -169,16 +179,22 @@ export async function setupAuth(app: Express) {
     const protocol = req.headers["x-forwarded-proto"] || req.protocol;
     const baseUrl = `${protocol}://${req.hostname}`;
 
+    const doSwitch = () => {
+      const endSessionUrl = client.buildEndSessionUrl(config, {
+        client_id: process.env.REPL_ID!,
+        post_logout_redirect_uri: `${baseUrl}/api/login`,
+      }).href;
+      res.redirect(endSessionUrl);
+    };
+
     if (req.isAuthenticated()) {
       req.logout(() => {
-        const endSessionUrl = client.buildEndSessionUrl(config, {
-          client_id: process.env.REPL_ID!,
-          post_logout_redirect_uri: `${baseUrl}/api/login`,
-        }).href;
-        res.redirect(endSessionUrl);
+        req.session.destroy(() => {
+          doSwitch();
+        });
       });
     } else {
-      res.redirect(`${baseUrl}/api/login`);
+      doSwitch();
     }
   });
 
@@ -203,14 +219,19 @@ export async function setupAuth(app: Express) {
     const startAuth = () => {
       ensureMobileStrategy(req.hostname);
       passport.authenticate(`replitauth-mobile:${req.hostname}`, {
-        prompt: "login consent",
+        prompt: "login consent select_account",
         scope: ["openid", "email", "profile", "offline_access"],
       })(req, res, next);
     };
 
     if (req.isAuthenticated()) {
       req.logout(() => {
-        startAuth();
+        req.session.regenerate((err) => {
+          if (err) {
+            console.error("Mobile session regenerate error:", err);
+          }
+          startAuth();
+        });
       });
     } else {
       startAuth();
@@ -222,10 +243,13 @@ export async function setupAuth(app: Express) {
     passport.authenticate(`replitauth-mobile:${req.hostname}`, (err: any, user: any, info: any) => {
       if (err) {
         console.error("Mobile auth callback error:", err.message || err);
+        console.error("Mobile auth callback error details:", JSON.stringify(err, Object.getOwnPropertyNames(err)));
         return res.redirect("brazadash://oauth-callback?error=callback_failed");
       }
       if (!user) {
-        console.error("Mobile auth callback: no user returned", info);
+        console.error("Mobile auth callback: no user returned. Info:", JSON.stringify(info));
+        console.error("Mobile auth callback: session ID:", req.sessionID);
+        console.error("Mobile auth callback: session keys:", Object.keys(req.session || {}));
         return res.redirect("brazadash://oauth-callback?error=no_user");
       }
       req.logIn(user, (loginErr) => {
@@ -278,16 +302,22 @@ export async function setupAuth(app: Express) {
     const protocol = req.headers["x-forwarded-proto"] || req.protocol;
     const baseUrl = `${protocol}://${req.hostname}`;
 
+    const doSwitch = () => {
+      const endSessionUrl = client.buildEndSessionUrl(config, {
+        client_id: process.env.REPL_ID!,
+        post_logout_redirect_uri: `${baseUrl}/api/mobile/login`,
+      }).href;
+      res.redirect(endSessionUrl);
+    };
+
     if (req.isAuthenticated()) {
       req.logout(() => {
-        const endSessionUrl = client.buildEndSessionUrl(config, {
-          client_id: process.env.REPL_ID!,
-          post_logout_redirect_uri: `${baseUrl}/api/mobile/login`,
-        }).href;
-        res.redirect(endSessionUrl);
+        req.session.destroy(() => {
+          doSwitch();
+        });
       });
     } else {
-      res.redirect(`${baseUrl}/api/mobile/login`);
+      doSwitch();
     }
   });
 }
