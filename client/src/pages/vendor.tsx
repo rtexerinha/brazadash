@@ -1317,7 +1317,7 @@ function TerminalSettings({ restaurant }: { restaurant: Restaurant }) {
       const res = await apiRequest("GET", `/api/terminal/readers?restaurantId=${restaurant.id}`);
       return res.json();
     },
-    enabled: !!restaurant.terminalEnabled && !!restaurant.terminalLocationId,
+    enabled: !!restaurant.terminalEnabled,
   });
 
   const toggleTerminal = useMutation({
@@ -1444,63 +1444,65 @@ function TerminalSettings({ restaurant }: { restaurant: Restaurant }) {
                 </div>
               </div>
 
+              <div className="border-t pt-4">
+                <div className="flex items-center justify-between gap-4 mb-3 flex-wrap">
+                  <div>
+                    <Label className="text-base">{t("terminal.connectedReaders")}</Label>
+                    <p className="text-sm text-muted-foreground">{t("terminal.readersDesc")}</p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => readersQuery.refetch()}
+                    disabled={readersQuery.isFetching}
+                    data-testid="button-refresh-readers"
+                  >
+                    <RefreshCw className={`h-4 w-4 mr-2 ${readersQuery.isFetching ? "animate-spin" : ""}`} />
+                    {t("common.refresh")}
+                  </Button>
+                </div>
+
+                {readersQuery.isLoading ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-16" />
+                    <Skeleton className="h-16" />
+                  </div>
+                ) : readers.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Wifi className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">{t("terminal.noReaders")}</p>
+                    <p className="text-xs mt-1">{t("terminal.noReadersHint")}</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {readers.map((reader: any) => (
+                      <div
+                        key={reader.id}
+                        className="flex items-center justify-between gap-4 p-3 border rounded-md flex-wrap"
+                        data-testid={`reader-card-${reader.id}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <CreditCard className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="font-medium text-sm">{reader.label || reader.deviceType}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {reader.serialNumber}
+                              {reader.deviceType ? ` \u00b7 ${reader.deviceType}` : ""}
+                              {reader.ipAddress ? ` \u00b7 ${reader.ipAddress}` : ""}
+                            </p>
+                          </div>
+                        </div>
+                        <Badge variant={reader.status === "online" ? "default" : "secondary"}>
+                          {reader.status}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {restaurant.terminalLocationId && (
                 <>
-                  <div className="border-t pt-4">
-                    <div className="flex items-center justify-between gap-4 mb-3 flex-wrap">
-                      <div>
-                        <Label className="text-base">{t("terminal.connectedReaders")}</Label>
-                        <p className="text-sm text-muted-foreground">{t("terminal.readersDesc")}</p>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => readersQuery.refetch()}
-                        disabled={readersQuery.isFetching}
-                        data-testid="button-refresh-readers"
-                      >
-                        <RefreshCw className={`h-4 w-4 mr-2 ${readersQuery.isFetching ? "animate-spin" : ""}`} />
-                        {t("common.refresh")}
-                      </Button>
-                    </div>
-
-                    {readersQuery.isLoading ? (
-                      <div className="space-y-2">
-                        <Skeleton className="h-16" />
-                        <Skeleton className="h-16" />
-                      </div>
-                    ) : readers.length === 0 ? (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <Wifi className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                        <p className="text-sm">{t("terminal.noReaders")}</p>
-                        <p className="text-xs mt-1">{t("terminal.noReadersHint")}</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        {readers.map((reader: any) => (
-                          <div
-                            key={reader.id}
-                            className="flex items-center justify-between gap-4 p-3 border rounded-md flex-wrap"
-                            data-testid={`reader-card-${reader.id}`}
-                          >
-                            <div className="flex items-center gap-3">
-                              <CreditCard className="h-5 w-5 text-muted-foreground" />
-                              <div>
-                                <p className="font-medium text-sm">{reader.label || reader.deviceType}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {reader.serialNumber} &middot; {reader.status}
-                                </p>
-                              </div>
-                            </div>
-                            <Badge variant={reader.status === "online" ? "default" : "secondary"}>
-                              {reader.status}
-                            </Badge>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
                   <div className="border-t pt-4">
                     <Label className="text-base mb-1 block">{t("terminal.createCharge")}</Label>
                     <p className="text-sm text-muted-foreground mb-3">{t("terminal.createChargeDesc")}</p>

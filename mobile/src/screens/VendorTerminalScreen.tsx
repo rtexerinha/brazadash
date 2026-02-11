@@ -41,6 +41,7 @@ function SectionCard({ children, title, subtitle }: { children: React.ReactNode;
 function ReaderItem({ reader, onConnect }: { reader: TerminalReader | DiscoveredReader; onConnect?: () => void }) {
   const isDiscovered = 'batteryLevel' in reader;
   const status = 'status' in reader ? reader.status : 'discovered';
+  const ipAddress = 'ipAddress' in reader ? (reader as any).ipAddress : null;
   
   return (
     <View style={styles.readerRow}>
@@ -51,10 +52,12 @@ function ReaderItem({ reader, onConnect }: { reader: TerminalReader | Discovered
           color={isDiscovered ? colors.secondary : colors.primary} 
         />
         <View style={{ marginLeft: spacing.md, flex: 1 }}>
-          <Text style={styles.readerLabel}>{reader.label || reader.id}</Text>
+          <Text style={styles.readerLabel}>{reader.label || reader.deviceType || reader.id}</Text>
           <Text style={styles.readerDetail}>
-            {reader.deviceType} {reader.serialNumber ? `• ${reader.serialNumber}` : ''}
-            {isDiscovered && reader.batteryLevel ? ` • ${reader.batteryLevel}%` : ''}
+            {reader.serialNumber || ''}
+            {reader.deviceType ? ` \u00b7 ${reader.deviceType}` : ''}
+            {ipAddress ? ` \u00b7 ${ipAddress}` : ''}
+            {isDiscovered && reader.batteryLevel ? ` \u00b7 ${reader.batteryLevel}%` : ''}
           </Text>
         </View>
       </View>
@@ -92,7 +95,7 @@ export default function VendorTerminalScreen() {
   const { data: readersData, refetch: refetchReaders } = useQuery({
     queryKey: ["terminal-readers", restaurant?.id],
     queryFn: () => api.getTerminalReaders(restaurant!.id),
-    enabled: !!restaurant?.terminalEnabled && !!restaurant?.terminalLocationId,
+    enabled: !!restaurant?.terminalEnabled,
   });
 
   // Bluetooth Discovery Function (Placeholder - needs native module)
@@ -209,7 +212,7 @@ export default function VendorTerminalScreen() {
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={false} onRefresh={() => { refetch(); if (isTerminalEnabled && hasLocation) refetchReaders(); }} />}
+      refreshControl={<RefreshControl refreshing={false} onRefresh={() => { refetch(); if (isTerminalEnabled) refetchReaders(); }} />}
     >
       <View style={styles.header}>
         <View style={styles.headerIcon}>
@@ -269,161 +272,156 @@ export default function VendorTerminalScreen() {
             )}
           </SectionCard>
 
-          {hasLocation && (
-            <>
-              <SectionCard title="Card Readers" subtitle="Connect and manage your Stripe Terminal readers.">
-                {/* Tab Selector */}
-                <View style={styles.tabContainer}>
-                  <TouchableOpacity
-                    style={[styles.tab, activeTab === 'registered' && styles.tabActive]}
-                    onPress={() => setActiveTab('registered')}
-                  >
-                    <Ionicons 
-                      name="list" 
-                      size={18} 
-                      color={activeTab === 'registered' ? colors.primary : colors.textSecondary} 
-                    />
-                    <Text style={[styles.tabText, activeTab === 'registered' && styles.tabTextActive]}>
-                      Registered ({readers.length})
+          <SectionCard title="Card Readers" subtitle="Connect and manage your Stripe Terminal readers.">
+            <View style={styles.tabContainer}>
+              <TouchableOpacity
+                style={[styles.tab, activeTab === 'registered' && styles.tabActive]}
+                onPress={() => setActiveTab('registered')}
+              >
+                <Ionicons 
+                  name="list" 
+                  size={18} 
+                  color={activeTab === 'registered' ? colors.primary : colors.textSecondary} 
+                />
+                <Text style={[styles.tabText, activeTab === 'registered' && styles.tabTextActive]}>
+                  Registered ({readers.length})
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.tab, activeTab === 'discover' && styles.tabActive]}
+                onPress={() => setActiveTab('discover')}
+              >
+                <Ionicons 
+                  name="bluetooth" 
+                  size={18} 
+                  color={activeTab === 'discover' ? colors.secondary : colors.textSecondary} 
+                />
+                <Text style={[styles.tabText, activeTab === 'discover' && styles.tabTextActive]}>
+                  Discover
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {activeTab === 'registered' && (
+              <>
+                {readers.length === 0 ? (
+                  <View style={styles.emptyReaders}>
+                    <Ionicons name="hardware-chip-outline" size={32} color={colors.textTertiary} />
+                    <Text style={styles.emptyReadersText}>No readers registered</Text>
+                    <Text style={styles.emptyReadersHint}>
+                      Register readers in the Stripe Dashboard or discover them via Bluetooth
                     </Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity
-                    style={[styles.tab, activeTab === 'discover' && styles.tabActive]}
-                    onPress={() => setActiveTab('discover')}
-                  >
-                    <Ionicons 
-                      name="bluetooth" 
-                      size={18} 
-                      color={activeTab === 'discover' ? colors.secondary : colors.textSecondary} 
-                    />
-                    <Text style={[styles.tabText, activeTab === 'discover' && styles.tabTextActive]}>
-                      Discover
-                    </Text>
-                  </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={styles.readersList}>
+                    {readers.map((reader) => (
+                      <ReaderItem key={reader.id} reader={reader} />
+                    ))}
+                  </View>
+                )}
+                <TouchableOpacity style={styles.refreshButton} onPress={() => refetchReaders()}>
+                  <Ionicons name="refresh" size={16} color={colors.primary} />
+                  <Text style={styles.refreshButtonText}>Refresh List</Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            {activeTab === 'discover' && (
+              <>
+                <View style={styles.discoveryInfo}>
+                  <Ionicons name="information-circle" size={20} color={colors.secondary} />
+                  <Text style={styles.discoveryInfoText}>
+                    Make sure your Stripe reader is powered on and in pairing mode
+                  </Text>
                 </View>
 
-                {/* Registered Readers Tab */}
-                {activeTab === 'registered' && (
-                  <>
-                    {readers.length === 0 ? (
-                      <View style={styles.emptyReaders}>
-                        <Ionicons name="hardware-chip-outline" size={32} color={colors.textTertiary} />
-                        <Text style={styles.emptyReadersText}>No readers registered</Text>
-                        <Text style={styles.emptyReadersHint}>
-                          Register readers in the Stripe Dashboard or discover them via Bluetooth
-                        </Text>
-                      </View>
-                    ) : (
-                      <View style={styles.readersList}>
-                        {readers.map((reader) => (
-                          <ReaderItem key={reader.id} reader={reader} />
-                        ))}
-                      </View>
-                    )}
-                    <TouchableOpacity style={styles.refreshButton} onPress={() => refetchReaders()}>
-                      <Ionicons name="refresh" size={16} color={colors.primary} />
-                      <Text style={styles.refreshButtonText}>Refresh List</Text>
-                    </TouchableOpacity>
-                  </>
+                {discoveredReaders.length > 0 && (
+                  <View style={styles.readersList}>
+                    {discoveredReaders.map((reader) => (
+                      <ReaderItem 
+                        key={reader.id} 
+                        reader={reader} 
+                        onConnect={() => connectToReader(reader)}
+                      />
+                    ))}
+                  </View>
                 )}
 
-                {/* Bluetooth Discovery Tab */}
-                {activeTab === 'discover' && (
-                  <>
-                    <View style={styles.discoveryInfo}>
-                      <Ionicons name="information-circle" size={20} color={colors.secondary} />
-                      <Text style={styles.discoveryInfoText}>
-                        Make sure your Stripe reader is powered on and in pairing mode
-                      </Text>
-                    </View>
-
-                    {discoveredReaders.length > 0 && (
-                      <View style={styles.readersList}>
-                        {discoveredReaders.map((reader) => (
-                          <ReaderItem 
-                            key={reader.id} 
-                            reader={reader} 
-                            onConnect={() => connectToReader(reader)}
-                          />
-                        ))}
-                      </View>
-                    )}
-
-                    {discoveredReaders.length === 0 && !isDiscovering && (
-                      <View style={styles.emptyReaders}>
-                        <Ionicons name="bluetooth-outline" size={32} color={colors.textTertiary} />
-                        <Text style={styles.emptyReadersText}>No readers discovered</Text>
-                        <Text style={styles.emptyReadersHint}>
-                          Tap the button below to scan for nearby Stripe readers
-                        </Text>
-                      </View>
-                    )}
-
-                    <TouchableOpacity 
-                      style={[styles.button, styles.discoverButton, isDiscovering && styles.buttonDisabled]} 
-                      onPress={discoverBluetoothReaders}
-                      disabled={isDiscovering}
-                    >
-                      {isDiscovering ? (
-                        <>
-                          <ActivityIndicator size="small" color={colors.white} />
-                          <Text style={styles.buttonText}>Scanning...</Text>
-                        </>
-                      ) : (
-                        <>
-                          <Ionicons name="bluetooth" size={18} color={colors.white} />
-                          <Text style={styles.buttonText}>Discover Readers</Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
-                  </>
+                {discoveredReaders.length === 0 && !isDiscovering && (
+                  <View style={styles.emptyReaders}>
+                    <Ionicons name="bluetooth-outline" size={32} color={colors.textTertiary} />
+                    <Text style={styles.emptyReadersText}>No readers discovered</Text>
+                    <Text style={styles.emptyReadersHint}>
+                      Tap the button below to scan for nearby Stripe readers
+                    </Text>
+                  </View>
                 )}
-              </SectionCard>
 
-              <SectionCard title="Create In-Person Charge" subtitle="Create a payment intent for an in-person card transaction.">
-                <View style={styles.chargeForm}>
-                  <Text style={styles.inputLabel}>Amount ($)</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="e.g. 25.50"
-                    value={chargeAmount}
-                    onChangeText={setChargeAmount}
-                    keyboardType="decimal-pad"
-                  />
-
-                  <Text style={[styles.inputLabel, { marginTop: spacing.md }]}>Description (optional)</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="e.g. Lunch order - Table 5"
-                    value={chargeDescription}
-                    onChangeText={setChargeDescription}
-                  />
-
-                  {chargeAmount && parseFloat(chargeAmount) >= 0.5 && (
-                    <View style={styles.feeInfo}>
-                      <Text style={styles.feeText}>Total: ${parseFloat(chargeAmount).toFixed(2)}</Text>
-                      <Text style={styles.feeDetail}>Platform fee (8%): ${(parseFloat(chargeAmount) * 0.08).toFixed(2)}</Text>
-                    </View>
-                  )}
-
-                  <TouchableOpacity
-                    style={[styles.button, styles.chargeButton, (!chargeAmount || parseFloat(chargeAmount) < 0.5 || chargeMutation.isPending) && styles.buttonDisabled]}
-                    onPress={() => chargeMutation.mutate()}
-                    disabled={!chargeAmount || parseFloat(chargeAmount) < 0.5 || chargeMutation.isPending}
-                  >
-                    {chargeMutation.isPending ? (
+                <TouchableOpacity 
+                  style={[styles.button, styles.discoverButton, isDiscovering && styles.buttonDisabled]} 
+                  onPress={discoverBluetoothReaders}
+                  disabled={isDiscovering}
+                >
+                  {isDiscovering ? (
+                    <>
                       <ActivityIndicator size="small" color={colors.white} />
-                    ) : (
-                      <>
-                        <Ionicons name="cash" size={18} color={colors.white} />
-                        <Text style={styles.buttonText}>Create Payment Intent</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </SectionCard>
-            </>
+                      <Text style={styles.buttonText}>Scanning...</Text>
+                    </>
+                  ) : (
+                    <>
+                      <Ionicons name="bluetooth" size={18} color={colors.white} />
+                      <Text style={styles.buttonText}>Discover Readers</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </>
+            )}
+          </SectionCard>
+
+          {hasLocation && (
+            <SectionCard title="Create In-Person Charge" subtitle="Create a payment intent for an in-person card transaction.">
+              <View style={styles.chargeForm}>
+                <Text style={styles.inputLabel}>Amount ($)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. 25.50"
+                  value={chargeAmount}
+                  onChangeText={setChargeAmount}
+                  keyboardType="decimal-pad"
+                />
+
+                <Text style={[styles.inputLabel, { marginTop: spacing.md }]}>Description (optional)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. Lunch order - Table 5"
+                  value={chargeDescription}
+                  onChangeText={setChargeDescription}
+                />
+
+                {chargeAmount && parseFloat(chargeAmount) >= 0.5 && (
+                  <View style={styles.feeInfo}>
+                    <Text style={styles.feeText}>Total: ${parseFloat(chargeAmount).toFixed(2)}</Text>
+                    <Text style={styles.feeDetail}>Platform fee (8%): ${(parseFloat(chargeAmount) * 0.08).toFixed(2)}</Text>
+                  </View>
+                )}
+
+                <TouchableOpacity
+                  style={[styles.button, styles.chargeButton, (!chargeAmount || parseFloat(chargeAmount) < 0.5 || chargeMutation.isPending) && styles.buttonDisabled]}
+                  onPress={() => chargeMutation.mutate()}
+                  disabled={!chargeAmount || parseFloat(chargeAmount) < 0.5 || chargeMutation.isPending}
+                >
+                  {chargeMutation.isPending ? (
+                    <ActivityIndicator size="small" color={colors.white} />
+                  ) : (
+                    <>
+                      <Ionicons name="cash" size={18} color={colors.white} />
+                      <Text style={styles.buttonText}>Create Payment Intent</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </SectionCard>
           )}
         </>
       )}

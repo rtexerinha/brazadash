@@ -2611,24 +2611,36 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Forbidden" });
       }
 
-      if (!restaurant.terminalLocationId) {
-        return res.json({ readers: [] });
+      const stripe = await getUncachableStripeClient();
+
+      const allReaders: any[] = [];
+
+      if (restaurant.terminalLocationId) {
+        const locationReaders = await stripe.terminal.readers.list({
+          location: restaurant.terminalLocationId,
+          limit: 100,
+        });
+        allReaders.push(...locationReaders.data);
       }
 
-      const stripe = await getUncachableStripeClient();
-      const readers = await stripe.terminal.readers.list({
-        location: restaurant.terminalLocationId,
+      const allAccountReaders = await stripe.terminal.readers.list({
         limit: 100,
       });
+      for (const r of allAccountReaders.data) {
+        if (!allReaders.find((existing: any) => existing.id === r.id)) {
+          allReaders.push(r);
+        }
+      }
 
       res.json({
-        readers: readers.data.map((r: any) => ({
+        readers: allReaders.map((r: any) => ({
           id: r.id,
           label: r.label,
           deviceType: r.device_type,
           status: r.status,
           serialNumber: r.serial_number,
           ipAddress: r.ip_address,
+          locationId: r.location,
         })),
       });
     } catch (error: any) {
