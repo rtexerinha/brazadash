@@ -129,7 +129,7 @@ export async function setupAuth(app: Express) {
         });
       };
       passport.authenticate(`replitauth:${req.hostname}`, {
-        prompt: "login consent select_account",
+        prompt: "login consent",
         scope: ["openid", "email", "profile", "offline_access"],
       })(req, res, next);
     };
@@ -241,7 +241,7 @@ export async function setupAuth(app: Express) {
         });
       };
       passport.authenticate(`replitauth-mobile:${req.hostname}`, {
-        prompt: "login consent select_account",
+        prompt: "login consent",
         scope: ["openid", "email", "profile", "offline_access"],
       })(req, res, next);
     };
