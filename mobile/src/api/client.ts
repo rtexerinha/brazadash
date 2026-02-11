@@ -197,6 +197,23 @@ export const api = {
       body: JSON.stringify({ restaurantId, amount, description, readerId }),
     }),
 
+  checkTerminalPaymentStatus: (paymentIntentId: string) =>
+    request<{ id: string; status: string; amount: number; description: string; metadata: Record<string, string> }>(
+      `/api/terminal/payment-intents/${paymentIntentId}/status`
+    ),
+
+  captureTerminalPayment: (paymentIntentId: string) =>
+    request<{ id: string; status: string; amount: number; description: string }>(
+      `/api/terminal/payment-intents/${paymentIntentId}/capture`,
+      { method: "POST" }
+    ),
+
+  cancelTerminalReaderAction: (readerId: string, restaurantId: string) =>
+    request(`/api/terminal/readers/${readerId}/cancel`, {
+      method: "POST",
+      body: JSON.stringify({ restaurantId }),
+    }),
+
   createTerminalConnectionToken: () =>
     request<{ secret: string }>("/api/terminal/connection-token", { method: "POST" }),
 

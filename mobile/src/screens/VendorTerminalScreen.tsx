@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -85,6 +85,20 @@ export default function VendorTerminalScreen() {
   const [discoveredReaders, setDiscoveredReaders] = useState<DiscoveredReader[]>([]);
   const [activeTab, setActiveTab] = useState<'registered' | 'discover'>('registered');
   const [selectedReaderId, setSelectedReaderId] = useState("");
+  const [pendingPayment, setPendingPayment] = useState<{
+    paymentIntentId: string;
+    amount: string;
+    description: string;
+    readerLabel: string;
+  } | null>(null);
+  const [paymentStatus, setPaymentStatus] = useState("");
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, []);
 
   const { data: restaurants, isLoading, refetch } = useQuery({
     queryKey: ["vendor-restaurants"],
@@ -183,17 +197,103 @@ export default function VendorTerminalScreen() {
     },
   });
 
+  const startPolling = (paymentIntentId: string) => {
+    if (pollingRef.current) clearInterval(pollingRef.current);
+    setPaymentStatus("waiting_for_card");
+    let pollCount = 0;
+    const maxPolls = 150;
+    let isPolling = false;
+
+    const poll = async () => {
+      if (isPolling) return;
+      isPolling = true;
+      pollCount++;
+
+      if (pollCount > maxPolls) {
+        if (pollingRef.current) clearInterval(pollingRef.current);
+        pollingRef.current = null;
+        setPaymentStatus("timed_out");
+        Alert.alert("Payment Timed Out", "No card was detected within 5 minutes. The payment intent is still open in Stripe.");
+        setTimeout(() => { setPendingPayment(null); setPaymentStatus(""); }, 5000);
+        isPolling = false;
+        return;
+      }
+
+      try {
+        const data = await api.checkTerminalPaymentStatus(paymentIntentId);
+
+        if (data.status === "requires_capture") {
+          if (pollingRef.current) clearInterval(pollingRef.current);
+          pollingRef.current = null;
+          setPaymentStatus("capturing");
+          try {
+            const captureData = await api.captureTerminalPayment(paymentIntentId);
+            setPaymentStatus("completed");
+            Alert.alert("Payment Completed", `$${(captureData.amount / 100).toFixed(2)} captured successfully.`);
+            setTimeout(() => { setPendingPayment(null); setPaymentStatus(""); }, 3000);
+          } catch (captureErr: any) {
+            setPaymentStatus("capture_failed");
+            Alert.alert("Capture Failed", captureErr.message || "Failed to capture payment");
+          }
+        } else if (data.status === "canceled" || data.status === "cancelled") {
+          if (pollingRef.current) clearInterval(pollingRef.current);
+          pollingRef.current = null;
+          setPaymentStatus("cancelled");
+          Alert.alert("Payment Cancelled", "The payment was cancelled.");
+          setTimeout(() => { setPendingPayment(null); setPaymentStatus(""); }, 3000);
+        } else if (data.status === "succeeded") {
+          if (pollingRef.current) clearInterval(pollingRef.current);
+          pollingRef.current = null;
+          setPaymentStatus("completed");
+          Alert.alert("Payment Completed", "Payment was already captured.");
+          setTimeout(() => { setPendingPayment(null); setPaymentStatus(""); }, 3000);
+        } else if (data.status === "requires_payment_method") {
+          if (pollingRef.current) clearInterval(pollingRef.current);
+          pollingRef.current = null;
+          setPaymentStatus("capture_failed");
+          Alert.alert("Payment Failed", "Card was declined or removed. Please try again.");
+          setTimeout(() => { setPendingPayment(null); setPaymentStatus(""); }, 5000);
+        }
+      } catch {} finally {
+        isPolling = false;
+      }
+    };
+
+    pollingRef.current = setInterval(poll, 2000);
+  };
+
+  const cancelPendingPayment = async () => {
+    if (!pendingPayment || !selectedReaderId || !restaurant) return;
+    try {
+      await api.cancelTerminalReaderAction(selectedReaderId, restaurant.id.toString());
+      if (pollingRef.current) clearInterval(pollingRef.current);
+      pollingRef.current = null;
+      setPendingPayment(null);
+      setPaymentStatus("");
+      Alert.alert("Cancelled", "Payment cancelled.");
+    } catch {
+      Alert.alert("Error", "Failed to cancel payment");
+    }
+  };
+
   const chargeMutation = useMutation({
     mutationFn: () => api.createTerminalPaymentIntent(restaurant!.id, chargeAmount, chargeDescription || undefined, selectedReaderId || undefined),
     onSuccess: (data: any) => {
+      const selectedReader = readers.find((r: any) => r.id === selectedReaderId);
+      const readerName = selectedReader?.label || selectedReader?.deviceType || "reader";
+
       if (data.readerAction && !data.readerAction.error) {
-        const selectedReader = readers.find((r: any) => r.id === selectedReaderId);
-        const readerName = selectedReader?.label || selectedReader?.deviceType || "reader";
-        Alert.alert("Payment Sent", `Payment of $${(data.amount / 100).toFixed(2)} sent to "${readerName}".\n\nThe customer can now tap or insert their card.`);
+        setPendingPayment({
+          paymentIntentId: data.paymentIntentId,
+          amount: chargeAmount,
+          description: chargeDescription || "In-person payment",
+          readerLabel: readerName,
+        });
+        startPolling(data.paymentIntentId);
       } else if (data.readerAction?.error) {
-        Alert.alert("Partial Success", `Payment intent created (${data.paymentIntentId}), but failed to send to reader:\n${data.readerAction.error}`);
+        Alert.alert("Error", `Payment created but failed to send to reader:\n${data.readerAction.error}`);
       } else {
-        Alert.alert("Payment Intent Created", `ID: ${data.paymentIntentId}\nAmount: $${(data.amount / 100).toFixed(2)}\nPlatform Fee: $${(data.platformFee / 100).toFixed(2)}`);
+        Alert.alert("Payment Created", `ID: ${data.paymentIntentId}\nAmount: $${(data.amount / 100).toFixed(2)}`);
       }
       setChargeAmount("");
       setChargeDescription("");
@@ -441,27 +541,106 @@ export default function VendorTerminalScreen() {
                 </View>
               )}
 
-              {chargeAmount && parseFloat(chargeAmount) >= 0.5 && (
+              {chargeAmount && parseFloat(chargeAmount) >= 0.5 && !pendingPayment && (
                 <View style={styles.feeInfo}>
                   <Text style={styles.feeText}>Total: ${parseFloat(chargeAmount).toFixed(2)}</Text>
                   <Text style={styles.feeDetail}>Platform fee (8%): ${(parseFloat(chargeAmount) * 0.08).toFixed(2)}</Text>
                 </View>
               )}
 
-              <TouchableOpacity
-                style={[styles.button, styles.chargeButton, (!chargeAmount || parseFloat(chargeAmount) < 0.5 || !selectedReaderId || chargeMutation.isPending) && styles.buttonDisabled]}
-                onPress={() => chargeMutation.mutate()}
-                disabled={!chargeAmount || parseFloat(chargeAmount) < 0.5 || !selectedReaderId || chargeMutation.isPending}
-              >
-                {chargeMutation.isPending ? (
-                  <ActivityIndicator size="small" color={colors.white} />
-                ) : (
-                  <>
-                    <Ionicons name="send" size={18} color={colors.white} />
-                    <Text style={styles.buttonText}>Send Payment to Reader</Text>
-                  </>
-                )}
-              </TouchableOpacity>
+              {pendingPayment ? (
+                <View style={styles.pendingPaymentCard}>
+                  {paymentStatus === "waiting_for_card" && (
+                    <View>
+                      <View style={styles.pendingRow}>
+                        <ActivityIndicator size="small" color={colors.primary} />
+                        <View style={{ flex: 1, marginLeft: spacing.md }}>
+                          <Text style={styles.pendingTitle}>Waiting for card...</Text>
+                          <Text style={styles.pendingSubtitle}>
+                            Customer should tap or insert card on "{pendingPayment.readerLabel}"
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.pendingAmountRow}>
+                        <Text style={styles.feeText}>Amount: ${parseFloat(pendingPayment.amount).toFixed(2)}</Text>
+                        <Text style={styles.feeDetail}>{pendingPayment.description}</Text>
+                      </View>
+                      <TouchableOpacity
+                        style={[styles.button, { backgroundColor: colors.border, marginTop: spacing.sm }]}
+                        onPress={cancelPendingPayment}
+                      >
+                        <Ionicons name="close-circle" size={18} color={colors.text} />
+                        <Text style={[styles.buttonText, { color: colors.text }]}>Cancel Payment</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                  {paymentStatus === "capturing" && (
+                    <View style={styles.pendingRow}>
+                      <ActivityIndicator size="small" color={colors.primary} />
+                      <View style={{ flex: 1, marginLeft: spacing.md }}>
+                        <Text style={styles.pendingTitle}>Card detected - capturing payment...</Text>
+                        <Text style={styles.pendingSubtitle}>Please wait while we finalize the transaction.</Text>
+                      </View>
+                    </View>
+                  )}
+                  {paymentStatus === "completed" && (
+                    <View style={styles.pendingRow}>
+                      <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+                      <View style={{ flex: 1, marginLeft: spacing.md }}>
+                        <Text style={[styles.pendingTitle, { color: colors.primary }]}>Payment Completed</Text>
+                        <Text style={styles.pendingSubtitle}>
+                          ${parseFloat(pendingPayment.amount).toFixed(2)} captured successfully.
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+                  {paymentStatus === "capture_failed" && (
+                    <View style={styles.pendingRow}>
+                      <Ionicons name="alert-circle" size={24} color={colors.error || "#dc2626"} />
+                      <View style={{ flex: 1, marginLeft: spacing.md }}>
+                        <Text style={[styles.pendingTitle, { color: colors.error || "#dc2626" }]}>Capture Failed</Text>
+                        <Text style={styles.pendingSubtitle}>
+                          The payment was authorized but failed to capture. Please try again.
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+                  {paymentStatus === "cancelled" && (
+                    <View style={styles.pendingRow}>
+                      <Ionicons name="close-circle" size={24} color={colors.textSecondary} />
+                      <View style={{ flex: 1, marginLeft: spacing.md }}>
+                        <Text style={styles.pendingTitle}>Payment Cancelled</Text>
+                      </View>
+                    </View>
+                  )}
+                  {paymentStatus === "timed_out" && (
+                    <View style={styles.pendingRow}>
+                      <Ionicons name="alert-circle" size={24} color={colors.error || "#dc2626"} />
+                      <View style={{ flex: 1, marginLeft: spacing.md }}>
+                        <Text style={[styles.pendingTitle, { color: colors.error || "#dc2626" }]}>Payment Timed Out</Text>
+                        <Text style={styles.pendingSubtitle}>
+                          No card was detected within 5 minutes.
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={[styles.button, styles.chargeButton, (!chargeAmount || parseFloat(chargeAmount) < 0.5 || !selectedReaderId || chargeMutation.isPending) && styles.buttonDisabled]}
+                  onPress={() => chargeMutation.mutate()}
+                  disabled={!chargeAmount || parseFloat(chargeAmount) < 0.5 || !selectedReaderId || chargeMutation.isPending}
+                >
+                  {chargeMutation.isPending ? (
+                    <ActivityIndicator size="small" color={colors.white} />
+                  ) : (
+                    <>
+                      <Ionicons name="send" size={18} color={colors.white} />
+                      <Text style={styles.buttonText}>Send Payment to Reader</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              )}
             </View>
           </SectionCard>
         </>
@@ -685,4 +864,32 @@ const styles = StyleSheet.create({
   readerPickerLabel: { fontSize: fontSize.md, fontWeight: fontWeight.medium, color: colors.text },
   readerPickerLabelSelected: { color: colors.primary },
   readerPickerDetail: { fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 2 },
+  pendingPaymentCard: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.sm,
+    padding: spacing.lg,
+    marginTop: spacing.md,
+    backgroundColor: colors.background,
+  },
+  pendingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  pendingTitle: {
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.semibold,
+    color: colors.text,
+  },
+  pendingSubtitle: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  pendingAmountRow: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.sm,
+    padding: spacing.md,
+    marginTop: spacing.md,
+  },
 });

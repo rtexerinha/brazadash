@@ -2675,9 +2675,11 @@ export async function registerRoutes(
       const platformFee = Math.round(amountCents * 0.08);
 
       const stripe = await getUncachableStripeClient();
+      const desc = description || "In-person payment";
       const paymentIntent = await stripe.paymentIntents.create({
         amount: amountCents,
         currency: "usd",
+        description: `${restaurant.name} - ${desc}`,
         payment_method_types: ["card_present"],
         capture_method: "manual",
         statement_descriptor: "BRAZADASH ORDER",
@@ -2685,7 +2687,7 @@ export async function registerRoutes(
           restaurantId,
           restaurantName: restaurant.name,
           type: "terminal_in_person",
-          description: description || "In-person payment",
+          description: desc,
           platformFee: platformFee.toString(),
         },
       });
@@ -2776,6 +2778,37 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/terminal/payment-intents/:id/status", isAuthenticated, isApprovedVendor, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const paymentIntentId = req.params.id;
+
+      const stripe = await getUncachableStripeClient();
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+
+      const restaurantId = paymentIntent.metadata?.restaurantId;
+      if (!restaurantId) {
+        return res.status(400).json({ message: "Invalid payment intent" });
+      }
+
+      const restaurant = await storage.getRestaurant(restaurantId);
+      if (!restaurant || restaurant.ownerId !== userId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      res.json({
+        id: paymentIntent.id,
+        status: paymentIntent.status,
+        amount: paymentIntent.amount,
+        description: paymentIntent.description,
+        metadata: paymentIntent.metadata,
+      });
+    } catch (error: any) {
+      console.error("Error checking payment status:", error);
+      res.status(500).json({ message: "Failed to check payment status" });
+    }
+  });
+
   app.post("/api/terminal/payment-intents/:id/capture", isAuthenticated, isApprovedVendor, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -2794,16 +2827,30 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Forbidden" });
       }
 
-      const captured = await stripe.paymentIntents.capture(paymentIntentId);
+      if (paymentIntent.status !== "requires_capture") {
+        return res.status(400).json({ 
+          message: `Payment cannot be captured. Current status: ${paymentIntent.status}`,
+          status: paymentIntent.status,
+        });
+      }
+
+      const platformFee = parseInt(paymentIntent.metadata?.platformFee || "0");
+      const captureParams: any = {};
+      if (platformFee > 0) {
+        captureParams.application_fee_amount = platformFee;
+      }
+
+      const captured = await stripe.paymentIntents.capture(paymentIntentId, captureParams);
 
       res.json({
         status: captured.status,
         amount: captured.amount,
         id: captured.id,
+        description: captured.description,
       });
     } catch (error: any) {
       console.error("Error capturing payment:", error);
-      res.status(500).json({ message: "Failed to capture payment" });
+      res.status(500).json({ message: error.message || "Failed to capture payment" });
     }
   });
 

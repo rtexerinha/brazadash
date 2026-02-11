@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,7 +18,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/lib/language-context";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Store, Plus, Utensils, Package, Star, DollarSign, Loader2, Pencil, Trash2, Clock, CheckCircle, Truck, MapPin, XCircle, ChefHat, Upload, ImageIcon, AlertTriangle, Calendar, TrendingUp, Filter, BarChart3, Smartphone, CreditCard, RefreshCw, Wifi } from "lucide-react";
+import { Store, Plus, Utensils, Package, Star, DollarSign, Loader2, Pencil, Trash2, Clock, CheckCircle, CheckCircle2, Truck, MapPin, XCircle, ChefHat, Upload, ImageIcon, AlertTriangle, AlertCircle, Calendar, TrendingUp, Filter, BarChart3, Smartphone, CreditCard, RefreshCw, Wifi } from "lucide-react";
 import { format, startOfDay, startOfWeek, startOfMonth } from "date-fns";
 import { z } from "zod";
 import type { Restaurant, MenuItem, Order } from "@shared/schema";
@@ -1311,6 +1311,119 @@ function TerminalSettings({ restaurant }: { restaurant: Restaurant }) {
   const [chargeDescription, setChargeDescription] = useState("");
   const [postalCode, setPostalCode] = useState("");
   const [selectedReaderId, setSelectedReaderId] = useState("");
+  const [pendingPayment, setPendingPayment] = useState<{
+    paymentIntentId: string;
+    amount: string;
+    description: string;
+    readerLabel: string;
+  } | null>(null);
+  const [paymentStatus, setPaymentStatus] = useState<string>("");
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, []);
+
+  const startPolling = (paymentIntentId: string) => {
+    if (pollingRef.current) clearInterval(pollingRef.current);
+    setPaymentStatus("waiting_for_card");
+    let pollCount = 0;
+    const maxPolls = 150;
+    let isPolling = false;
+
+    const poll = async () => {
+      if (isPolling) return;
+      isPolling = true;
+      pollCount++;
+
+      if (pollCount > maxPolls) {
+        if (pollingRef.current) clearInterval(pollingRef.current);
+        pollingRef.current = null;
+        setPaymentStatus("timed_out");
+        toast({
+          title: "Payment Timed Out",
+          description: "No card was detected within 5 minutes. The payment intent is still open in Stripe.",
+          variant: "destructive",
+        });
+        setTimeout(() => { setPendingPayment(null); setPaymentStatus(""); }, 5000);
+        isPolling = false;
+        return;
+      }
+
+      try {
+        const res = await apiRequest("GET", `/api/terminal/payment-intents/${paymentIntentId}/status`);
+        const data = await res.json();
+
+        if (data.status === "requires_capture") {
+          if (pollingRef.current) clearInterval(pollingRef.current);
+          pollingRef.current = null;
+          setPaymentStatus("capturing");
+          try {
+            const captureRes = await apiRequest("POST", `/api/terminal/payment-intents/${paymentIntentId}/capture`);
+            const captureData = await captureRes.json();
+            setPaymentStatus("completed");
+            toast({
+              title: "Payment Completed",
+              description: `$${(captureData.amount / 100).toFixed(2)} payment captured successfully.`,
+            });
+            setTimeout(() => { setPendingPayment(null); setPaymentStatus(""); }, 3000);
+          } catch (captureErr: any) {
+            setPaymentStatus("capture_failed");
+            toast({
+              title: t("common.error"),
+              description: `Failed to capture payment: ${captureErr.message || "Unknown error"}`,
+              variant: "destructive",
+            });
+          }
+        } else if (data.status === "canceled" || data.status === "cancelled") {
+          if (pollingRef.current) clearInterval(pollingRef.current);
+          pollingRef.current = null;
+          setPaymentStatus("cancelled");
+          toast({ title: "Payment Cancelled", description: "The payment was cancelled.", variant: "destructive" });
+          setTimeout(() => { setPendingPayment(null); setPaymentStatus(""); }, 3000);
+        } else if (data.status === "succeeded") {
+          if (pollingRef.current) clearInterval(pollingRef.current);
+          pollingRef.current = null;
+          setPaymentStatus("completed");
+          toast({ title: "Payment Completed", description: "Payment was already captured." });
+          setTimeout(() => { setPendingPayment(null); setPaymentStatus(""); }, 3000);
+        } else if (data.status === "requires_payment_method") {
+          if (pollingRef.current) clearInterval(pollingRef.current);
+          pollingRef.current = null;
+          setPaymentStatus("capture_failed");
+          toast({
+            title: "Payment Failed",
+            description: "Card was declined or removed. Please try again.",
+            variant: "destructive",
+          });
+          setTimeout(() => { setPendingPayment(null); setPaymentStatus(""); }, 5000);
+        }
+      } catch {
+      } finally {
+        isPolling = false;
+      }
+    };
+
+    pollingRef.current = setInterval(poll, 2000);
+  };
+
+  const cancelPendingPayment = async () => {
+    if (!pendingPayment || !selectedReaderId) return;
+    try {
+      await apiRequest("POST", `/api/terminal/readers/${selectedReaderId}/cancel`, {
+        restaurantId: restaurant.id,
+      });
+      if (pollingRef.current) clearInterval(pollingRef.current);
+      pollingRef.current = null;
+      setPendingPayment(null);
+      setPaymentStatus("");
+      toast({ title: "Payment cancelled" });
+    } catch {
+      toast({ title: t("common.error"), description: "Failed to cancel", variant: "destructive" });
+    }
+  };
 
   const readersQuery = useQuery<{ readers: any[] }>({
     queryKey: ["/api/terminal/readers", restaurant.id],
@@ -1371,23 +1484,31 @@ function TerminalSettings({ restaurant }: { restaurant: Restaurant }) {
       return res.json();
     },
     onSuccess: (data: any) => {
+      const selectedReader = readers.find((r: any) => r.id === selectedReaderId);
+      const readerName = selectedReader?.label || selectedReader?.deviceType || selectedReaderId;
+
       if (data.readerAction && !data.readerAction.error) {
-        const selectedReader = readers.find((r: any) => r.id === selectedReaderId);
-        const readerName = selectedReader?.label || selectedReader?.deviceType || selectedReaderId;
+        setPendingPayment({
+          paymentIntentId: data.paymentIntentId,
+          amount: chargeAmount,
+          description: chargeDescription || "In-person payment",
+          readerLabel: readerName,
+        });
+        startPolling(data.paymentIntentId);
         toast({
-          title: t("terminal.chargeCreated"),
-          description: `Payment sent to "${readerName}". The customer can now tap or insert their card.`,
+          title: "Payment Sent to Reader",
+          description: `Waiting for customer to tap or insert card on "${readerName}"...`,
         });
       } else if (data.readerAction?.error) {
         toast({
-          title: t("terminal.chargeCreated"),
-          description: `Payment intent created (${data.paymentIntentId}), but failed to send to reader: ${data.readerAction.error}`,
+          title: t("common.error"),
+          description: `Payment created but failed to send to reader: ${data.readerAction.error}`,
           variant: "destructive",
         });
       } else {
         toast({
           title: t("terminal.chargeCreated"),
-          description: `${t("terminal.paymentIntentId")}: ${data.paymentIntentId}. Select a reader to collect payment.`,
+          description: `${t("terminal.paymentIntentId")}: ${data.paymentIntentId}`,
         });
       }
       setChargeAmount("");
@@ -1590,7 +1711,7 @@ function TerminalSettings({ restaurant }: { restaurant: Restaurant }) {
                     </p>
                   )}
                 </div>
-                {chargeAmount && parseFloat(chargeAmount) >= 0.5 && (
+                {chargeAmount && parseFloat(chargeAmount) >= 0.5 && !pendingPayment && (
                   <div className="mt-3 p-3 border rounded-md bg-muted/30">
                     <div className="flex items-center justify-between gap-4 text-sm flex-wrap">
                       <span>Total: <strong>${parseFloat(chargeAmount).toFixed(2)}</strong></span>
@@ -1598,16 +1719,97 @@ function TerminalSettings({ restaurant }: { restaurant: Restaurant }) {
                     </div>
                   </div>
                 )}
-                <Button
-                  onClick={() => createCharge.mutate()}
-                  disabled={createCharge.isPending || !chargeAmount || parseFloat(chargeAmount) < 0.5 || !selectedReaderId}
-                  className="mt-3"
-                  data-testid="button-create-terminal-charge"
-                >
-                  {createCharge.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                  <CreditCard className="h-4 w-4 mr-2" />
-                  Send Payment to Reader
-                </Button>
+
+                {pendingPayment ? (
+                  <div className="mt-3 p-4 border rounded-md" data-testid="terminal-pending-payment">
+                    {paymentStatus === "waiting_for_card" && (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-3">
+                          <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                          <div>
+                            <p className="font-medium">Waiting for card...</p>
+                            <p className="text-sm text-muted-foreground">
+                              Customer should tap or insert card on "{pendingPayment.readerLabel}"
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between gap-4 text-sm p-2 bg-muted/30 rounded flex-wrap">
+                          <span>Amount: <strong>${parseFloat(pendingPayment.amount).toFixed(2)}</strong></span>
+                          <span className="text-muted-foreground">{pendingPayment.description}</span>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={cancelPendingPayment}
+                          data-testid="button-cancel-terminal-payment"
+                        >
+                          Cancel Payment
+                        </Button>
+                      </div>
+                    )}
+                    {paymentStatus === "capturing" && (
+                      <div className="flex items-center gap-3">
+                        <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                        <div>
+                          <p className="font-medium">Card detected - capturing payment...</p>
+                          <p className="text-sm text-muted-foreground">Please wait while we finalize the transaction.</p>
+                        </div>
+                      </div>
+                    )}
+                    {paymentStatus === "completed" && (
+                      <div className="flex items-center gap-3">
+                        <CheckCircle2 className="h-5 w-5 text-green-600" />
+                        <div>
+                          <p className="font-medium text-green-600">Payment Completed</p>
+                          <p className="text-sm text-muted-foreground">
+                            ${parseFloat(pendingPayment.amount).toFixed(2)} captured successfully.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    {paymentStatus === "capture_failed" && (
+                      <div className="flex items-center gap-3">
+                        <AlertCircle className="h-5 w-5 text-destructive" />
+                        <div>
+                          <p className="font-medium text-destructive">Capture Failed</p>
+                          <p className="text-sm text-muted-foreground">
+                            The payment was authorized but failed to capture. Please try again.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    {paymentStatus === "cancelled" && (
+                      <div className="flex items-center gap-3">
+                        <AlertCircle className="h-5 w-5 text-muted-foreground" />
+                        <div>
+                          <p className="font-medium">Payment Cancelled</p>
+                        </div>
+                      </div>
+                    )}
+                    {paymentStatus === "timed_out" && (
+                      <div className="flex items-center gap-3">
+                        <AlertCircle className="h-5 w-5 text-destructive" />
+                        <div>
+                          <p className="font-medium text-destructive">Payment Timed Out</p>
+                          <p className="text-sm text-muted-foreground">
+                            No card was detected within 5 minutes. The payment intent is still open in Stripe.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <Button
+                    onClick={() => createCharge.mutate()}
+                    disabled={createCharge.isPending || !chargeAmount || parseFloat(chargeAmount) < 0.5 || !selectedReaderId}
+                    className="mt-3"
+                    data-testid="button-create-terminal-charge"
+                  >
+                    {createCharge.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    Send Payment to Reader
+                  </Button>
+                )}
               </div>
             </>
           )}
