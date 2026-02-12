@@ -1309,6 +1309,7 @@ function TerminalSettings({ restaurant }: { restaurant: Restaurant }) {
   const { toast } = useToast();
   const [chargeAmount, setChargeAmount] = useState("");
   const [chargeDescription, setChargeDescription] = useState("");
+  const [chargeCustomerEmail, setChargeCustomerEmail] = useState("");
   const [postalCode, setPostalCode] = useState("");
   const [selectedReaderId, setSelectedReaderId] = useState("");
   const [pendingPayment, setPendingPayment] = useState<{
@@ -1517,6 +1518,7 @@ function TerminalSettings({ restaurant }: { restaurant: Restaurant }) {
         amount: chargeAmount,
         description: chargeDescription || undefined,
         readerId: selectedReaderId || undefined,
+        customerEmail: chargeCustomerEmail || undefined,
       });
       return res.json();
     },
@@ -1740,6 +1742,21 @@ function TerminalSettings({ restaurant }: { restaurant: Restaurant }) {
                       data-testid="input-terminal-description"
                     />
                   </div>
+                </div>
+                <div className="mt-3">
+                  <Label htmlFor="terminal-customer-email">{t("terminal.customerEmail")}</Label>
+                  <Input
+                    id="terminal-customer-email"
+                    type="email"
+                    placeholder={t("terminal.customerEmailPlaceholder") || "customer@email.com (optional)"}
+                    value={chargeCustomerEmail}
+                    onChange={(e) => setChargeCustomerEmail(e.target.value)}
+                    className="mt-1.5"
+                    data-testid="input-terminal-customer-email"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {t("terminal.customerEmailHint") || "Enter customer email to send a receipt after payment"}
+                  </p>
                 </div>
                 <div className="mt-3">
                   <Label>Send to Reader</Label>

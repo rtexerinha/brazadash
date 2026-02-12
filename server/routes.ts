@@ -2732,7 +2732,7 @@ export async function registerRoutes(
   app.post("/api/terminal/payment-intents", isAuthenticated, isApprovedVendor, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { restaurantId, amount, description, readerId } = req.body;
+      const { restaurantId, amount, description, readerId, customerEmail } = req.body;
 
       if (!restaurantId || !amount) {
         return res.status(400).json({ message: "restaurantId and amount are required" });
@@ -2769,6 +2769,7 @@ export async function registerRoutes(
           type: "terminal_in_person",
           description: desc,
           platformFee: platformFee.toString(),
+          ...(customerEmail ? { customerEmail } : {}),
         },
       });
 
@@ -2950,6 +2951,53 @@ export async function registerRoutes(
 
       const captured = await stripe.paymentIntents.capture(paymentIntentId);
       const tipAmount = (captured as any).amount_details?.tip?.amount || 0;
+
+      const desc = captured.metadata?.description || "In-person payment";
+      const restaurantName = captured.metadata?.restaurantName || restaurant.name;
+      const totalCents = captured.amount;
+      const tipCents = tipAmount;
+      const subtotalCents = totalCents - tipCents;
+
+      try {
+        const customerEmail = captured.metadata?.customerEmail;
+        const order = await storage.createOrder({
+          customerId: `terminal_${userId}`,
+          restaurantId: restaurantId,
+          status: "delivered",
+          items: [{ name: desc, price: (subtotalCents / 100).toFixed(2), quantity: 1 }],
+          subtotal: (subtotalCents / 100).toFixed(2),
+          deliveryFee: "0.00",
+          tip: (tipCents / 100).toFixed(2),
+          total: (totalCents / 100).toFixed(2),
+          deliveryAddress: "In-person (Terminal)",
+          notes: `Terminal payment - ${captured.id}${customerEmail ? ` - ${customerEmail}` : ""}`,
+          stripeSessionId: captured.id,
+        });
+
+        if (customerEmail) {
+          void (async () => {
+            try {
+              await sendOrderReceiptEmail({
+                orderId: order.id,
+                customerEmail,
+                customerName: "Customer",
+                restaurantName,
+                items: [{ name: desc, price: (subtotalCents / 100).toFixed(2), quantity: 1 }],
+                subtotal: (subtotalCents / 100).toFixed(2),
+                deliveryFee: "0.00",
+                tip: (tipCents / 100).toFixed(2),
+                total: (totalCents / 100).toFixed(2),
+                deliveryAddress: "In-person (Terminal)",
+                orderDate: new Date(),
+              });
+            } catch (emailErr) {
+              console.error("Failed to send terminal receipt email:", emailErr);
+            }
+          })();
+        }
+      } catch (orderErr) {
+        console.error("Failed to create order for terminal payment:", orderErr);
+      }
 
       res.json({
         status: captured.status,

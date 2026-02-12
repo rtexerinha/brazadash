@@ -197,10 +197,10 @@ export const api = {
   getTerminalReaders: (restaurantId: string) =>
     request<{ readers: TerminalReader[] }>(`/api/terminal/readers?restaurantId=${restaurantId}`),
 
-  createTerminalPaymentIntent: (restaurantId: string, amount: string, description?: string, readerId?: string) =>
+  createTerminalPaymentIntent: (restaurantId: string, amount: string, description?: string, readerId?: string, customerEmail?: string) =>
     request<TerminalPaymentIntent>("/api/terminal/payment-intents", {
       method: "POST",
-      body: JSON.stringify({ restaurantId, amount, description, readerId }),
+      body: JSON.stringify({ restaurantId, amount, description, readerId, customerEmail }),
     }),
 
   checkTerminalPaymentStatus: (paymentIntentId: string) =>

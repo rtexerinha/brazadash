@@ -81,6 +81,7 @@ export default function VendorTerminalScreen() {
   const [postalCode, setPostalCode] = useState("");
   const [chargeAmount, setChargeAmount] = useState("");
   const [chargeDescription, setChargeDescription] = useState("");
+  const [chargeCustomerEmail, setChargeCustomerEmail] = useState("");
   const [isDiscovering, setIsDiscovering] = useState(false);
   const [discoveredReaders, setDiscoveredReaders] = useState<DiscoveredReader[]>([]);
   const [activeTab, setActiveTab] = useState<'registered' | 'discover'>('registered');
@@ -288,7 +289,7 @@ export default function VendorTerminalScreen() {
   };
 
   const chargeMutation = useMutation({
-    mutationFn: () => api.createTerminalPaymentIntent(restaurant!.id, chargeAmount, chargeDescription || undefined, selectedReaderId || undefined),
+    mutationFn: () => api.createTerminalPaymentIntent(restaurant!.id, chargeAmount, chargeDescription || undefined, selectedReaderId || undefined, chargeCustomerEmail || undefined),
     onSuccess: (data: any) => {
       const selectedReader = readers.find((r: any) => r.id === selectedReaderId);
       const readerName = selectedReader?.label || selectedReader?.deviceType || "reader";
@@ -538,6 +539,17 @@ export default function VendorTerminalScreen() {
                 value={chargeDescription}
                 onChangeText={setChargeDescription}
               />
+
+              <Text style={[styles.inputLabel, { marginTop: spacing.md }]}>Customer Email (optional)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="customer@email.com"
+                value={chargeCustomerEmail}
+                onChangeText={setChargeCustomerEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+              <Text style={[styles.feeDetail, { marginTop: 4 }]}>Enter customer email to send a receipt after payment</Text>
 
               <Text style={[styles.inputLabel, { marginTop: spacing.md }]}>Send to Reader</Text>
               {onlineReaders.length === 0 ? (
