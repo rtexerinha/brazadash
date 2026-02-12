@@ -1371,6 +1371,7 @@ function TerminalSettings({ restaurant }: { restaurant: Restaurant }) {
             const tip = captureData.tipAmount || 0;
             setCapturedTipAmount(tip);
             setPaymentStatus("completed");
+            queryClient.invalidateQueries({ queryKey: ["/api/vendor/restaurants", restaurant.id, "orders"] });
             const tipText = tip > 0 ? ` (includes $${(tip / 100).toFixed(2)} tip)` : "";
             toast({
               title: "Payment Completed",
@@ -1430,6 +1431,7 @@ function TerminalSettings({ restaurant }: { restaurant: Restaurant }) {
       const tip = captureData.tipAmount || 0;
       setCapturedTipAmount(tip);
       setPaymentStatus("completed");
+      queryClient.invalidateQueries({ queryKey: ["/api/vendor/restaurants", restaurant.id, "orders"] });
       const tipText = tip > 0 ? ` (includes $${(tip / 100).toFixed(2)} tip)` : "";
       toast({
         title: "Payment Completed",
