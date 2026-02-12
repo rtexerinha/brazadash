@@ -277,6 +277,7 @@ export async function setupAuth(app: Express) {
         console.error("Mobile auth callback: session keys:", Object.keys(req.session || {}));
         return res.redirect("brazadash://oauth-callback?error=no_user");
       }
+      console.log("Mobile auth callback: user authenticated successfully, sub:", (user as any)?.claims?.sub);
       req.logIn(user, (loginErr) => {
         if (loginErr) {
           console.error("Mobile auth login error:", loginErr);
@@ -290,6 +291,7 @@ export async function setupAuth(app: Express) {
           const authCode = crypto.randomBytes(32).toString("hex");
           const signedSid = "s:" + cookieSignature.sign(req.sessionID, process.env.SESSION_SECRET!);
           const sessionCookie = `connect.sid=${encodeURIComponent(signedSid)}`;
+          console.log("Mobile auth: generated auth code, sessionID:", req.sessionID, "cookie length:", sessionCookie.length);
           mobileAuthCodes.set(authCode, {
             sessionID: req.sessionID,
             cookie: sessionCookie,
@@ -309,9 +311,11 @@ export async function setupAuth(app: Express) {
     cleanExpiredCodes();
     const data = mobileAuthCodes.get(code);
     if (!data) {
+      console.log("Mobile exchange-code: invalid/expired code. Active codes:", mobileAuthCodes.size);
       return res.status(401).json({ error: "Invalid or expired auth code" });
     }
     mobileAuthCodes.delete(code);
+    console.log("Mobile exchange-code: success, cookie length:", data.cookie.length, "sessionID:", data.sessionID);
     res.json({ session: data.cookie });
   });
 

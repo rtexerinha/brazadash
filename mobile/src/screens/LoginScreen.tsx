@@ -25,6 +25,7 @@ export default function LoginScreen() {
   const [authenticating, setAuthenticating] = useState(false);
 
   const handleAuthResult = async (result: WebBrowser.WebBrowserAuthSessionResult) => {
+    console.log("Auth result type:", result.type, "url:", (result as any).url || "none");
     if (result.type === "success" && result.url) {
       const url = new URL(result.url);
       const error = url.searchParams.get("error");
@@ -35,32 +36,44 @@ export default function LoginScreen() {
       }
 
       const authCode = url.searchParams.get("code");
-      if (authCode) {
-        try {
-          const sessionCookie = await api.exchangeAuthCode(authCode);
-          if (sessionCookie) {
-            await setSessionCookie(sessionCookie);
-          }
-        } catch {
-          Alert.alert("Login Failed", "Could not complete authentication. Please try again.");
-          setAuthenticating(false);
-          return;
+      if (!authCode) {
+        Alert.alert("Login Failed", "No authentication code received. Please try again.");
+        setAuthenticating(false);
+        return;
+      }
+
+      let sessionCookie: string | null = null;
+      try {
+        sessionCookie = await api.exchangeAuthCode(authCode);
+        if (sessionCookie) {
+          await setSessionCookie(sessionCookie);
+          console.log("Session cookie stored, length:", sessionCookie.length);
+        } else {
+          console.log("Warning: empty session cookie received");
         }
+      } catch (e: any) {
+        console.log("Exchange code error:", e?.message);
+        Alert.alert("Login Failed", "Could not complete authentication. Please try again.");
+        setAuthenticating(false);
+        return;
       }
 
       try {
         const newProfile = await api.getMobileProfile();
+        console.log("Profile fetched:", newProfile?.email, "roles:", newProfile?.roles);
         if (!newProfile.roles || newProfile.roles.length === 0) {
           navigation.replace("Onboarding");
         } else {
           setAuthenticated(newProfile);
           navigation.goBack();
         }
-      } catch {
-        Alert.alert("Login Failed", "Could not authenticate. Please try again.");
+      } catch (e: any) {
+        console.log("Get profile error:", e?.message);
+        Alert.alert("Login Failed", "Could not load your profile. Please try again.");
         setAuthenticating(false);
       }
     } else {
+      console.log("Auth dismissed or cancelled, type:", result.type);
       setAuthenticating(false);
     }
   };

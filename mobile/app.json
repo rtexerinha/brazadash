@@ -6,6 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "scheme": "brazadash",
     "splash": {
       "backgroundColor": "#1B9B59",
       "resizeMode": "contain"
@@ -27,7 +28,18 @@
       "adaptiveIcon": {
         "backgroundColor": "#1B9B59"
       },
-      "package": "com.brazadash.app"
+      "package": "com.brazadash.app",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "brazadash"
+            }
+          ],
+          "category": ["DEFAULT", "BROWSABLE"]
+        }
+      ]
     },
     "plugins": [
       "expo-secure-store",
