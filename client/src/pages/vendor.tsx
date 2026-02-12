@@ -1374,10 +1374,11 @@ function TerminalSettings({ restaurant }: { restaurant: Restaurant }) {
             });
             setTimeout(() => { setPendingPayment(null); setPaymentStatus(""); setCapturedTipAmount(0); }, 3000);
           } catch (captureErr: any) {
+            console.error("Capture error:", captureErr);
             setPaymentStatus("capture_failed");
             toast({
               title: t("common.error"),
-              description: `Failed to capture payment: ${captureErr.message || "Unknown error"}`,
+              description: "The payment was authorized but failed to capture. Please try again.",
               variant: "destructive",
             });
           }
@@ -1411,6 +1412,32 @@ function TerminalSettings({ restaurant }: { restaurant: Restaurant }) {
     };
 
     pollingRef.current = setInterval(poll, 2000);
+  };
+
+  const retryCapture = async () => {
+    if (!pendingPayment) return;
+    setPaymentStatus("capturing");
+    try {
+      const captureRes = await apiRequest("POST", `/api/terminal/payment-intents/${pendingPayment}/capture`);
+      const captureData = await captureRes.json();
+      const tip = captureData.tipAmount || 0;
+      setCapturedTipAmount(tip);
+      setPaymentStatus("completed");
+      const tipText = tip > 0 ? ` (includes $${(tip / 100).toFixed(2)} tip)` : "";
+      toast({
+        title: "Payment Completed",
+        description: `$${(captureData.amount / 100).toFixed(2)} captured successfully${tipText}.`,
+      });
+      setTimeout(() => { setPendingPayment(null); setPaymentStatus(""); setCapturedTipAmount(0); }, 3000);
+    } catch (err: any) {
+      console.error("Retry capture error:", err);
+      setPaymentStatus("capture_failed");
+      toast({
+        title: t("common.error"),
+        description: "Capture failed again. You can retry or capture manually in Stripe Dashboard.",
+        variant: "destructive",
+      });
+    }
   };
 
   const cancelPendingPayment = async () => {
@@ -1802,13 +1829,34 @@ function TerminalSettings({ restaurant }: { restaurant: Restaurant }) {
                       </div>
                     )}
                     {paymentStatus === "capture_failed" && (
-                      <div className="flex items-center gap-3">
-                        <AlertCircle className="h-5 w-5 text-destructive" />
-                        <div>
-                          <p className="font-medium text-destructive">Capture Failed</p>
-                          <p className="text-sm text-muted-foreground">
-                            The payment was authorized but failed to capture. Please try again.
-                          </p>
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <AlertCircle className="h-5 w-5 text-destructive" />
+                          <div>
+                            <p className="font-medium text-destructive">{t("terminal.captureFailed") || "Capture Failed"}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {t("terminal.captureFailedDesc") || "The payment was authorized but failed to capture. Please try again."}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={retryCapture}
+                            disabled={paymentStatus === "capturing"}
+                            data-testid="button-retry-capture"
+                          >
+                            {t("terminal.retryCapture") || "Retry Capture"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => { setPendingPayment(null); setPaymentStatus(""); }}
+                            disabled={paymentStatus === "capturing"}
+                            data-testid="button-dismiss-capture-error"
+                          >
+                            {t("common.dismiss") || "Dismiss"}
+                          </Button>
                         </div>
                       </div>
                     )}

@@ -2948,13 +2948,7 @@ export async function registerRoutes(
         });
       }
 
-      const platformFee = parseInt(paymentIntent.metadata?.platformFee || "0");
-      const captureParams: any = {};
-      if (platformFee > 0) {
-        captureParams.application_fee_amount = platformFee;
-      }
-
-      const captured = await stripe.paymentIntents.capture(paymentIntentId, captureParams);
+      const captured = await stripe.paymentIntents.capture(paymentIntentId);
       const tipAmount = (captured as any).amount_details?.tip?.amount || 0;
 
       res.json({

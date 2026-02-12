@@ -627,6 +627,10 @@ const translations: Record<Language, Record<string, string>> = {
     "terminal.tippingEnabled": "Tipping enabled",
     "terminal.tippingDisabled": "Tipping disabled",
     "terminal.tipIncluded": "Tip included",
+    "terminal.captureFailed": "Capture Failed",
+    "terminal.captureFailedDesc": "The payment was authorized but failed to capture. Please try again.",
+    "terminal.retryCapture": "Retry Capture",
+    "common.dismiss": "Dismiss",
     "common.refresh": "Refresh",
   },
   pt: {
@@ -1248,6 +1252,10 @@ const translations: Record<Language, Record<string, string>> = {
     "terminal.tippingEnabled": "Gorjeta ativada",
     "terminal.tippingDisabled": "Gorjeta desativada",
     "terminal.tipIncluded": "Gorjeta incluida",
+    "terminal.captureFailed": "Captura Falhou",
+    "terminal.captureFailedDesc": "O pagamento foi autorizado mas nao foi capturado. Por favor, tente novamente.",
+    "terminal.retryCapture": "Tentar Novamente",
+    "common.dismiss": "Fechar",
     "common.refresh": "Atualizar",
   },
 };
