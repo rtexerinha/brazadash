@@ -595,6 +595,18 @@ function VendorDashboard({ restaurant }: { restaurant: Restaurant }) {
         </TabsList>
 
         <TabsContent value="orders" className="mt-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold">{t("vendor.orders")}</h3>
+            <Button
+              variant="outline"
+              size="sm"
+              data-testid="button-refresh-orders"
+              onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/vendor/restaurants", restaurant.id, "orders"] })}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${ordersLoading ? "animate-spin" : ""}`} />
+              {t("common.refresh") || "Refresh"}
+            </Button>
+          </div>
           {ordersLoading ? (
             <div className="space-y-4">
               {[...Array(3)].map((_, i) => (
