@@ -77,6 +77,13 @@ async function upsertUser(claims: any) {
 
 export async function setupAuth(app: Express) {
   app.set("trust proxy", 1);
+  app.use((req, _res, next) => {
+    const mobileSession = req.headers["x-session-cookie"] as string;
+    if (mobileSession && (!req.headers.cookie || !req.headers.cookie.includes("connect.sid"))) {
+      req.headers.cookie = mobileSession + (req.headers.cookie ? "; " + req.headers.cookie : "");
+    }
+    next();
+  });
   app.use(getSession());
   app.use(passport.initialize());
   app.use(passport.session());

@@ -30,6 +30,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   };
   if (cookie) {
     headers["Cookie"] = cookie;
+    headers["X-Session-Cookie"] = cookie;
   }
 
   const res = await fetch(`${API_BASE}${path}`, {
