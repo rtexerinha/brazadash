@@ -352,8 +352,19 @@ export async function setupAuth(app: Express) {
 
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
   const user = req.user as any;
+  const isMobileReq = !!req.headers["x-session-cookie"];
 
-  if (!req.isAuthenticated() || !user.expires_at) {
+  if (!req.isAuthenticated() || !user?.expires_at) {
+    if (isMobileReq) {
+      console.log("Mobile auth failed:", {
+        isAuthenticated: req.isAuthenticated(),
+        hasUser: !!user,
+        hasExpiresAt: !!user?.expires_at,
+        sessionID: req.sessionID,
+        hasCookie: !!req.headers.cookie?.includes("connect.sid"),
+        hasXSessionCookie: !!req.headers["x-session-cookie"],
+      });
+    }
     return res.status(401).json({ message: "Unauthorized" });
   }
 
@@ -362,8 +373,13 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     return next();
   }
 
+  if (isMobileReq) {
+    console.log("Mobile auth: token expired, attempting refresh. sub:", user.claims?.sub);
+  }
+
   const refreshToken = user.refresh_token;
   if (!refreshToken) {
+    if (isMobileReq) console.log("Mobile auth: no refresh token available");
     res.status(401).json({ message: "Unauthorized" });
     return;
   }
@@ -372,8 +388,10 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     const config = await getOidcConfig();
     const tokenResponse = await client.refreshTokenGrant(config, refreshToken);
     updateUserSession(user, tokenResponse);
+    if (isMobileReq) console.log("Mobile auth: token refreshed successfully");
     return next();
-  } catch (error) {
+  } catch (error: any) {
+    if (isMobileReq) console.log("Mobile auth: token refresh failed:", error?.message);
     res.status(401).json({ message: "Unauthorized" });
     return;
   }
