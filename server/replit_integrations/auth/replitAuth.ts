@@ -1,6 +1,9 @@
 import * as client from "openid-client";
 import { Strategy, type VerifyFunction } from "openid-client/passport";
 import crypto from "crypto";
+import { createRequire } from "module";
+const _require = createRequire(import.meta.url);
+const cookieSignature = _require("cookie-signature");
 
 import passport from "passport";
 import session from "express-session";
@@ -279,29 +282,21 @@ export async function setupAuth(app: Express) {
           console.error("Mobile auth login error:", loginErr);
           return res.redirect("brazadash://oauth-callback?error=login_failed");
         }
-        cleanExpiredCodes();
-        const authCode = crypto.randomBytes(32).toString("hex");
-        let sessionCookie = "";
-        const cookies = res.getHeader("set-cookie");
-        if (cookies) {
-          const cookieArray = Array.isArray(cookies) ? cookies : [cookies as string];
-          const connectCookie = cookieArray.find((c) => c.toString().startsWith("connect.sid="));
-          if (connectCookie) {
-            sessionCookie = connectCookie.toString().split(";")[0];
+        req.session.save((saveErr) => {
+          if (saveErr) {
+            console.error("Mobile session save error:", saveErr);
           }
-        }
-        if (!sessionCookie && req.headers.cookie) {
-          const match = req.headers.cookie.match(/connect\.sid=([^;]+)/);
-          if (match) {
-            sessionCookie = `connect.sid=${match[1]}`;
-          }
-        }
-        mobileAuthCodes.set(authCode, {
-          sessionID: req.sessionID,
-          cookie: sessionCookie,
-          expiresAt: Date.now() + 60 * 1000,
+          cleanExpiredCodes();
+          const authCode = crypto.randomBytes(32).toString("hex");
+          const signedSid = "s:" + cookieSignature.sign(req.sessionID, process.env.SESSION_SECRET!);
+          const sessionCookie = `connect.sid=${encodeURIComponent(signedSid)}`;
+          mobileAuthCodes.set(authCode, {
+            sessionID: req.sessionID,
+            cookie: sessionCookie,
+            expiresAt: Date.now() + 60 * 1000,
+          });
+          return res.redirect(`brazadash://oauth-callback?code=${authCode}`);
         });
-        return res.redirect(`brazadash://oauth-callback?code=${authCode}`);
       });
     })(req, res, next);
   });
