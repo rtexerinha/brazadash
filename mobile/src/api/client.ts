@@ -182,6 +182,12 @@ export const api = {
       body: JSON.stringify({ restaurantId, terminalEnabled }),
     }),
 
+  updateTerminalSettings: (restaurantId: string, terminalEnabled?: boolean, terminalTippingEnabled?: boolean) =>
+    request("/api/terminal/settings", {
+      method: "PATCH",
+      body: JSON.stringify({ restaurantId, ...(terminalEnabled !== undefined && { terminalEnabled }), ...(terminalTippingEnabled !== undefined && { terminalTippingEnabled }) }),
+    }),
+
   setupTerminalLocation: (restaurantId: string, postalCode: string) =>
     request<{ locationId: string }>("/api/terminal/locations", {
       method: "POST",

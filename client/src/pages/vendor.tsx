@@ -1318,6 +1318,7 @@ function TerminalSettings({ restaurant }: { restaurant: Restaurant }) {
     readerLabel: string;
   } | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<string>("");
+  const [capturedTipAmount, setCapturedTipAmount] = useState<number>(0);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -1363,12 +1364,15 @@ function TerminalSettings({ restaurant }: { restaurant: Restaurant }) {
           try {
             const captureRes = await apiRequest("POST", `/api/terminal/payment-intents/${paymentIntentId}/capture`);
             const captureData = await captureRes.json();
+            const tip = captureData.tipAmount || 0;
+            setCapturedTipAmount(tip);
             setPaymentStatus("completed");
+            const tipText = tip > 0 ? ` (includes $${(tip / 100).toFixed(2)} tip)` : "";
             toast({
               title: "Payment Completed",
-              description: `$${(captureData.amount / 100).toFixed(2)} payment captured successfully.`,
+              description: `$${(captureData.amount / 100).toFixed(2)} captured successfully${tipText}.`,
             });
-            setTimeout(() => { setPendingPayment(null); setPaymentStatus(""); }, 3000);
+            setTimeout(() => { setPendingPayment(null); setPaymentStatus(""); setCapturedTipAmount(0); }, 3000);
           } catch (captureErr: any) {
             setPaymentStatus("capture_failed");
             toast({
@@ -1548,6 +1552,31 @@ function TerminalSettings({ restaurant }: { restaurant: Restaurant }) {
 
           {restaurant.terminalEnabled && (
             <>
+              <div className="border-t pt-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <Label className="text-base">{t("terminal.tipping")}</Label>
+                    <p className="text-sm text-muted-foreground">{t("terminal.tippingDesc")}</p>
+                  </div>
+                  <Switch
+                    checked={restaurant.terminalTippingEnabled !== false}
+                    onCheckedChange={async (checked) => {
+                      try {
+                        await apiRequest("PATCH", "/api/terminal/settings", {
+                          restaurantId: restaurant.id,
+                          terminalTippingEnabled: checked,
+                        });
+                        queryClient.invalidateQueries({ queryKey: ["/api/vendor/restaurants"] });
+                        toast({ title: checked ? t("terminal.tippingEnabled") : t("terminal.tippingDisabled") });
+                      } catch {
+                        toast({ title: t("common.error"), description: t("terminal.settingsUpdateFailed"), variant: "destructive" });
+                      }
+                    }}
+                    data-testid="switch-terminal-tipping"
+                  />
+                </div>
+              </div>
+
               <div className="border-t pt-4">
                 <div className="flex items-center justify-between gap-4 flex-wrap">
                   <div>
@@ -1764,6 +1793,11 @@ function TerminalSettings({ restaurant }: { restaurant: Restaurant }) {
                           <p className="text-sm text-muted-foreground">
                             ${parseFloat(pendingPayment.amount).toFixed(2)} captured successfully.
                           </p>
+                          {capturedTipAmount > 0 && (
+                            <p className="text-sm text-green-600 font-medium">
+                              {t("terminal.tipIncluded")}: ${(capturedTipAmount / 100).toFixed(2)}
+                            </p>
+                          )}
                         </div>
                       </div>
                     )}

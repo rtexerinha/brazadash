@@ -37,6 +37,8 @@ export const restaurants = pgTable("restaurants", {
   venmoInfo: varchar("venmo_info", { length: 255 }),
   terminalEnabled: boolean("terminal_enabled").default(false),
   terminalLocationId: varchar("terminal_location_id", { length: 255 }),
+  terminalTippingEnabled: boolean("terminal_tipping_enabled").default(true),
+  terminalConfigurationId: varchar("terminal_configuration_id", { length: 255 }),
   isOpen: boolean("is_open").default(true),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),

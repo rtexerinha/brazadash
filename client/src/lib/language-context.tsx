@@ -622,6 +622,11 @@ const translations: Record<Language, Record<string, string>> = {
     "terminal.chargeCreated": "Payment intent created",
     "terminal.paymentIntentId": "Payment Intent ID",
     "terminal.chargeCreateFailed": "Failed to create payment intent",
+    "terminal.tipping": "On-Reader Tipping",
+    "terminal.tippingDesc": "Show tip options (15%, 20%, 25%) on the card reader screen before collecting payment.",
+    "terminal.tippingEnabled": "Tipping enabled",
+    "terminal.tippingDisabled": "Tipping disabled",
+    "terminal.tipIncluded": "Tip included",
     "common.refresh": "Refresh",
   },
   pt: {
@@ -1238,6 +1243,11 @@ const translations: Record<Language, Record<string, string>> = {
     "terminal.chargeCreated": "Intencao de pagamento criada",
     "terminal.paymentIntentId": "ID da Intencao de Pagamento",
     "terminal.chargeCreateFailed": "Falha ao criar intencao de pagamento",
+    "terminal.tipping": "Gorjeta no Leitor",
+    "terminal.tippingDesc": "Mostrar opcoes de gorjeta (15%, 20%, 25%) na tela do leitor de cartao antes de cobrar.",
+    "terminal.tippingEnabled": "Gorjeta ativada",
+    "terminal.tippingDisabled": "Gorjeta desativada",
+    "terminal.tipIncluded": "Gorjeta incluida",
     "common.refresh": "Atualizar",
   },
 };

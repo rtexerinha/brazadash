@@ -2577,6 +2577,16 @@ export async function registerRoutes(
       cityName = cityName.replace(/,?\s*CA\s*$/i, "").trim() || "Unknown";
 
       const stripe = await getUncachableStripeClient();
+
+      const tippingConfig = await stripe.terminal.configurations.create({
+        tipping: {
+          usd: {
+            percentages: [15, 20, 25],
+            smart_tip_threshold: 1000,
+          },
+        },
+      });
+
       const location = await stripe.terminal.locations.create({
         display_name: restaurant.name,
         address: {
@@ -2586,14 +2596,17 @@ export async function registerRoutes(
           country: "US",
           postal_code: zipCode,
         },
+        configuration_overrides: tippingConfig.id,
       });
 
       await storage.updateRestaurant(restaurantId, {
         terminalLocationId: location.id,
+        terminalConfigurationId: tippingConfig.id,
+        terminalTippingEnabled: true,
         terminalEnabled: true,
       });
 
-      res.json({ locationId: location.id });
+      res.json({ locationId: location.id, configurationId: tippingConfig.id });
     } catch (error: any) {
       console.error("Error creating terminal location:", error);
       res.status(500).json({ message: "Failed to create terminal location" });
@@ -2692,12 +2705,37 @@ export async function registerRoutes(
         },
       });
 
+      if (restaurant.terminalTippingEnabled !== false && !restaurant.terminalConfigurationId && restaurant.terminalLocationId) {
+        try {
+          const tippingConfig = await stripe.terminal.configurations.create({
+            tipping: { usd: { percentages: [15, 20, 25], smart_tip_threshold: 1000 } },
+          });
+          await stripe.terminal.locations.update(restaurant.terminalLocationId, {
+            configuration_overrides: tippingConfig.id,
+          });
+          await storage.updateRestaurant(restaurantId, { terminalConfigurationId: tippingConfig.id });
+          (restaurant as any).terminalConfigurationId = tippingConfig.id;
+        } catch (configErr: any) {
+          console.error("Error creating tipping config for existing location:", configErr.message);
+        }
+      }
+
       let readerAction = null;
       if (readerId) {
         try {
-          const reader = await stripe.terminal.readers.processPaymentIntent(readerId, {
+          const processParams: any = {
             payment_intent: paymentIntent.id,
-          });
+          };
+          if (restaurant.terminalTippingEnabled !== false) {
+            processParams.process_config = {
+              skip_tipping: false,
+            };
+          } else {
+            processParams.process_config = {
+              skip_tipping: true,
+            };
+          }
+          const reader = await stripe.terminal.readers.processPaymentIntent(readerId, processParams);
           readerAction = {
             readerId: reader.id,
             status: reader.action?.status || "in_progress",
@@ -2738,9 +2776,15 @@ export async function registerRoutes(
       }
 
       const stripe = await getUncachableStripeClient();
-      const reader = await stripe.terminal.readers.processPaymentIntent(readerId, {
+      const processParams: any = {
         payment_intent: paymentIntentId,
-      });
+      };
+      if (restaurant.terminalTippingEnabled !== false) {
+        processParams.process_config = { skip_tipping: false };
+      } else {
+        processParams.process_config = { skip_tipping: true };
+      }
+      const reader = await stripe.terminal.readers.processPaymentIntent(readerId, processParams);
 
       res.json({
         readerId: reader.id,
@@ -2796,10 +2840,13 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Forbidden" });
       }
 
+      const tipAmount = (paymentIntent as any).amount_details?.tip?.amount || 0;
+
       res.json({
         id: paymentIntent.id,
         status: paymentIntent.status,
         amount: paymentIntent.amount,
+        tipAmount,
         description: paymentIntent.description,
         metadata: paymentIntent.metadata,
       });
@@ -2841,10 +2888,12 @@ export async function registerRoutes(
       }
 
       const captured = await stripe.paymentIntents.capture(paymentIntentId, captureParams);
+      const tipAmount = (captured as any).amount_details?.tip?.amount || 0;
 
       res.json({
         status: captured.status,
         amount: captured.amount,
+        tipAmount,
         id: captured.id,
         description: captured.description,
       });
@@ -2857,7 +2906,7 @@ export async function registerRoutes(
   app.patch("/api/terminal/settings", isAuthenticated, isApprovedVendor, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { restaurantId, terminalEnabled } = req.body;
+      const { restaurantId, terminalEnabled, terminalTippingEnabled } = req.body;
 
       if (!restaurantId) return res.status(400).json({ message: "restaurantId is required" });
 
@@ -2866,9 +2915,11 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Forbidden" });
       }
 
-      const updated = await storage.updateRestaurant(restaurantId, {
-        terminalEnabled: !!terminalEnabled,
-      });
+      const updateData: any = {};
+      if (terminalEnabled !== undefined) updateData.terminalEnabled = !!terminalEnabled;
+      if (terminalTippingEnabled !== undefined) updateData.terminalTippingEnabled = !!terminalTippingEnabled;
+
+      const updated = await storage.updateRestaurant(restaurantId, updateData);
 
       res.json(updated);
     } catch (error: any) {

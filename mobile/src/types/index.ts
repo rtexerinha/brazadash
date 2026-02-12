@@ -16,6 +16,8 @@ export interface Restaurant {
   isActive: boolean;
   terminalEnabled?: boolean;
   terminalLocationId?: string | null;
+  terminalTippingEnabled?: boolean;
+  terminalConfigurationId?: string | null;
   createdAt: string;
 }
 

@@ -92,6 +92,7 @@ export default function VendorTerminalScreen() {
     readerLabel: string;
   } | null>(null);
   const [paymentStatus, setPaymentStatus] = useState("");
+  const [capturedTipAmount, setCapturedTipAmount] = useState<number>(0);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -228,9 +229,12 @@ export default function VendorTerminalScreen() {
           setPaymentStatus("capturing");
           try {
             const captureData = await api.captureTerminalPayment(paymentIntentId);
+            const tip = captureData.tipAmount || 0;
+            setCapturedTipAmount(tip);
             setPaymentStatus("completed");
-            Alert.alert("Payment Completed", `$${(captureData.amount / 100).toFixed(2)} captured successfully.`);
-            setTimeout(() => { setPendingPayment(null); setPaymentStatus(""); }, 3000);
+            const tipText = tip > 0 ? ` (includes $${(tip / 100).toFixed(2)} tip)` : "";
+            Alert.alert("Payment Completed", `$${(captureData.amount / 100).toFixed(2)} captured successfully${tipText}.`);
+            setTimeout(() => { setPendingPayment(null); setPaymentStatus(""); setCapturedTipAmount(0); }, 3000);
           } catch (captureErr: any) {
             setPaymentStatus("capture_failed");
             Alert.alert("Capture Failed", captureErr.message || "Failed to capture payment");
@@ -349,6 +353,26 @@ export default function VendorTerminalScreen() {
 
       {isTerminalEnabled && (
         <>
+          <SectionCard title="On-Reader Tipping" subtitle="Show tip options (15%, 20%, 25%) on the card reader screen before collecting payment.">
+            <View style={styles.switchRow}>
+              <Text style={styles.switchLabel}>Tipping {restaurant.terminalTippingEnabled !== false ? "Enabled" : "Disabled"}</Text>
+              <Switch
+                value={restaurant.terminalTippingEnabled !== false}
+                onValueChange={async (val) => {
+                  try {
+                    await api.updateTerminalSettings(restaurant.id, undefined, val);
+                    queryClient.invalidateQueries({ queryKey: ["vendor-restaurants"] });
+                    Alert.alert(val ? "Tipping Enabled" : "Tipping Disabled", val ? "Customers will see tip options on the reader." : "Tip screen will be skipped on the reader.");
+                  } catch {
+                    Alert.alert("Error", "Failed to update tipping setting");
+                  }
+                }}
+                trackColor={{ false: colors.border, true: colors.primaryLight }}
+                thumbColor={restaurant.terminalTippingEnabled !== false ? colors.primary : colors.textTertiary}
+              />
+            </View>
+          </SectionCard>
+
           <SectionCard
             title="Terminal Location"
             subtitle={hasLocation ? `Location ID: ${restaurant.terminalLocationId}` : "Set up a location to connect card readers."}
@@ -591,6 +615,11 @@ export default function VendorTerminalScreen() {
                         <Text style={styles.pendingSubtitle}>
                           ${parseFloat(pendingPayment.amount).toFixed(2)} captured successfully.
                         </Text>
+                        {capturedTipAmount > 0 && (
+                          <Text style={[styles.pendingSubtitle, { color: colors.primary, fontWeight: "600" }]}>
+                            Tip included: ${(capturedTipAmount / 100).toFixed(2)}
+                          </Text>
+                        )}
                       </View>
                     </View>
                   )}
