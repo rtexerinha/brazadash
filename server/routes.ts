@@ -2972,33 +2972,32 @@ export async function registerRoutes(
         notes: `Terminal payment - ${captured.id}${customerEmail ? ` - ${customerEmail}` : ""}`,
         stripeSessionId: captured.id,
       };
-      console.log("Creating terminal order:", JSON.stringify(orderData));
 
+      let emailSent = false;
       try {
         const order = await storage.createOrder(orderData);
         console.log("Terminal order created:", order.id);
 
         if (customerEmail) {
-          void (async () => {
-            try {
-              await sendOrderReceiptEmail({
-                orderId: order.id,
-                customerEmail,
-                customerName: "Customer",
-                restaurantName,
-                items: [{ name: desc, price: (subtotalCents / 100).toFixed(2), quantity: 1 }],
-                subtotal: (subtotalCents / 100).toFixed(2),
-                deliveryFee: "0.00",
-                tip: (tipCents / 100).toFixed(2),
-                total: (totalCents / 100).toFixed(2),
-                deliveryAddress: "In-person (Terminal)",
-                orderDate: new Date(),
-              });
-              console.log("Terminal receipt email sent to:", customerEmail);
-            } catch (emailErr) {
-              console.error("Failed to send terminal receipt email:", emailErr);
-            }
-          })();
+          try {
+            await sendOrderReceiptEmail({
+              orderId: order.id,
+              customerEmail,
+              customerName: "Customer",
+              restaurantName,
+              items: [{ name: desc, price: (subtotalCents / 100).toFixed(2), quantity: 1 }],
+              subtotal: (subtotalCents / 100).toFixed(2),
+              deliveryFee: "0.00",
+              tip: (tipCents / 100).toFixed(2),
+              total: (totalCents / 100).toFixed(2),
+              deliveryAddress: "In-person (Terminal)",
+              orderDate: new Date(),
+            });
+            emailSent = true;
+            console.log("Terminal receipt email sent to:", customerEmail);
+          } catch (emailErr) {
+            console.error("Failed to send terminal receipt email:", emailErr);
+          }
         }
       } catch (orderErr: any) {
         console.error("Failed to create order for terminal payment:", orderErr.message, orderErr.stack);
@@ -3010,6 +3009,7 @@ export async function registerRoutes(
         tipAmount,
         id: captured.id,
         description: captured.description,
+        emailSent,
       });
     } catch (error: any) {
       console.error("Error capturing payment:", error);

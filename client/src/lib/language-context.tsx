@@ -637,7 +637,6 @@ const translations: Record<Language, Record<string, string>> = {
     "terminal.customerEmailPlaceholder": "customer@email.com (optional)",
     "terminal.customerEmailHint": "Enter customer email to send a receipt after payment",
     "common.dismiss": "Dismiss",
-    "common.refresh": "Refresh",
   },
   pt: {
     "nav.home": "Inicio",
@@ -1268,7 +1267,6 @@ const translations: Record<Language, Record<string, string>> = {
     "terminal.customerEmailPlaceholder": "cliente@email.com (opcional)",
     "terminal.customerEmailHint": "Insira o email do cliente para enviar um recibo apos o pagamento",
     "common.dismiss": "Fechar",
-    "common.refresh": "Atualizar",
   },
 };
 
