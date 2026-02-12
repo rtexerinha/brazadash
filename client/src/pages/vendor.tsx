@@ -1397,13 +1397,12 @@ function TerminalSettings({ restaurant }: { restaurant: Restaurant }) {
         } else if (data.status === "requires_payment_method") {
           if (pollingRef.current) clearInterval(pollingRef.current);
           pollingRef.current = null;
-          setPaymentStatus("capture_failed");
+          setPaymentStatus("payment_failed");
           toast({
-            title: "Payment Failed",
-            description: "Card was declined or removed. Please try again.",
+            title: t("terminal.paymentFailed") || "Payment Failed",
+            description: t("terminal.cardDeclined") || "Card was declined or removed. Please try again.",
             variant: "destructive",
           });
-          setTimeout(() => { setPendingPayment(null); setPaymentStatus(""); }, 5000);
         }
       } catch {
       } finally {
@@ -1858,6 +1857,27 @@ function TerminalSettings({ restaurant }: { restaurant: Restaurant }) {
                             {t("common.dismiss") || "Dismiss"}
                           </Button>
                         </div>
+                      </div>
+                    )}
+                    {paymentStatus === "payment_failed" && (
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <AlertCircle className="h-5 w-5 text-destructive" />
+                          <div>
+                            <p className="font-medium text-destructive">{t("terminal.paymentFailed") || "Payment Failed"}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {t("terminal.cardDeclined") || "Card was declined or removed. Please try again."}
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => { setPendingPayment(null); setPaymentStatus(""); }}
+                          data-testid="button-dismiss-payment-error"
+                        >
+                          {t("common.dismiss") || "Dismiss"}
+                        </Button>
                       </div>
                     )}
                     {paymentStatus === "cancelled" && (

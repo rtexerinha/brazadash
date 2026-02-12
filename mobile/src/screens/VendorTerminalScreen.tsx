@@ -254,7 +254,7 @@ export default function VendorTerminalScreen() {
         } else if (data.status === "requires_payment_method") {
           if (pollingRef.current) clearInterval(pollingRef.current);
           pollingRef.current = null;
-          setPaymentStatus("capture_failed");
+          setPaymentStatus("payment_failed");
           Alert.alert("Payment Failed", "Card was declined or removed. Please try again.");
           setTimeout(() => { setPendingPayment(null); setPaymentStatus(""); }, 5000);
         }
@@ -630,6 +630,17 @@ export default function VendorTerminalScreen() {
                         <Text style={[styles.pendingTitle, { color: colors.error || "#dc2626" }]}>Capture Failed</Text>
                         <Text style={styles.pendingSubtitle}>
                           The payment was authorized but failed to capture. Please try again.
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+                  {paymentStatus === "payment_failed" && (
+                    <View style={styles.pendingRow}>
+                      <Ionicons name="alert-circle" size={24} color={colors.error || "#dc2626"} />
+                      <View style={{ flex: 1, marginLeft: spacing.md }}>
+                        <Text style={[styles.pendingTitle, { color: colors.error || "#dc2626" }]}>Payment Failed</Text>
+                        <Text style={styles.pendingSubtitle}>
+                          Card was declined or removed. Please try again.
                         </Text>
                       </View>
                     </View>
