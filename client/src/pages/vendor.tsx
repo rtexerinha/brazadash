@@ -1333,6 +1333,8 @@ function TerminalSettings({ restaurant }: { restaurant: Restaurant }) {
     let pollCount = 0;
     const maxPolls = 150;
     let isPolling = false;
+    const startTime = Date.now();
+    const gracePeriodMs = 15000;
 
     const poll = async () => {
       if (isPolling) return;
@@ -1356,6 +1358,7 @@ function TerminalSettings({ restaurant }: { restaurant: Restaurant }) {
       try {
         const res = await apiRequest("GET", `/api/terminal/payment-intents/${paymentIntentId}/status`);
         const data = await res.json();
+        const elapsed = Date.now() - startTime;
 
         if (data.status === "requires_capture") {
           if (pollingRef.current) clearInterval(pollingRef.current);
@@ -1395,6 +1398,10 @@ function TerminalSettings({ restaurant }: { restaurant: Restaurant }) {
           toast({ title: "Payment Completed", description: "Payment was already captured." });
           setTimeout(() => { setPendingPayment(null); setPaymentStatus(""); }, 3000);
         } else if (data.status === "requires_payment_method") {
+          if (elapsed < gracePeriodMs) {
+            isPolling = false;
+            return;
+          }
           if (pollingRef.current) clearInterval(pollingRef.current);
           pollingRef.current = null;
           setPaymentStatus("payment_failed");

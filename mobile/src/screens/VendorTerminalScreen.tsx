@@ -204,6 +204,8 @@ export default function VendorTerminalScreen() {
     let pollCount = 0;
     const maxPolls = 150;
     let isPolling = false;
+    const startTime = Date.now();
+    const gracePeriodMs = 15000;
 
     const poll = async () => {
       if (isPolling) return;
@@ -222,6 +224,7 @@ export default function VendorTerminalScreen() {
 
       try {
         const data = await api.checkTerminalPaymentStatus(paymentIntentId);
+        const elapsed = Date.now() - startTime;
 
         if (data.status === "requires_capture") {
           if (pollingRef.current) clearInterval(pollingRef.current);
@@ -252,6 +255,10 @@ export default function VendorTerminalScreen() {
           Alert.alert("Payment Completed", "Payment was already captured.");
           setTimeout(() => { setPendingPayment(null); setPaymentStatus(""); }, 3000);
         } else if (data.status === "requires_payment_method") {
+          if (elapsed < gracePeriodMs) {
+            isPolling = false;
+            return;
+          }
           if (pollingRef.current) clearInterval(pollingRef.current);
           pollingRef.current = null;
           setPaymentStatus("payment_failed");
