@@ -68,6 +68,7 @@ export default function LoginScreen() {
   const performLogin = async () => {
     setAuthenticating(true);
     try {
+      await clearSessionCookie();
       const result = await WebBrowser.openAuthSessionAsync(
         `${API_BASE}/api/mobile/login`,
         "brazadash://oauth-callback"
@@ -96,10 +97,6 @@ export default function LoginScreen() {
       Alert.alert("Error", "An error occurred. Please try again.");
       setAuthenticating(false);
     }
-  };
-
-  const handleSignIn = () => {
-    performLogin();
   };
 
   if (authenticating) {
@@ -210,19 +207,19 @@ export default function LoginScreen() {
         <Text style={styles.welcomeTitle}>Welcome to BrazaDash</Text>
         <Text style={styles.welcomeSubtitle}>Sign in to access your orders, bookings, and more</Text>
 
-        <TouchableOpacity style={styles.primaryButton} onPress={handleSignIn} activeOpacity={0.8}>
+        <TouchableOpacity style={styles.primaryButton} onPress={performLogin} activeOpacity={0.8}>
           <Ionicons name="log-in-outline" size={22} color={colors.white} />
-          <Text style={styles.primaryButtonText}>Sign In with Replit</Text>
+          <Text style={styles.primaryButtonText}>Sign In</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.secondaryButton} onPress={handleSignIn} activeOpacity={0.8}>
+        <TouchableOpacity style={styles.secondaryButton} onPress={performLogin} activeOpacity={0.8}>
           <Ionicons name="person-add-outline" size={20} color={colors.primary} />
           <Text style={styles.secondaryButtonText}>Create a new account</Text>
         </TouchableOpacity>
 
         <View style={styles.secureRow}>
-          <Ionicons name="lock-closed" size={14} color={colors.textTertiary} />
-          <Text style={styles.secureText}>Secured by Replit authentication</Text>
+          <Ionicons name="shield-checkmark" size={14} color={colors.textTertiary} />
+          <Text style={styles.secureText}>Secure authentication</Text>
         </View>
       </View>
     </SafeAreaView>
