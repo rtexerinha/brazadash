@@ -12,7 +12,7 @@ import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
 import { authStorage } from "./storage";
 
-const mobileAuthCodes = new Map<string, { sessionID: string; cookie: string; expiresAt: number }>();
+const mobileAuthCodes = new Map<string, { sessionID: string; cookie: string; userData: any; expiresAt: number }>();
 
 function cleanExpiredCodes() {
   const now = Date.now();
@@ -285,32 +285,20 @@ export async function setupAuth(app: Express) {
         return res.redirect("brazadash://oauth-callback?error=no_user");
       }
       console.log("Mobile auth callback: user authenticated successfully, sub:", (user as any)?.claims?.sub);
-      req.logIn(user, (loginErr) => {
-        if (loginErr) {
-          console.error("Mobile auth login error:", loginErr);
-          return res.redirect("brazadash://oauth-callback?error=login_failed");
-        }
-        req.session.save((saveErr) => {
-          if (saveErr) {
-            console.error("Mobile session save error:", saveErr);
-          }
-          cleanExpiredCodes();
-          const authCode = crypto.randomBytes(32).toString("hex");
-          const signedSid = "s:" + cookieSignature.sign(req.sessionID, process.env.SESSION_SECRET!);
-          const sessionCookie = `connect.sid=${encodeURIComponent(signedSid)}`;
-          console.log("Mobile auth: generated auth code, sessionID:", req.sessionID, "cookie length:", sessionCookie.length);
-          mobileAuthCodes.set(authCode, {
-            sessionID: req.sessionID,
-            cookie: sessionCookie,
-            expiresAt: Date.now() + 60 * 1000,
-          });
-          return res.redirect(`brazadash://oauth-callback?code=${authCode}`);
-        });
+      cleanExpiredCodes();
+      const authCode = crypto.randomBytes(32).toString("hex");
+      console.log("Mobile auth: generated auth code for user:", (user as any)?.claims?.sub);
+      mobileAuthCodes.set(authCode, {
+        sessionID: "",
+        cookie: "",
+        userData: user,
+        expiresAt: Date.now() + 120 * 1000,
       });
+      return res.redirect(`brazadash://oauth-callback?code=${authCode}`);
     })(req, res, next);
   });
 
-  app.post("/api/mobile/exchange-code", (req, res) => {
+  app.post("/api/mobile/exchange-code", (req: any, res) => {
     const { code } = req.body;
     if (!code || typeof code !== "string") {
       return res.status(400).json({ error: "Missing auth code" });
@@ -322,8 +310,23 @@ export async function setupAuth(app: Express) {
       return res.status(401).json({ error: "Invalid or expired auth code" });
     }
     mobileAuthCodes.delete(code);
-    console.log("Mobile exchange-code: success, cookie length:", data.cookie.length, "sessionID:", data.sessionID);
-    res.json({ session: data.cookie });
+
+    req.logIn(data.userData, (loginErr: any) => {
+      if (loginErr) {
+        console.error("Mobile exchange-code: logIn failed:", loginErr);
+        return res.status(500).json({ error: "Failed to create session" });
+      }
+      req.session.save((saveErr: any) => {
+        if (saveErr) {
+          console.error("Mobile exchange-code: session save failed:", saveErr);
+          return res.status(500).json({ error: "Failed to save session" });
+        }
+        const signedSid = "s:" + cookieSignature.sign(req.sessionID, process.env.SESSION_SECRET!);
+        const sessionCookie = `connect.sid=${encodeURIComponent(signedSid)}`;
+        console.log("Mobile exchange-code: success, sessionID:", req.sessionID, "sub:", (data.userData as any)?.claims?.sub);
+        res.json({ session: sessionCookie });
+      });
+    });
   });
 
   app.get("/api/mobile/switch-account", (req, res) => {
