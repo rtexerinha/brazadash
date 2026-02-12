@@ -13,6 +13,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
+import { sendOrderReceiptEmail } from "./sendgrid";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -181,6 +182,28 @@ export async function registerRoutes(
         message: `Your order #${order.id.slice(0, 8)} has been placed successfully!`,
         type: "order",
       });
+
+      const customerEmail = req.user.claims.email;
+      if (customerEmail) {
+        void (async () => {
+          try {
+            const restaurant = await storage.getRestaurant(validationResult.data.restaurantId);
+            await sendOrderReceiptEmail({
+              orderId: order.id,
+              customerEmail,
+              customerName: req.user.claims.first_name || "Customer",
+              restaurantName: restaurant?.name || "BrazaDash Restaurant",
+              items: Array.isArray(order.items) ? order.items as any[] : [],
+              subtotal: order.subtotal,
+              deliveryFee: order.deliveryFee,
+              tip: order.tip || "0",
+              total: order.total,
+              deliveryAddress: order.deliveryAddress || "",
+              orderDate: order.createdAt || new Date(),
+            });
+          } catch (e) { console.error("Receipt email error:", e); }
+        })();
+      }
       
       res.status(201).json(order);
     } catch (error) {
@@ -1058,6 +1081,28 @@ export async function registerRoutes(
         type: "order",
       });
 
+      const customerEmail = req.user.claims.email;
+      if (customerEmail) {
+        void (async () => {
+          try {
+            const restaurant = await storage.getRestaurant(paymentIntent.metadata?.restaurantId || '');
+            await sendOrderReceiptEmail({
+              orderId: order.id,
+              customerEmail,
+              customerName: req.user.claims.first_name || "Customer",
+              restaurantName: restaurant?.name || "BrazaDash Restaurant",
+              items: Array.isArray(items) ? items : [],
+              subtotal: subtotal.toFixed(2),
+              deliveryFee: deliveryFee.toFixed(2),
+              tip: tipAmount.toFixed(2),
+              total: total.toFixed(2),
+              deliveryAddress: paymentIntent.metadata?.deliveryAddress || '',
+              orderDate: order.createdAt || new Date(),
+            });
+          } catch (e) { console.error("Receipt email error:", e); }
+        })();
+      }
+
       res.json(order);
     } catch (error) {
       console.error("Error confirming payment:", error);
@@ -1238,6 +1283,28 @@ export async function registerRoutes(
         message: `Your order #${order.id.slice(0, 8)} has been placed successfully!`,
         type: "order",
       });
+
+      const customerEmail = req.user.claims.email;
+      if (customerEmail) {
+        void (async () => {
+          try {
+            const restaurant = await storage.getRestaurant(session.metadata?.restaurantId || '');
+            await sendOrderReceiptEmail({
+              orderId: order.id,
+              customerEmail,
+              customerName: req.user.claims.first_name || "Customer",
+              restaurantName: restaurant?.name || "BrazaDash Restaurant",
+              items: Array.isArray(items) ? items : [],
+              subtotal: subtotal.toFixed(2),
+              deliveryFee: deliveryFee.toFixed(2),
+              tip: tipAmount.toFixed(2),
+              total: total.toFixed(2),
+              deliveryAddress: session.metadata?.deliveryAddress || '',
+              orderDate: order.createdAt || new Date(),
+            });
+          } catch (e) { console.error("Receipt email error:", e); }
+        })();
+      }
 
       res.json(order);
     } catch (error) {
