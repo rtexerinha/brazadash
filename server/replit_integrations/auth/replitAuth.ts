@@ -79,14 +79,24 @@ export async function setupAuth(app: Express) {
   app.set("trust proxy", 1);
   app.use((req, _res, next) => {
     const mobileSession = req.headers["x-session-cookie"] as string;
-    if (mobileSession && (!req.headers.cookie || !req.headers.cookie.includes("connect.sid"))) {
-      req.headers.cookie = mobileSession + (req.headers.cookie ? "; " + req.headers.cookie : "");
+    if (mobileSession) {
+      console.log("Mobile session header detected, path:", req.path, "cookie length:", mobileSession.length, "has existing cookie:", !!req.headers.cookie?.includes("connect.sid"));
+      if (!req.headers.cookie || !req.headers.cookie.includes("connect.sid")) {
+        req.headers.cookie = mobileSession + (req.headers.cookie ? "; " + req.headers.cookie : "");
+        console.log("Mobile session injected into cookie header");
+      }
     }
     next();
   });
   app.use(getSession());
   app.use(passport.initialize());
   app.use(passport.session());
+  app.use((req, _res, next) => {
+    if (req.headers["x-session-cookie"]) {
+      console.log("Post-session middleware - path:", req.path, "sessionID:", req.sessionID, "isAuthenticated:", req.isAuthenticated(), "user:", req.user ? "present" : "absent", "session.passport:", JSON.stringify((req.session as any)?.passport));
+    }
+    next();
+  });
 
   const config = await getOidcConfig();
 
@@ -311,21 +321,16 @@ export async function setupAuth(app: Express) {
     }
     mobileAuthCodes.delete(code);
 
-    req.logIn(data.userData, (loginErr: any) => {
-      if (loginErr) {
-        console.error("Mobile exchange-code: logIn failed:", loginErr);
-        return res.status(500).json({ error: "Failed to create session" });
+    (req.session as any).passport = { user: data.userData };
+    req.session.save((saveErr: any) => {
+      if (saveErr) {
+        console.error("Mobile exchange-code: session save failed:", saveErr);
+        return res.status(500).json({ error: "Failed to save session" });
       }
-      req.session.save((saveErr: any) => {
-        if (saveErr) {
-          console.error("Mobile exchange-code: session save failed:", saveErr);
-          return res.status(500).json({ error: "Failed to save session" });
-        }
-        const signedSid = "s:" + cookieSignature.sign(req.sessionID, process.env.SESSION_SECRET!);
-        const sessionCookie = `connect.sid=${encodeURIComponent(signedSid)}`;
-        console.log("Mobile exchange-code: success, sessionID:", req.sessionID, "sub:", (data.userData as any)?.claims?.sub);
-        res.json({ session: sessionCookie });
-      });
+      const signedSid = "s:" + cookieSignature.sign(req.sessionID, process.env.SESSION_SECRET!);
+      const sessionCookie = `connect.sid=${encodeURIComponent(signedSid)}`;
+      console.log("Mobile exchange-code: success, sessionID:", req.sessionID, "sub:", (data.userData as any)?.claims?.sub);
+      res.json({ session: sessionCookie });
     });
   });
 
