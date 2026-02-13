@@ -320,6 +320,8 @@ export async function setupAuth(app: Express) {
       return res.status(401).json({ error: "Invalid or expired auth code" });
     }
     mobileAuthCodes.delete(code);
+    const userData = data.userData as any;
+    console.log("Mobile exchange-code: userData keys:", Object.keys(userData || {}), "has claims:", !!userData?.claims, "has expires_at:", !!userData?.expires_at, "claims.sub:", userData?.claims?.sub);
 
     (req.session as any).passport = { user: data.userData };
     req.session.save((saveErr: any) => {
@@ -331,6 +333,25 @@ export async function setupAuth(app: Express) {
       const sessionCookie = `connect.sid=${encodeURIComponent(signedSid)}`;
       console.log("Mobile exchange-code: success, sessionID:", req.sessionID, "sub:", (data.userData as any)?.claims?.sub);
       res.json({ session: sessionCookie });
+    });
+  });
+
+  app.get("/api/mobile/test-session", (req: any, res) => {
+    const testUser = {
+      claims: { sub: "test-user-123", email: "test@test.com", first_name: "Test", last_name: "User", exp: Math.floor(Date.now() / 1000) + 3600 },
+      access_token: "test-token",
+      refresh_token: "test-refresh",
+      expires_at: Math.floor(Date.now() / 1000) + 3600,
+    };
+    (req.session as any).passport = { user: testUser };
+    req.session.save((saveErr: any) => {
+      if (saveErr) {
+        return res.status(500).json({ error: "save failed", details: String(saveErr) });
+      }
+      const signedSid = "s:" + cookieSignature.sign(req.sessionID, process.env.SESSION_SECRET!);
+      const sessionCookie = `connect.sid=${encodeURIComponent(signedSid)}`;
+      console.log("Test session created, sessionID:", req.sessionID);
+      res.json({ session: sessionCookie, sessionID: req.sessionID });
     });
   });
 
