@@ -31,18 +31,32 @@ async function initStripe() {
     const stripeSync = await getStripeSync();
 
     console.log('Setting up managed webhook...');
-    const webhookBaseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
-    try {
-      const result = await stripeSync.findOrCreateManagedWebhook(
-        `${webhookBaseUrl}/api/stripe/webhook`
-      );
+
+    // Determine the base URL for the webhook
+    // In production (Render, etc), we use PUBLIC_URL or APP_URL
+    // In local development, we skip this as Stripe can't reach localhost directly
+    const publicUrl = process.env.PUBLIC_URL || process.env.APP_URL;
+    let webhookBaseUrl = publicUrl;
+
+    if (!webhookBaseUrl && process.env.REPLIT_DOMAINS) {
+      webhookBaseUrl = `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`;
+    }
+
+    if (!webhookBaseUrl) {
+      console.log('No public URL found (PUBLIC_URL, APP_URL, or REPLIT_DOMAINS), skipping webhook auto-setup. Use Stripe CLI for local testing or manual setup in production.');
+    } else {
+      try {
+        const result = await stripeSync.findOrCreateManagedWebhook(
+          `${webhookBaseUrl}/api/stripe/webhook`
+        );
       if (result?.webhook?.url) {
         console.log(`Webhook configured: ${result.webhook.url}`);
       } else {
         console.log('Webhook setup returned no URL, continuing without webhook');
       }
-    } catch (webhookError) {
-      console.log('Webhook setup failed, continuing without webhook:', webhookError);
+      } catch (webhookError) {
+        console.log('Webhook setup failed, continuing without webhook:', webhookError);
+      }
     }
 
     console.log('Syncing Stripe data...');
