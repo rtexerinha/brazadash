@@ -16,18 +16,27 @@ const mobileAuthCodes = new Map<string, { sessionID: string; cookie: string; use
 
 function cleanExpiredCodes() {
   const now = Date.now();
-  for (const [code, data] of mobileAuthCodes) {
+  Array.from(mobileAuthCodes.entries()).forEach(([code, data]) => {
     if (data.expiresAt < now) {
       mobileAuthCodes.delete(code);
     }
-  }
+  });
 }
 
 const getOidcConfig = memoize(
   async () => {
+    const issuerUrl = process.env.AUTH_ISSUER_URL || process.env.ISSUER_URL || "https://replit.com/oidc";
+    const clientId = process.env.AUTH_CLIENT_ID || process.env.REPL_ID;
+    const clientSecret = process.env.AUTH_CLIENT_SECRET;
+
+    if (!clientId) {
+      throw new Error("AUTH_CLIENT_ID or REPL_ID must be set for OIDC discovery");
+    }
+
     return await client.discovery(
-      new URL(process.env.ISSUER_URL ?? "https://replit.com/oidc"),
-      process.env.REPL_ID!
+      new URL(issuerUrl),
+      clientId,
+      clientSecret
     );
   },
   { maxAge: 3600 * 1000 }
@@ -49,8 +58,9 @@ export function getSession() {
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: true,
+      secure: process.env.NODE_ENV === "production" && process.env.AUTH_CALLBACK_URL?.startsWith("https"),
       maxAge: sessionTtl,
+      sameSite: "lax",
     },
   });
 }
@@ -69,9 +79,9 @@ async function upsertUser(claims: any) {
   await authStorage.upsertUser({
     id: claims["sub"],
     email: claims["email"],
-    firstName: claims["first_name"],
-    lastName: claims["last_name"],
-    profileImageUrl: claims["profile_image_url"],
+    firstName: claims["first_name"] || claims["given_name"],
+    lastName: claims["last_name"] || claims["family_name"],
+    profileImageUrl: claims["profile_image_url"] || claims["picture"],
   });
 }
 
@@ -80,10 +90,8 @@ export async function setupAuth(app: Express) {
   app.use((req, _res, next) => {
     const mobileSession = req.headers["x-session-cookie"] as string;
     if (mobileSession) {
-      console.log("Mobile session header detected, path:", req.path, "cookie length:", mobileSession.length, "has existing cookie:", !!req.headers.cookie?.includes("connect.sid"));
       if (!req.headers.cookie || !req.headers.cookie.includes("connect.sid")) {
         req.headers.cookie = mobileSession + (req.headers.cookie ? "; " + req.headers.cookie : "");
-        console.log("Mobile session injected into cookie header");
       }
     }
     next();
@@ -91,12 +99,6 @@ export async function setupAuth(app: Express) {
   app.use(getSession());
   app.use(passport.initialize());
   app.use(passport.session());
-  app.use((req, _res, next) => {
-    if (req.headers["x-session-cookie"]) {
-      console.log("Post-session middleware - path:", req.path, "sessionID:", req.sessionID, "isAuthenticated:", req.isAuthenticated(), "user:", req.user ? "present" : "absent", "session.passport:", JSON.stringify((req.session as any)?.passport));
-    }
-    next();
-  });
 
   const config = await getOidcConfig();
 
@@ -114,21 +116,24 @@ export async function setupAuth(app: Express) {
   const registeredStrategies = new Set<string>();
 
   // Helper function to ensure strategy exists for a domain
-  const ensureStrategy = (domain: string) => {
-    const strategyName = `replitauth:${domain}`;
+  const ensureStrategy = (req: any) => {
+    const domain = req.hostname;
+    const protocol = req.headers["x-forwarded-proto"] || req.protocol;
+    const strategyName = `oidcauth:${domain}`;
     if (!registeredStrategies.has(strategyName)) {
       const strategy = new Strategy(
         {
           name: strategyName,
           config,
-          scope: "openid email profile offline_access",
-          callbackURL: `https://${domain}/api/callback`,
+          scope: "openid email profile",
+          callbackURL: process.env.AUTH_CALLBACK_URL || `${protocol}://${domain}/api/callback`,
         },
         verify
       );
       passport.use(strategy);
       registeredStrategies.add(strategyName);
     }
+    return strategyName;
   };
 
   passport.serializeUser((user: Express.User, cb) => cb(null, user));
@@ -136,7 +141,7 @@ export async function setupAuth(app: Express) {
 
   app.get("/api/login", (req, res, next) => {
     const startAuth = () => {
-      ensureStrategy(req.hostname);
+      const strategyName = ensureStrategy(req);
       const originalRedirect = res.redirect.bind(res);
       (res as any).redirect = function (statusOrUrl: number | string, url?: string) {
         const redirectUrl = typeof statusOrUrl === "string" ? statusOrUrl : url!;
@@ -148,10 +153,10 @@ export async function setupAuth(app: Express) {
           originalRedirect(statusCode, redirectUrl);
         });
       };
-      passport.authenticate(`replitauth:${req.hostname}`, {
-        prompt: "login consent",
-        scope: ["openid", "email", "profile", "offline_access"],
-      })(req, res, next);
+      passport.authenticate(strategyName, {
+        prompt: "consent",
+        scope: "openid email profile",
+      } as any)(req, res, next);
     };
 
     if (req.isAuthenticated()) {
@@ -169,17 +174,14 @@ export async function setupAuth(app: Express) {
   });
 
   app.get("/api/callback", (req, res, next) => {
-    ensureStrategy(req.hostname);
-    passport.authenticate(`replitauth:${req.hostname}`, (err: any, user: any, info: any) => {
+    const strategyName = ensureStrategy(req);
+    passport.authenticate(strategyName, (err: any, user: any, info: any) => {
       if (err) {
         console.error("Auth callback error:", err.message || err);
-        console.error("Auth callback error details:", JSON.stringify(err, Object.getOwnPropertyNames(err)));
         return res.redirect("/?auth_error=callback_failed");
       }
       if (!user) {
         console.error("Auth callback: no user returned. Info:", JSON.stringify(info));
-        console.error("Auth callback: session ID:", req.sessionID);
-        console.error("Auth callback: session keys:", Object.keys(req.session || {}));
         return res.redirect("/?auth_error=no_user");
       }
       req.logIn(user, (loginErr) => {
@@ -196,12 +198,18 @@ export async function setupAuth(app: Express) {
     const protocol = req.headers["x-forwarded-proto"] || req.protocol;
     req.logout(() => {
       req.session.destroy(() => {
-        res.redirect(
-          client.buildEndSessionUrl(config, {
-            client_id: process.env.REPL_ID!,
-            post_logout_redirect_uri: `${protocol}://${req.hostname}`,
-          }).href
-        );
+        try {
+          res.redirect(
+            client.buildEndSessionUrl(config, {
+              client_id: process.env.AUTH_CLIENT_ID || process.env.REPL_ID!,
+              post_logout_redirect_uri: `${protocol}://${req.hostname}`,
+            }).href
+          );
+        } catch (e) {
+          // If the provider doesn't support end_session_endpoint (like Google),
+          // logout locally and go home.
+          res.redirect("/");
+        }
       });
     });
   });
@@ -211,11 +219,15 @@ export async function setupAuth(app: Express) {
     const baseUrl = `${protocol}://${req.hostname}`;
 
     const doSwitch = () => {
-      const endSessionUrl = client.buildEndSessionUrl(config, {
-        client_id: process.env.REPL_ID!,
-        post_logout_redirect_uri: `${baseUrl}/api/login`,
-      }).href;
-      res.redirect(endSessionUrl);
+      try {
+        const endSessionUrl = client.buildEndSessionUrl(config, {
+          client_id: process.env.AUTH_CLIENT_ID || process.env.REPL_ID!,
+          post_logout_redirect_uri: `${baseUrl}/api/login`,
+        }).href;
+        res.redirect(endSessionUrl);
+      } catch (e) {
+        res.redirect("/api/login");
+      }
     };
 
     if (req.isAuthenticated()) {
@@ -229,26 +241,29 @@ export async function setupAuth(app: Express) {
     }
   });
 
-  const ensureMobileStrategy = (domain: string) => {
-    const strategyName = `replitauth-mobile:${domain}`;
+  const ensureMobileStrategy = (req: any) => {
+    const domain = req.hostname;
+    const protocol = req.headers["x-forwarded-proto"] || req.protocol;
+    const strategyName = `oidcauth-mobile:${domain}`;
     if (!registeredStrategies.has(strategyName)) {
       const strategy = new Strategy(
         {
           name: strategyName,
           config,
-          scope: "openid email profile offline_access",
-          callbackURL: `https://${domain}/api/mobile/callback`,
+          scope: "openid email profile",
+          callbackURL: process.env.AUTH_MOBILE_CALLBACK_URL || `${protocol}://${domain}/api/mobile/callback`,
         },
         verify
       );
       passport.use(strategy);
       registeredStrategies.add(strategyName);
     }
+    return strategyName;
   };
 
   app.get("/api/mobile/login", (req, res, next) => {
     const startAuth = () => {
-      ensureMobileStrategy(req.hostname);
+      const strategyName = ensureMobileStrategy(req);
       const originalRedirect = res.redirect.bind(res);
       (res as any).redirect = function (statusOrUrl: number | string, url?: string) {
         const redirectUrl = typeof statusOrUrl === "string" ? statusOrUrl : url!;
@@ -260,10 +275,10 @@ export async function setupAuth(app: Express) {
           originalRedirect(statusCode, redirectUrl);
         });
       };
-      passport.authenticate(`replitauth-mobile:${req.hostname}`, {
-        prompt: "login consent",
-        scope: ["openid", "email", "profile", "offline_access"],
-      })(req, res, next);
+      passport.authenticate(strategyName, {
+        prompt: "consent",
+        scope: "openid email profile",
+      } as any)(req, res, next);
     };
 
     if (req.isAuthenticated()) {
@@ -281,23 +296,18 @@ export async function setupAuth(app: Express) {
   });
 
   app.get("/api/mobile/callback", (req, res, next) => {
-    ensureMobileStrategy(req.hostname);
-    passport.authenticate(`replitauth-mobile:${req.hostname}`, (err: any, user: any, info: any) => {
+    const strategyName = ensureMobileStrategy(req);
+    passport.authenticate(strategyName, (err: any, user: any, info: any) => {
       if (err) {
         console.error("Mobile auth callback error:", err.message || err);
-        console.error("Mobile auth callback error details:", JSON.stringify(err, Object.getOwnPropertyNames(err)));
         return res.redirect("brazadash://oauth-callback?error=callback_failed");
       }
       if (!user) {
         console.error("Mobile auth callback: no user returned. Info:", JSON.stringify(info));
-        console.error("Mobile auth callback: session ID:", req.sessionID);
-        console.error("Mobile auth callback: session keys:", Object.keys(req.session || {}));
         return res.redirect("brazadash://oauth-callback?error=no_user");
       }
-      console.log("Mobile auth callback: user authenticated successfully, sub:", (user as any)?.claims?.sub);
       cleanExpiredCodes();
       const authCode = crypto.randomBytes(32).toString("hex");
-      console.log("Mobile auth: generated auth code for user:", (user as any)?.claims?.sub);
       mobileAuthCodes.set(authCode, {
         sessionID: "",
         cookie: "",
@@ -316,13 +326,9 @@ export async function setupAuth(app: Express) {
     cleanExpiredCodes();
     const data = mobileAuthCodes.get(code);
     if (!data) {
-      console.log("Mobile exchange-code: invalid/expired code. Active codes:", mobileAuthCodes.size);
       return res.status(401).json({ error: "Invalid or expired auth code" });
     }
     mobileAuthCodes.delete(code);
-    const userData = data.userData as any;
-    console.log("Mobile exchange-code: userData keys:", Object.keys(userData || {}), "has claims:", !!userData?.claims, "has expires_at:", !!userData?.expires_at, "claims.sub:", userData?.claims?.sub);
-
     (req.session as any).passport = { user: data.userData };
     req.session.save((saveErr: any) => {
       if (saveErr) {
@@ -331,27 +337,7 @@ export async function setupAuth(app: Express) {
       }
       const signedSid = "s:" + cookieSignature.sign(req.sessionID, process.env.SESSION_SECRET!);
       const sessionCookie = `connect.sid=${encodeURIComponent(signedSid)}`;
-      console.log("Mobile exchange-code: success, sessionID:", req.sessionID, "sub:", (data.userData as any)?.claims?.sub);
       res.json({ session: sessionCookie });
-    });
-  });
-
-  app.get("/api/mobile/test-session", (req: any, res) => {
-    const testUser = {
-      claims: { sub: "test-user-123", email: "test@test.com", first_name: "Test", last_name: "User", exp: Math.floor(Date.now() / 1000) + 3600 },
-      access_token: "test-token",
-      refresh_token: "test-refresh",
-      expires_at: Math.floor(Date.now() / 1000) + 3600,
-    };
-    (req.session as any).passport = { user: testUser };
-    req.session.save((saveErr: any) => {
-      if (saveErr) {
-        return res.status(500).json({ error: "save failed", details: String(saveErr) });
-      }
-      const signedSid = "s:" + cookieSignature.sign(req.sessionID, process.env.SESSION_SECRET!);
-      const sessionCookie = `connect.sid=${encodeURIComponent(signedSid)}`;
-      console.log("Test session created, sessionID:", req.sessionID);
-      res.json({ session: sessionCookie, sessionID: req.sessionID });
     });
   });
 
@@ -360,11 +346,15 @@ export async function setupAuth(app: Express) {
     const baseUrl = `${protocol}://${req.hostname}`;
 
     const doSwitch = () => {
-      const endSessionUrl = client.buildEndSessionUrl(config, {
-        client_id: process.env.REPL_ID!,
-        post_logout_redirect_uri: `${baseUrl}/api/mobile/login`,
-      }).href;
-      res.redirect(endSessionUrl);
+      try {
+        const endSessionUrl = client.buildEndSessionUrl(config, {
+          client_id: process.env.AUTH_CLIENT_ID || process.env.REPL_ID!,
+          post_logout_redirect_uri: `${baseUrl}/api/mobile/login`,
+        }).href;
+        res.redirect(endSessionUrl);
+      } catch (e) {
+        res.redirect("/api/mobile/login");
+      }
     };
 
     if (req.isAuthenticated()) {
@@ -381,19 +371,7 @@ export async function setupAuth(app: Express) {
 
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
   const user = req.user as any;
-  const isMobileReq = !!req.headers["x-session-cookie"];
-
   if (!req.isAuthenticated() || !user?.expires_at) {
-    if (isMobileReq) {
-      console.log("Mobile auth failed:", {
-        isAuthenticated: req.isAuthenticated(),
-        hasUser: !!user,
-        hasExpiresAt: !!user?.expires_at,
-        sessionID: req.sessionID,
-        hasCookie: !!req.headers.cookie?.includes("connect.sid"),
-        hasXSessionCookie: !!req.headers["x-session-cookie"],
-      });
-    }
     return res.status(401).json({ message: "Unauthorized" });
   }
 
@@ -402,13 +380,8 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     return next();
   }
 
-  if (isMobileReq) {
-    console.log("Mobile auth: token expired, attempting refresh. sub:", user.claims?.sub);
-  }
-
   const refreshToken = user.refresh_token;
   if (!refreshToken) {
-    if (isMobileReq) console.log("Mobile auth: no refresh token available");
     res.status(401).json({ message: "Unauthorized" });
     return;
   }
@@ -417,10 +390,8 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     const config = await getOidcConfig();
     const tokenResponse = await client.refreshTokenGrant(config, refreshToken);
     updateUserSession(user, tokenResponse);
-    if (isMobileReq) console.log("Mobile auth: token refreshed successfully");
     return next();
   } catch (error: any) {
-    if (isMobileReq) console.log("Mobile auth: token refresh failed:", error?.message);
     res.status(401).json({ message: "Unauthorized" });
     return;
   }

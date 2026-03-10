@@ -548,7 +548,7 @@ const translations: Record<Language, Record<string, string>> = {
     "authDialog.continue": "Continue",
     "authDialog.login": "Log In",
     "authDialog.register": "Create Account",
-    "authDialog.secure": "Secured by Replit Authentication",
+    "authDialog.secure": "Secured by Google OAuth",
 
     "onboarding.einNumber": "EIN Number (Tax ID)",
     "onboarding.einNumberDesc": "Your Employer Identification Number for tax purposes (optional).",
@@ -1178,7 +1178,7 @@ const translations: Record<Language, Record<string, string>> = {
     "authDialog.continue": "Continuar",
     "authDialog.login": "Entrar",
     "authDialog.register": "Criar Conta",
-    "authDialog.secure": "Protegido pela Autenticacao Replit",
+    "authDialog.secure": "Protegido pelo Google OAuth",
 
     "onboarding.einNumber": "Numero EIN (CNPJ/Tax ID)",
     "onboarding.einNumberDesc": "Seu Numero de Identificacao do Empregador para fins fiscais (opcional).",
