@@ -1,0 +1,35 @@
+services:
+  db:
+    image: postgres:14-alpine
+    container_name: brazadash-db
+    restart: always
+    environment:
+      POSTGRES_USER: daviwp
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: brazadash
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  app:
+    build: .
+    container_name: brazadash-app
+    restart: always
+    ports:
+      - "5000:5000"
+    environment:
+      - DATABASE_URL=postgresql://daviwp:password@db:5432/brazadash
+      - NODE_ENV=production
+      - SESSION_SECRET=${SESSION_SECRET}
+      - AUTH_ISSUER_URL=${AUTH_ISSUER_URL}
+      - AUTH_CLIENT_ID=${AUTH_CLIENT_ID}
+      - AUTH_CLIENT_SECRET=${AUTH_CLIENT_SECRET}
+      - AUTH_CALLBACK_URL=${AUTH_CALLBACK_URL}
+      - STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:

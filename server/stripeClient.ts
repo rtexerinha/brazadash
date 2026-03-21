@@ -1,84 +1,18 @@
 import Stripe from 'stripe';
 
-let connectionSettings: any;
-let cachedCredentials: { publishableKey: string; secretKey: string } | null = null;
-let credentialsCacheTime = 0;
-const CREDENTIALS_CACHE_TTL = 5 * 60 * 1000;
+export async function getCredentials() {
+  const secretKey = process.env.STRIPE_SECRET_KEY || process.env.STRIPE_LIVE_SECRET_KEY;
+  const publishableKey = process.env.STRIPE_PUBLISHABLE_KEY || process.env.STRIPE_LIVE_PUBLISHABLE_KEY;
 
-async function fetchCredentialsForEnvironment(hostname: string, xReplitToken: string, environment: string) {
-  const url = new URL(`https://${hostname}/api/v2/connection`);
-  url.searchParams.set('include_secrets', 'true');
-  url.searchParams.set('connector_names', 'stripe');
-  url.searchParams.set('environment', environment);
-
-  const response = await fetch(url.toString(), {
-    headers: {
-      'Accept': 'application/json',
-      'X_REPLIT_TOKEN': xReplitToken
-    }
-  });
-
-  const data = await response.json();
-  const conn = data.items?.[0];
-
-  if (conn?.settings?.publishable && conn?.settings?.secret) {
-    return {
-      publishableKey: conn.settings.publishable,
-      secretKey: conn.settings.secret,
-    };
-  }
-  return null;
-}
-
-async function getCredentials() {
-  if (cachedCredentials && Date.now() - credentialsCacheTime < CREDENTIALS_CACHE_TTL) {
-    return cachedCredentials;
+  if (!secretKey || !publishableKey) {
+    throw new Error('Stripe credentials not found. Set STRIPE_SECRET_KEY and STRIPE_PUBLISHABLE_KEY environment variables.');
   }
 
-  const isProduction = process.env.REPLIT_DEPLOYMENT === '1';
-
-  if (isProduction && process.env.STRIPE_LIVE_PUBLISHABLE_KEY && process.env.STRIPE_LIVE_SECRET_KEY) {
-    cachedCredentials = {
-      publishableKey: process.env.STRIPE_LIVE_PUBLISHABLE_KEY,
-      secretKey: process.env.STRIPE_LIVE_SECRET_KEY,
-    };
-    credentialsCacheTime = Date.now();
-    return cachedCredentials;
-  }
-
-  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
-  const xReplitToken = process.env.REPL_IDENTITY
-    ? 'repl ' + process.env.REPL_IDENTITY
-    : process.env.WEB_REPL_RENEWAL
-      ? 'depl ' + process.env.WEB_REPL_RENEWAL
-      : null;
-
-  if (!xReplitToken) {
-    throw new Error('X_REPLIT_TOKEN not found for repl/depl');
-  }
-
-  const primaryEnv = isProduction ? 'production' : 'development';
-
-  let creds = await fetchCredentialsForEnvironment(hostname!, xReplitToken, primaryEnv);
-
-  if (!creds && isProduction) {
-    console.log('Production Stripe credentials not found, falling back to development credentials');
-    creds = await fetchCredentialsForEnvironment(hostname!, xReplitToken, 'development');
-  }
-
-  if (!creds) {
-    throw new Error(`Stripe connection not found for ${primaryEnv}`);
-  }
-
-  cachedCredentials = creds;
-  credentialsCacheTime = Date.now();
-
-  return cachedCredentials;
+  return { secretKey, publishableKey };
 }
 
 export async function getUncachableStripeClient() {
   const { secretKey } = await getCredentials();
-
   return new Stripe(secretKey, {
     apiVersion: '2025-11-17.clover',
   });

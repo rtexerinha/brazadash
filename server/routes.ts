@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
-import { 
+import {
   insertOrderSchema, insertReviewSchema, insertRestaurantSchema, insertMenuItemSchema,
   insertServiceProviderSchema, insertServiceSchema, insertBookingSchema, insertServiceReviewSchema, insertMessageSchema,
   insertPushTokenSchema, serviceCategories
@@ -78,7 +78,7 @@ export async function registerRoutes(
   // Get single restaurant
   app.get("/api/restaurants/:id", async (req, res) => {
     try {
-      const restaurant = await storage.getRestaurant(req.params.id);
+      const restaurant = await storage.getRestaurant(req.params.id as string);
       if (!restaurant) {
         return res.status(404).json({ message: "Restaurant not found" });
       }
@@ -92,7 +92,7 @@ export async function registerRoutes(
   // Get restaurant menu
   app.get("/api/restaurants/:id/menu", async (req, res) => {
     try {
-      const menuItems = await storage.getMenuItems(req.params.id);
+      const menuItems = await storage.getMenuItems(req.params.id as string);
       res.json(menuItems);
     } catch (error) {
       console.error("Error fetching menu:", error);
@@ -103,7 +103,7 @@ export async function registerRoutes(
   // Get restaurant reviews
   app.get("/api/restaurants/:id/reviews", async (req, res) => {
     try {
-      const reviews = await storage.getReviewsByRestaurant(req.params.id);
+      const reviews = await storage.getReviewsByRestaurant(req.params.id as string);
       res.json(reviews);
     } catch (error) {
       console.error("Error fetching reviews:", error);
@@ -130,7 +130,7 @@ export async function registerRoutes(
   // Get single order
   app.get("/api/orders/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const order = await storage.getOrder(req.params.id);
+      const order = await storage.getOrder(req.params.id as string);
       if (!order) {
         return res.status(404).json({ message: "Order not found" });
       }
@@ -149,32 +149,32 @@ export async function registerRoutes(
   app.post("/api/orders", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      
+
       // Prepare order data with customerId
       const orderData = {
         ...req.body,
         customerId: userId,
       };
-      
+
       // Validate with Zod schema
       const validationResult = insertOrderSchema.safeParse(orderData);
       if (!validationResult.success) {
         const errors = validationResult.error.issues.map(i => i.message).join(", ");
         return res.status(400).json({ message: `Validation error: ${errors}` });
       }
-      
+
       // Additional business validation
       const { items, deliveryAddress } = validationResult.data;
       if (!items || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ message: "Order must contain at least one item" });
       }
-      
+
       if (!deliveryAddress || deliveryAddress.trim().length < 5) {
         return res.status(400).json({ message: "Delivery address is required" });
       }
-      
+
       const order = await storage.createOrder(validationResult.data);
-      
+
       // Create notification for customer
       await storage.createNotification({
         userId,
@@ -203,7 +203,7 @@ export async function registerRoutes(
           console.log("Order receipt email sent to:", customerEmail);
         } catch (e) { console.error("Receipt email error:", e); }
       }
-      
+
       res.status(201).json(order);
     } catch (error) {
       console.error("Error creating order:", error);
@@ -215,44 +215,44 @@ export async function registerRoutes(
   app.post("/api/reviews", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      
+
       // Prepare review data with customerId
       const reviewData = {
         ...req.body,
         customerId: userId,
       };
-      
+
       // Validate with Zod schema
       const validationResult = insertReviewSchema.safeParse(reviewData);
       if (!validationResult.success) {
         const errors = validationResult.error.issues.map(i => i.message).join(", ");
         return res.status(400).json({ message: `Validation error: ${errors}` });
       }
-      
+
       const { orderId, rating } = validationResult.data;
-      
+
       // Additional business validation for rating range
       if (rating < 1 || rating > 5) {
         return res.status(400).json({ message: "Rating must be between 1 and 5" });
       }
-      
+
       // Verify user owns the order
       const order = await storage.getOrder(orderId);
       if (!order || order.customerId !== userId) {
         return res.status(403).json({ message: "Forbidden" });
       }
-      
+
       // Verify order is delivered
       if (order.status !== "delivered") {
         return res.status(400).json({ message: "Can only review delivered orders" });
       }
-      
+
       // Check if already reviewed
       const existingReview = await storage.getReviewByOrder(orderId);
       if (existingReview) {
         return res.status(400).json({ message: "Order already reviewed" });
       }
-      
+
       const review = await storage.createReview(validationResult.data);
       res.status(201).json(review);
     } catch (error) {
@@ -276,7 +276,7 @@ export async function registerRoutes(
   // Mark notification as read
   app.patch("/api/notifications/:id", isAuthenticated, async (req: any, res) => {
     try {
-      await storage.markNotificationRead(req.params.id);
+      await storage.markNotificationRead(req.params.id as string);
       res.json({ success: true });
     } catch (error) {
       console.error("Error marking notification read:", error);
@@ -338,20 +338,20 @@ export async function registerRoutes(
   app.post("/api/vendor/restaurants", isAuthenticated, isApprovedVendor, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      
+
       // Prepare restaurant data with ownerId
       const restaurantData = {
         ...req.body,
         ownerId: userId,
       };
-      
+
       // Validate with Zod schema
       const validationResult = insertRestaurantSchema.safeParse(restaurantData);
       if (!validationResult.success) {
         const errors = validationResult.error.issues.map(i => i.message).join(", ");
         return res.status(400).json({ message: `Validation error: ${errors}` });
       }
-      
+
       const restaurant = await storage.createRestaurant(validationResult.data);
       res.status(201).json(restaurant);
     } catch (error) {
@@ -364,12 +364,12 @@ export async function registerRoutes(
   app.patch("/api/vendor/restaurants/:id", isAuthenticated, isApprovedVendor, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const restaurant = await storage.getRestaurant(req.params.id);
-      
+      const restaurant = await storage.getRestaurant(req.params.id as string);
+
       if (!restaurant || restaurant.ownerId !== userId) {
         return res.status(403).json({ message: "Forbidden" });
       }
-      
+
       // Validate update fields using partial schema
       const updateSchema = insertRestaurantSchema.partial();
       const validationResult = updateSchema.safeParse(req.body);
@@ -377,8 +377,8 @@ export async function registerRoutes(
         const errors = validationResult.error.issues.map(i => i.message).join(", ");
         return res.status(400).json({ message: `Validation error: ${errors}` });
       }
-      
-      const updated = await storage.updateRestaurant(req.params.id, validationResult.data);
+
+      const updated = await storage.updateRestaurant(req.params.id as string, validationResult.data);
       res.json(updated);
     } catch (error) {
       console.error("Error updating restaurant:", error);
@@ -389,7 +389,7 @@ export async function registerRoutes(
   // Get vendor's restaurant menu
   app.get("/api/vendor/restaurants/:id/menu", isAuthenticated, isApprovedVendor, async (req: any, res) => {
     try {
-      const menuItems = await storage.getMenuItems(req.params.id);
+      const menuItems = await storage.getMenuItems(req.params.id as string);
       res.json(menuItems);
     } catch (error) {
       console.error("Error fetching menu:", error);
@@ -401,25 +401,25 @@ export async function registerRoutes(
   app.post("/api/vendor/restaurants/:id/menu", isAuthenticated, isApprovedVendor, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const restaurant = await storage.getRestaurant(req.params.id);
-      
+      const restaurant = await storage.getRestaurant(req.params.id as string);
+
       if (!restaurant || restaurant.ownerId !== userId) {
         return res.status(403).json({ message: "Forbidden" });
       }
-      
+
       // Prepare menu item data with restaurantId
       const menuItemData = {
         ...req.body,
-        restaurantId: req.params.id,
+        restaurantId: req.params.id as string,
       };
-      
+
       // Validate with Zod schema
       const validationResult = insertMenuItemSchema.safeParse(menuItemData);
       if (!validationResult.success) {
         const errors = validationResult.error.issues.map(i => i.message).join(", ");
         return res.status(400).json({ message: `Validation error: ${errors}` });
       }
-      
+
       const menuItem = await storage.createMenuItem(validationResult.data);
       res.status(201).json(menuItem);
     } catch (error) {
@@ -432,13 +432,13 @@ export async function registerRoutes(
   app.get("/api/vendor/restaurants/:id/orders", isAuthenticated, isApprovedVendor, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const restaurant = await storage.getRestaurant(req.params.id);
-      
+      const restaurant = await storage.getRestaurant(req.params.id as string);
+
       if (!restaurant || restaurant.ownerId !== userId) {
         return res.status(403).json({ message: "Forbidden" });
       }
-      
-      const orders = await storage.getOrdersByRestaurant(req.params.id);
+
+      const orders = await storage.getOrdersByRestaurant(req.params.id as string);
       res.json(orders);
     } catch (error) {
       console.error("Error fetching orders:", error);
@@ -451,26 +451,26 @@ export async function registerRoutes(
     try {
       const userId = req.user.claims.sub;
       const { status } = req.body;
-      
+
       // Validate status value
       const validStatuses = ["pending", "confirmed", "preparing", "ready", "out_for_delivery", "delivered", "cancelled"];
       if (!status || !validStatuses.includes(status)) {
         return res.status(400).json({ message: `Invalid status. Must be one of: ${validStatuses.join(", ")}` });
       }
-      
-      const order = await storage.getOrder(req.params.id);
-      
+
+      const order = await storage.getOrder(req.params.id as string);
+
       if (!order) {
         return res.status(404).json({ message: "Order not found" });
       }
-      
+
       const restaurant = await storage.getRestaurant(order.restaurantId);
       if (!restaurant || restaurant.ownerId !== userId) {
         return res.status(403).json({ message: "Forbidden" });
       }
-      
-      const updated = await storage.updateOrderStatus(req.params.id, status);
-      
+
+      const updated = await storage.updateOrderStatus(req.params.id as string, status);
+
       // Notify customer
       const statusMessages: Record<string, string> = {
         confirmed: "Your order has been confirmed!",
@@ -480,7 +480,7 @@ export async function registerRoutes(
         delivered: "Your order has been delivered. Enjoy!",
         cancelled: "Your order has been cancelled.",
       };
-      
+
       if (statusMessages[status]) {
         await storage.createNotification({
           userId: order.customerId,
@@ -489,7 +489,7 @@ export async function registerRoutes(
           type: "order",
         });
       }
-      
+
       res.json(updated);
     } catch (error) {
       console.error("Error updating order:", error);
@@ -511,13 +511,13 @@ export async function registerRoutes(
     try {
       const { category, search } = req.query;
       let providers;
-      
+
       if (search && typeof search === "string") {
         providers = await storage.searchServiceProviders(search, category as string | undefined);
       } else {
         providers = await storage.getServiceProviders(category as string | undefined);
       }
-      
+
       res.json(providers);
     } catch (error) {
       console.error("Error fetching providers:", error);
@@ -528,7 +528,7 @@ export async function registerRoutes(
   // Get single provider
   app.get("/api/services/providers/:id", async (req, res) => {
     try {
-      const provider = await storage.getServiceProvider(req.params.id);
+      const provider = await storage.getServiceProvider(req.params.id as string);
       if (!provider) {
         return res.status(404).json({ message: "Provider not found" });
       }
@@ -542,7 +542,7 @@ export async function registerRoutes(
   // Get provider's services
   app.get("/api/services/providers/:id/services", async (req, res) => {
     try {
-      const services = await storage.getServices(req.params.id);
+      const services = await storage.getServices(req.params.id as string);
       res.json(services);
     } catch (error) {
       console.error("Error fetching services:", error);
@@ -553,7 +553,7 @@ export async function registerRoutes(
   // Get provider's reviews
   app.get("/api/services/providers/:id/reviews", async (req, res) => {
     try {
-      const reviews = await storage.getServiceReviewsByProvider(req.params.id);
+      const reviews = await storage.getServiceReviewsByProvider(req.params.id as string);
       res.json(reviews);
     } catch (error) {
       console.error("Error fetching reviews:", error);
@@ -581,18 +581,18 @@ export async function registerRoutes(
   app.get("/api/bookings/:id", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const booking = await storage.getBooking(req.params.id);
-      
+      const booking = await storage.getBooking(req.params.id as string);
+
       if (!booking) {
         return res.status(404).json({ message: "Booking not found" });
       }
-      
+
       // Verify user owns the booking or is the provider
       const provider = await storage.getServiceProviderByUser(userId);
       if (booking.customerId !== userId && (!provider || provider.id !== booking.providerId)) {
         return res.status(403).json({ message: "Forbidden" });
       }
-      
+
       res.json(booking);
     } catch (error) {
       console.error("Error fetching booking:", error);
@@ -604,20 +604,20 @@ export async function registerRoutes(
   app.post("/api/bookings", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      
+
       const bookingData = {
         ...req.body,
         customerId: userId,
       };
-      
+
       const validationResult = insertBookingSchema.safeParse(bookingData);
       if (!validationResult.success) {
         const errors = validationResult.error.issues.map(i => i.message).join(", ");
         return res.status(400).json({ message: `Validation error: ${errors}` });
       }
-      
+
       const booking = await storage.createBooking(validationResult.data);
-      
+
       // Notify provider
       const provider = await storage.getServiceProvider(booking.providerId);
       if (provider) {
@@ -628,7 +628,7 @@ export async function registerRoutes(
           type: "booking",
         });
       }
-      
+
       res.status(201).json(booking);
     } catch (error) {
       console.error("Error creating booking:", error);
@@ -640,40 +640,40 @@ export async function registerRoutes(
   app.post("/api/services/reviews", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      
+
       const reviewData = {
         ...req.body,
         customerId: userId,
       };
-      
+
       const validationResult = insertServiceReviewSchema.safeParse(reviewData);
       if (!validationResult.success) {
         const errors = validationResult.error.issues.map(i => i.message).join(", ");
         return res.status(400).json({ message: `Validation error: ${errors}` });
       }
-      
+
       const { bookingId, rating } = validationResult.data;
-      
+
       if (rating < 1 || rating > 5) {
         return res.status(400).json({ message: "Rating must be between 1 and 5" });
       }
-      
+
       // Verify user owns the booking
       const booking = await storage.getBooking(bookingId);
       if (!booking || booking.customerId !== userId) {
         return res.status(403).json({ message: "Forbidden" });
       }
-      
+
       if (booking.status !== "completed") {
         return res.status(400).json({ message: "Can only review completed bookings" });
       }
-      
+
       // Check if already reviewed
       const existingReview = await storage.getServiceReviewByBooking(bookingId);
       if (existingReview) {
         return res.status(400).json({ message: "Booking already reviewed" });
       }
-      
+
       const review = await storage.createServiceReview(validationResult.data);
       res.status(201).json(review);
     } catch (error) {
@@ -703,10 +703,10 @@ export async function registerRoutes(
     try {
       const userId = req.user.claims.sub;
       const messages = await storage.getConversation(userId, req.params.partnerId);
-      
+
       // Mark messages as read
       await storage.markMessagesRead(req.params.partnerId, userId);
-      
+
       res.json(messages);
     } catch (error) {
       console.error("Error fetching messages:", error);
@@ -718,20 +718,20 @@ export async function registerRoutes(
   app.post("/api/messages", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      
+
       const messageData = {
         ...req.body,
         senderId: userId,
       };
-      
+
       const validationResult = insertMessageSchema.safeParse(messageData);
       if (!validationResult.success) {
         const errors = validationResult.error.issues.map(i => i.message).join(", ");
         return res.status(400).json({ message: `Validation error: ${errors}` });
       }
-      
+
       const message = await storage.createMessage(validationResult.data);
-      
+
       // Notify receiver
       await storage.createNotification({
         userId: message.receiverId,
@@ -739,7 +739,7 @@ export async function registerRoutes(
         message: "You have a new message",
         type: "message",
       });
-      
+
       res.status(201).json(message);
     } catch (error) {
       console.error("Error sending message:", error);
@@ -767,24 +767,24 @@ export async function registerRoutes(
   app.post("/api/provider/profile", isAuthenticated, isApprovedProvider, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      
+
       // Check if already has a profile
       const existing = await storage.getServiceProviderByUser(userId);
       if (existing) {
         return res.status(400).json({ message: "Profile already exists" });
       }
-      
+
       const providerData = {
         ...req.body,
         userId,
       };
-      
+
       const validationResult = insertServiceProviderSchema.safeParse(providerData);
       if (!validationResult.success) {
         const errors = validationResult.error.issues.map(i => i.message).join(", ");
         return res.status(400).json({ message: `Validation error: ${errors}` });
       }
-      
+
       const provider = await storage.createServiceProvider(validationResult.data);
       res.status(201).json(provider);
     } catch (error) {
@@ -798,18 +798,18 @@ export async function registerRoutes(
     try {
       const userId = req.user.claims.sub;
       const provider = await storage.getServiceProviderByUser(userId);
-      
+
       if (!provider) {
         return res.status(404).json({ message: "Provider profile not found" });
       }
-      
+
       const updateSchema = insertServiceProviderSchema.partial();
       const validationResult = updateSchema.safeParse(req.body);
       if (!validationResult.success) {
         const errors = validationResult.error.issues.map(i => i.message).join(", ");
         return res.status(400).json({ message: `Validation error: ${errors}` });
       }
-      
+
       const updated = await storage.updateServiceProvider(provider.id, validationResult.data);
       res.json(updated);
     } catch (error) {
@@ -823,11 +823,11 @@ export async function registerRoutes(
     try {
       const userId = req.user.claims.sub;
       const provider = await storage.getServiceProviderByUser(userId);
-      
+
       if (!provider) {
         return res.status(404).json({ message: "Provider profile not found" });
       }
-      
+
       const services = await storage.getServices(provider.id);
       res.json(services);
     } catch (error) {
@@ -841,22 +841,22 @@ export async function registerRoutes(
     try {
       const userId = req.user.claims.sub;
       const provider = await storage.getServiceProviderByUser(userId);
-      
+
       if (!provider) {
         return res.status(404).json({ message: "Provider profile not found" });
       }
-      
+
       const serviceData = {
         ...req.body,
         providerId: provider.id,
       };
-      
+
       const validationResult = insertServiceSchema.safeParse(serviceData);
       if (!validationResult.success) {
         const errors = validationResult.error.issues.map(i => i.message).join(", ");
         return res.status(400).json({ message: `Validation error: ${errors}` });
       }
-      
+
       const service = await storage.createService(validationResult.data);
       res.status(201).json(service);
     } catch (error) {
@@ -870,11 +870,11 @@ export async function registerRoutes(
     try {
       const userId = req.user.claims.sub;
       const provider = await storage.getServiceProviderByUser(userId);
-      
+
       if (!provider) {
         return res.status(404).json({ message: "Provider profile not found" });
       }
-      
+
       const bookings = await storage.getBookingsByProvider(provider.id);
       res.json(bookings);
     } catch (error) {
@@ -888,29 +888,29 @@ export async function registerRoutes(
     try {
       const userId = req.user.claims.sub;
       const provider = await storage.getServiceProviderByUser(userId);
-      
+
       if (!provider) {
         return res.status(404).json({ message: "Provider profile not found" });
       }
-      
-      const booking = await storage.getBooking(req.params.id);
+
+      const booking = await storage.getBooking(req.params.id as string);
       if (!booking || booking.providerId !== provider.id) {
         return res.status(403).json({ message: "Forbidden" });
       }
-      
+
       const { status, confirmedDate, confirmedTime, price } = req.body;
-      
+
       const validStatuses = ["pending", "accepted", "declined", "confirmed", "in_progress", "completed", "cancelled"];
       if (!status || !validStatuses.includes(status)) {
         return res.status(400).json({ message: `Invalid status. Must be one of: ${validStatuses.join(", ")}` });
       }
-      
-      const updated = await storage.updateBookingStatus(req.params.id, status, { 
-        confirmedDate, 
+
+      const updated = await storage.updateBookingStatus(req.params.id as string, status, {
+        confirmedDate,
         confirmedTime,
-        price 
+        price
       });
-      
+
       // Notify customer
       const statusMessages: Record<string, string> = {
         accepted: "Your booking request has been accepted!",
@@ -920,7 +920,7 @@ export async function registerRoutes(
         completed: "Your service has been completed. Please leave a review!",
         cancelled: "Your booking has been cancelled.",
       };
-      
+
       if (statusMessages[status]) {
         await storage.createNotification({
           userId: booking.customerId,
@@ -929,7 +929,7 @@ export async function registerRoutes(
           type: "booking",
         });
       }
-      
+
       res.json(updated);
     } catch (error) {
       console.error("Error updating booking:", error);
@@ -997,7 +997,7 @@ export async function registerRoutes(
 
       const stripe = await getUncachableStripeClient();
 
-      const descriptorSuffix = (restaurant.businessName || 'Order')
+      const descriptorSuffix = (restaurant.name || 'Order')
         .replace(/[^a-zA-Z0-9 ]/g, '')
         .substring(0, 22)
         .trim();
@@ -1256,7 +1256,7 @@ export async function registerRoutes(
       const items = JSON.parse(session.metadata?.items || '[]');
       const total = session.amount_total ? session.amount_total / 100 : 0;
       const tipAmount = parseFloat(session.metadata?.tip || '0');
-      
+
       // Calculate subtotal and delivery fee from total
       const deliveryFee = 3.99;
       const subtotal = total - deliveryFee - tipAmount;
@@ -1315,7 +1315,7 @@ export async function registerRoutes(
     try {
       const stripe = await getUncachableStripeClient();
       const session = await stripe.checkout.sessions.retrieve(req.params.sessionId);
-      
+
       res.json({
         status: session.payment_status,
         customerEmail: session.customer_email,
@@ -1560,7 +1560,7 @@ export async function registerRoutes(
 
   app.get("/api/community/events/:id", async (req, res) => {
     try {
-      const event = await storage.getEvent(req.params.id);
+      const event = await storage.getEvent(req.params.id as string);
       if (!event) {
         return res.status(404).json({ message: "Event not found" });
       }
@@ -1575,7 +1575,7 @@ export async function registerRoutes(
   app.post("/api/community/events/:id/rsvp", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const eventId = req.params.id;
+      const eventId = req.params.id as string;
       const { status } = req.body;
 
       const existing = await storage.getEventRsvp(eventId, userId);
@@ -1599,7 +1599,7 @@ export async function registerRoutes(
   app.get("/api/community/events/:id/rsvp", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const rsvp = await storage.getEventRsvp(req.params.id, userId);
+      const rsvp = await storage.getEventRsvp(req.params.id as string, userId);
       res.json(rsvp || null);
     } catch (error) {
       console.error("Error fetching RSVP:", error);
@@ -1612,7 +1612,7 @@ export async function registerRoutes(
     try {
       const category = req.query.category as string | undefined;
       const search = req.query.search as string | undefined;
-      
+
       let businesses;
       if (search) {
         businesses = await storage.searchBusinesses(search, category);
@@ -1628,7 +1628,7 @@ export async function registerRoutes(
 
   app.get("/api/community/businesses/:id", async (req, res) => {
     try {
-      const business = await storage.getBusiness(req.params.id);
+      const business = await storage.getBusiness(req.params.id as string);
       if (!business) {
         return res.status(404).json({ message: "Business not found" });
       }
@@ -1676,7 +1676,7 @@ export async function registerRoutes(
 
   app.get("/api/community/yellow-pages/:id", async (req, res) => {
     try {
-      const listing = await storage.getYellowPage(req.params.id);
+      const listing = await storage.getYellowPage(req.params.id as string);
       if (!listing) {
         return res.status(404).json({ message: "Listing not found" });
       }
@@ -1741,12 +1741,12 @@ export async function registerRoutes(
 
   app.get("/api/community/announcements/:id", async (req, res) => {
     try {
-      const announcement = await storage.getAnnouncement(req.params.id);
+      const announcement = await storage.getAnnouncement(req.params.id as string);
       if (!announcement) {
         return res.status(404).json({ message: "Announcement not found" });
       }
       // Increment view count
-      await storage.incrementAnnouncementViews(req.params.id);
+      await storage.incrementAnnouncementViews(req.params.id as string);
       res.json(announcement);
     } catch (error) {
       console.error("Error fetching announcement:", error);
@@ -1960,7 +1960,7 @@ export async function registerRoutes(
   // User management - get user details
   app.get("/api/admin/users/:id", isAuthenticated, isAdmin, async (req, res) => {
     try {
-      const user = await storage.getUserById(req.params.id);
+      const user = await storage.getUserById(req.params.id as string);
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
@@ -1975,11 +1975,11 @@ export async function registerRoutes(
     try {
       const { role, action } = req.body;
       if (action === "add") {
-        await storage.addUserRole(req.params.id, role);
+        await storage.addUserRole(req.params.id as string, role);
       } else if (action === "remove") {
-        await storage.removeUserRole(req.params.id, role);
+        await storage.removeUserRole(req.params.id as string, role);
       }
-      const roles = await storage.getUserRoles(req.params.id);
+      const roles = await storage.getUserRoles(req.params.id as string);
       res.json(roles);
     } catch (error) {
       res.status(500).json({ error: "Failed to update user roles" });
@@ -2079,7 +2079,7 @@ export async function registerRoutes(
   app.patch("/api/admin/restaurants/:id", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const { isActive, isOpen } = req.body;
-      const updated = await storage.updateRestaurant(req.params.id, { isActive, isOpen });
+      const updated = await storage.updateRestaurant(req.params.id as string, { isActive, isOpen });
       res.json(updated);
     } catch (error) {
       res.status(500).json({ error: "Failed to update restaurant" });
@@ -2099,7 +2099,7 @@ export async function registerRoutes(
   app.patch("/api/admin/providers/:id", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const { isActive, isVerified } = req.body;
-      const updated = await storage.updateServiceProvider(req.params.id, { isActive, isVerified });
+      const updated = await storage.updateServiceProvider(req.params.id as string, { isActive, isVerified });
       res.json(updated);
     } catch (error) {
       res.status(500).json({ error: "Failed to update provider" });
@@ -2139,7 +2139,7 @@ export async function registerRoutes(
   app.patch("/api/admin/events/:id", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const { isApproved, isFeatured } = req.body;
-      const updated = await storage.updateEvent(req.params.id, { isApproved, isFeatured });
+      const updated = await storage.updateEvent(req.params.id as string, { isApproved, isFeatured });
       res.json(updated);
     } catch (error) {
       res.status(500).json({ error: "Failed to update event" });
@@ -2159,7 +2159,7 @@ export async function registerRoutes(
   app.patch("/api/admin/businesses/:id", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const { isActive, isVerified } = req.body;
-      const updated = await storage.updateBusiness(req.params.id, { isActive, isVerified });
+      const updated = await storage.updateBusiness(req.params.id as string, { isActive, isVerified });
       res.json(updated);
     } catch (error) {
       res.status(500).json({ error: "Failed to update business" });
@@ -2190,7 +2190,7 @@ export async function registerRoutes(
 
   app.patch("/api/admin/announcements/:id", isAuthenticated, isAdmin, async (req, res) => {
     try {
-      const updated = await storage.updateAnnouncement(req.params.id, req.body);
+      const updated = await storage.updateAnnouncement(req.params.id as string, req.body);
       res.json(updated);
     } catch (error) {
       res.status(500).json({ error: "Failed to update announcement" });
@@ -2199,7 +2199,7 @@ export async function registerRoutes(
 
   app.delete("/api/admin/announcements/:id", isAuthenticated, isAdmin, async (req, res) => {
     try {
-      await storage.deleteAnnouncement(req.params.id);
+      await storage.deleteAnnouncement(req.params.id as string);
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ error: "Failed to delete announcement" });
@@ -2219,7 +2219,7 @@ export async function registerRoutes(
   app.patch("/api/admin/yellow-pages/:id", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const { isApproved, isActive } = req.body;
-      const updated = await storage.updateYellowPage(req.params.id, { isApproved, isActive });
+      const updated = await storage.updateYellowPage(req.params.id as string, { isApproved, isActive });
       res.json(updated);
     } catch (error) {
       res.status(500).json({ error: "Failed to update listing" });
@@ -2228,7 +2228,7 @@ export async function registerRoutes(
 
   app.delete("/api/admin/yellow-pages/:id", isAuthenticated, isAdmin, async (req, res) => {
     try {
-      await storage.deleteYellowPage(req.params.id);
+      await storage.deleteYellowPage(req.params.id as string);
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ error: "Failed to delete listing" });
@@ -2247,7 +2247,7 @@ export async function registerRoutes(
 
   app.delete("/api/admin/reviews/:id", isAuthenticated, isAdmin, async (req, res) => {
     try {
-      await storage.deleteReview(req.params.id);
+      await storage.deleteReview(req.params.id as string);
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ error: "Failed to delete review" });
@@ -2265,7 +2265,7 @@ export async function registerRoutes(
 
   app.delete("/api/admin/service-reviews/:id", isAuthenticated, isAdmin, async (req, res) => {
     try {
-      await storage.deleteServiceReview(req.params.id);
+      await storage.deleteServiceReview(req.params.id as string);
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ error: "Failed to delete service review" });
@@ -2274,7 +2274,7 @@ export async function registerRoutes(
 
   app.delete("/api/admin/restaurants/:id", isAuthenticated, isAdmin, async (req, res) => {
     try {
-      await storage.deleteRestaurant(req.params.id);
+      await storage.deleteRestaurant(req.params.id as string);
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ error: "Failed to delete restaurant" });
@@ -2283,7 +2283,7 @@ export async function registerRoutes(
 
   app.delete("/api/admin/providers/:id", isAuthenticated, isAdmin, async (req, res) => {
     try {
-      await storage.deleteServiceProvider(req.params.id);
+      await storage.deleteServiceProvider(req.params.id as string);
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ error: "Failed to delete provider" });
@@ -2292,7 +2292,7 @@ export async function registerRoutes(
 
   app.delete("/api/admin/events/:id", isAuthenticated, isAdmin, async (req, res) => {
     try {
-      await storage.deleteEvent(req.params.id);
+      await storage.deleteEvent(req.params.id as string);
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ error: "Failed to delete event" });
@@ -2301,7 +2301,7 @@ export async function registerRoutes(
 
   app.delete("/api/admin/businesses/:id", isAuthenticated, isAdmin, async (req, res) => {
     try {
-      await storage.deleteBusiness(req.params.id);
+      await storage.deleteBusiness(req.params.id as string);
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ error: "Failed to delete business" });
@@ -2456,7 +2456,7 @@ export async function registerRoutes(
       const startStr = rangeStart.toISOString().split("T")[0];
       const endStr = rangeEnd.toISOString().split("T")[0];
 
-      const totalPlatformRevenue = 
+      const totalPlatformRevenue =
         restaurantReports.reduce((s, r) => s + r.platformFee, 0) +
         providerReports.reduce((s, p) => s + p.platformFee, 0);
 
@@ -2890,7 +2890,7 @@ export async function registerRoutes(
   app.get("/api/terminal/payment-intents/:id/status", isAuthenticated, isApprovedVendor, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const paymentIntentId = req.params.id;
+      const paymentIntentId = req.params.id as string;
 
       const stripe = await getUncachableStripeClient();
       const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
@@ -2924,7 +2924,7 @@ export async function registerRoutes(
   app.post("/api/terminal/payment-intents/:id/capture", isAuthenticated, isApprovedVendor, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const paymentIntentId = req.params.id;
+      const paymentIntentId = req.params.id as string;
 
       const stripe = await getUncachableStripeClient();
       const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
@@ -2940,7 +2940,7 @@ export async function registerRoutes(
       }
 
       if (paymentIntent.status !== "requires_capture") {
-        return res.status(400).json({ 
+        return res.status(400).json({
           message: `Payment cannot be captured. Current status: ${paymentIntent.status}`,
           status: paymentIntent.status,
         });
